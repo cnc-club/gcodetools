@@ -868,7 +868,7 @@ class Gcode_tools(inkex.Effect):
 					if numpy.linalg.det(F1)	!=0:
 						t = t - numpy.linalg.inv(F1)*(F.transpose())
 					else: break	
-				return t	
+				return t.transpose().getA()[0]+[F.sum()]	
 
 
 		
@@ -1014,40 +1014,26 @@ class Gcode_tools(inkex.Effect):
 						for i in range(1,len(csp)):	
 							print_()
 							print_((i,"@@@@@@@@@@"))
-							if i==n[4] or (n[3] and i==n[4]+1) or (not n[3] and ti==0 and i==n[4]-1):
-								for n1 in range(5+1):
-									t2 = float(n1)/5	
-									bez1 = (csp[i-1][1][:],csp[i-1][2][:],csp[i][0][:],csp[i][1][:])
-									x2,y2 = bezmisc.bezierpointatt(bez1,t2)
-			 						t1 = find_cutter_center((x1,y1),(nx,ny), csp[i-1],csp[i], t2).transpose().getA()[0]
-			 						x3,y3 = bezmisc.bezierpointatt(bez1,t1[2])
-			 						d = (nx**2+ny**2)*t1[0]**2
-									if n[-1]==5: print_((t1,d))
-									
-			 						if d > engraving_tolerance and (x1-x2)**2+(y1-y2)**2<(x1-x3)**2+(y1-y3)**2 and 0<=t1[2]<=1:
-				 						print_("!!!")
-			 							r = min(d,r) if r!=None else d	
-							else:
-								for k in [i-1,i]:
-									x2,y2 = csp[k][1]
-									if (x1-x2 or y1!=y2) and (x2*nx - x1*nx + y2*ny - y1*ny) != 0:
-										t1 = .5 * ( (x1-x2)**2+(y1-y2)**2 ) /  (x2*nx - x1*nx + y2*ny - y1*ny)
-										d = (nx**2+ny**2)*t1**2
-										r = min(d,r) if r!=None else d
-										if abs(x1-297)<10: print_((t1,d,"!!!", x1,x2,y1,y2))
-										if n[-1]==5: print_((t1,d))
-								d,t3 = get_distance_from_point_to_csp((x1,y1),csp[i-1],csp[i])
-								if d==0 : t3 = 1-t3
-								for tk in [0.,.2,.4,.6,.8,1.,t3]:
-									t = find_cutter_center((x1,y1),(nx,ny), csp[i-1],csp[i], tk).transpose().getA()[0]
-									if n[-1]==5: print_((t,d))
-									if 0<=t[2]<=1 and t[0]>0:
-										print_("!!!")
-										t1 = t[0]
-										d = (nx**2+ny**2)*t1**2
-										r = min(d,r) if r!=None else d
-										if abs(x1-297)<10: print_((t,d))
-					r = math.sqrt(r)
+
+							for n1 in range(5+1):
+								t = float(n1)/5	
+								bez1 = (csp[i-1][1][:],csp[i-1][2][:],csp[i][0][:],csp[i][1][:])
+								x2,y2 = bezmisc.bezierpointatt(bez1,t)
+		 						t1 = find_cutter_center((x1,y1),(nx,ny), csp[i-1],csp[i], t)
+		 						x3,y3 = bezmisc.bezierpointatt(bez1,t1[2])
+		 						d = t1[0]
+								if n[-1]==7: print_((t1,d))
+		 						if d > engraving_tolerance and 0<=t1[2]<=1 :
+			 						print_("!!!")
+		 							r = min(d,r) if r!=None else d	
+										
+						for i in range(1,len(csp)):	
+							x2,y2 = csp[i][1]
+							if (x1-x2 or y1!=y2) and (x2*nx - x1*nx + y2*ny - y1*ny) != 0:
+								t1 = .5 * ( (x1-x2)**2+(y1-y2)**2 ) /  (x2*nx - x1*nx + y2*ny - y1*ny)
+								d = abs(t1)
+								r = min(d,r) if r!=None else d
+								if n[-1]==7: print_((t1,d))				
 					print_(("__",r))
 					r = min(r, self.options.tool_diameter)
 					p += [ [x1+nx*r,y1+ny*r] ]
