@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension>
+    <name>GCODE tools DEVELOPE</name>
+    <id>ru.cnc-club.filter.gcode_tools_develope</id>
+	<dependency type="executable" location="extensions">gcode_tools-develope.py</dependency>
+	<dependency type="executable" location="extensions">inkex.py</dependency>
+	<param name='tab' type="notebook">
+		<page name='tab' _gui-text='Help'>
+			<_param name="fullhelp" type="description">
+Gcode tools plug-in converts paths to Gcode. 
+This plug-in calculates Gcode for paths using circular interpolation or linear motion when needed.
+Default header and footer are used if there are no 'header' and 'footer' files in given directory. 
+
+Manuals, tutorials and exampels can be found here:
+
+Russian support forum:
+	http://www.cnc-club.ru/forum/viewtopic.php?t=34
+	
+English support forum:
+	http://www.cnc-club.ru/forum/viewtopic.php?t=35
+
+Gcode tools ver. 1.2 22.02.2010.
+			</_param>	
+		</page>
+		<page name='tab' _gui-text='Options'>
+			<param name="Xscale" type="float" precision="5" min="-1000" max="1000"  _gui-text="Scale along X axis">1</param>
+			<param name="Yscale" type="float" precision="5" min="-1000" max="1000" _gui-text="Scale along Y axis">1</param>
+			<param name="Zscale" type="float" precision="5" min="-1000" max="1000" _gui-text="Scale along Z axis">1</param>			
+			<param name="Xoffset" type="float" precision="5" min="-1000" max="1000" _gui-text="Offset along X axis">0.0</param>
+			<param name="Yoffset" type="float" precision="5" min="-1000" max="1000" _gui-text="Offset along Y axis">0.0</param>
+			<param name="Zoffset" type="float" precision="5" min="-1000" max="1000" _gui-text="Offset along Z axis">0.0</param>
+			<param name="generate_not_parametric_code" type="boolean" _gui-text="Generate not parametric code">false</param>
+			<param name="min-arc-radius" type="float" precision="5" min="-1000" max="1000"  _gui-text="Minimum arc radius">0.05</param>
+		</page>
+		
+		<page name='tab' _gui-text='Preferences'>
+			<param name="filename" type="string" _gui-text="File">output.ngc</param>
+			<param name="directory" type="string" _gui-text="Directory">/home</param>
+
+		
+			<param name="Zsafe" type="float" precision="5" min="-1000" max="1000" _gui-text="Z safe">5</param>
+			<param name="Zsurface" type="float" precision="5" min="-1000" max="1000" _gui-text="Z surface">0</param>
+			<param name="Zdepth" type="float" precision="5" min="-1000" max="1000" _gui-text="Z depth">-1</param>
+			<param name="Zstep" type="float" precision="5" min="-1000" max="1000" _gui-text="Z step for each cycle">1</param>
+			<param name="feed" type="float" precision="5" min="0" max="1000" _gui-text="Feed rate (unit/min)">4.0</param>
+			
+			<param name="unit" type="enum" _gui-text="Unit: ">
+				<item value="G21 (All units in mm)">mm</item>
+				<item value="G20 (All units in inches)">in</item>
+			</param>
+
+			<param name="tool-diameter" type="float" precision="5" min="0" max="1000" _gui-text="Tool diameter">3</param>
+		</page>	
+		<page name='tab' _gui-text='Path to Gcode'>	
+				<param name="biarc-tolerance" type='float' _gui-text='Biarc interpolation tolerance'>1</param>
+				<param name="biarc-max-split-depth" type="int" _gui-text="Maximum splitting depth">4</param>
+				<_param name="help" type="description">
+Biarc interpolation tolerance is maximum distance between path and it approximation. 
+If distance between path's segment and it's approximation is greater than biarc interpolation tolerance the segment will be split into two segments.
+				</_param>
+		</page>
+		<page name='tab' _gui-text='Area'>	
+			<param name="max-area-curves" type="int" min="0" max="1000" _gui-text="Maximum area cutting curves">100</param>
+			<param name="area-inkscape-radius" type="int" min="-1000" max="1000" _gui-text="Area radius">-10</param>
+			<_param name="help" type="description">
+This function creates several Inkscape path offsets to fill original path's area. Fill in in "Area radius" and press apply.
+Area will be filled with offsest, having radius equal to (n+1/2)*"tool diameter" where n is offset number.
+			</_param>
+
+		</page>			
+			
+	</param>	
+	
+	
+	<param type='optiongroup' name='function' _gui-text="What to do:">
+		<option value='Curve'>Path to G-code</option>
+		<option value='Area curves'>Calculate area curves</option>
+		<option value='Engraving'>Engraving</option>
+	</param>
+
+	
+    <effect>
+		<object-type>path</object-type>
+    </effect>
+    <script>
+        <command reldir="extensions" interpreter="python">gcode_tools-develope.py</command>
+    </script>
+</inkscape-extension>
