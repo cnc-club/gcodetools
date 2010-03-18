@@ -198,6 +198,24 @@ class P:
 ###		Functions to operate with CubicSuperPath
 ###
 
+def point_to_csp_simple_bound_dist(p, csp):
+	minx,miny,maxx,maxy = None,None,None,None
+	for subpath in csp:
+		for sp in subpath:
+			for p_ in sp:
+				minx = min(minx,p_[0]) if minx!=None else p_[0]
+				miny = min(miny,p_[1]) if miny!=None else p_[1]
+				maxx = max(maxx,p_[0]) if maxx!=None else p_[0]
+				maxy = max(maxy,p_[1]) if maxy!=None else p_[1]
+	return math.sqrt(max(minx-p[0],p[0]-maxx,0)**2+max(miny-p[1],p[1]-maxy,0)**2)
+
+def point_to_csp_bound_dist(p, sp1, sp2 , max_needed_distance):
+	d = point_to_csp_simple_bound_dist(p, [[ sp1,sp2]] )
+	if max_needed_distance>=d :
+		return d 
+	
+	
+
 def csp_at_t(sp1,sp2,t):
 	bez = (sp1[1][:],sp1[2][:],sp2[0][:],sp2[1][:])
 	return 	bezmisc.bezierpointatt(bez,t)
