@@ -868,7 +868,7 @@ class Gcode_tools(inkex.Effect):
 					if numpy.linalg.det(F1)	!=0:
 						t = t - numpy.linalg.inv(F1)*(F.transpose())
 					else: break	
-				return t.transpose().getA()[0]+[F.sum()]	
+				return list(t.transpose().getA()[0])+[F.sum(),i]	
 
 
 		
@@ -884,6 +884,8 @@ class Gcode_tools(inkex.Effect):
 			csp = csp[0]	
 
 			print_(csp)
+			print_(len(csp))
+			
 			"""	
 			d = self.selected[self.options.ids[0]].get('d')
 			d = re.sub(r'(?i)(m[^mz]+)',r'\1 Z ',d)
@@ -987,7 +989,7 @@ class Gcode_tools(inkex.Effect):
  									n1 += [ [ [x1,y1], [nx*math.cos(a*t)-ny*math.sin(a*t),nx*math.sin(a*t)+ny*math.cos(a*t)], False, True, i ]  ]
  				nl += [ n ] + ([ n1 ] if n1!=[] else [])
  				
- 			# 	Calculate ofset points	
+ 			# 	Calculate offset points	
  			csp_points = [] 			
 			for ki in range(len(nl)):
 				p = []
@@ -1012,9 +1014,7 @@ class Gcode_tools(inkex.Effect):
 						r = 0
 					else :
 						for i in range(1,len(csp)):	
-							print_()
-							print_((i,"@@@@@@@@@@"))
-
+ 							print_((i,"@@@@@@@@@@@"))
 							for n1 in range(5+1):
 								t = float(n1)/5	
 								bez1 = (csp[i-1][1][:],csp[i-1][2][:],csp[i][0][:],csp[i][1][:])
@@ -1022,21 +1022,21 @@ class Gcode_tools(inkex.Effect):
 		 						t1 = find_cutter_center((x1,y1),(nx,ny), csp[i-1],csp[i], t)
 		 						x3,y3 = bezmisc.bezierpointatt(bez1,t1[2])
 		 						d = t1[0]
-								if n[-1]==7: print_((t1,d))
-		 						if d > engraving_tolerance and 0<=t1[2]<=1 :
-			 						print_("!!!")
+		 						print_((t1,d))
+		 						if d > engraving_tolerance and 0<=t1[2]<=1 and abs(t1[3])<engraving_tolerance:
+		 							print_("@!!!")
 		 							r = min(d,r) if r!=None else d	
 										
-						for i in range(1,len(csp)):	
+						for i in range(0,len(csp)):	
 							x2,y2 = csp[i][1]
-							if (x1-x2 or y1!=y2) and (x2*nx - x1*nx + y2*ny - y1*ny) != 0:
+							if (abs(x1-x2)>engraving_tolerance or abs(y1-y2)>engraving_tolerance ) and (x2*nx - x1*nx + y2*ny - y1*ny) != 0:
 								t1 = .5 * ( (x1-x2)**2+(y1-y2)**2 ) /  (x2*nx - x1*nx + y2*ny - y1*ny)
-								d = abs(t1)
-								r = min(d,r) if r!=None else d
-								if n[-1]==7: print_((t1,d))				
-					print_(("__",r))
+								print_(( (x1,y1),(x2,y2),( (nx*t1)**2+(ny*t1)**2 , (x1+nx*t1-x2)**2+(y1+ny*t1-y2)**2 ) ))
+								if t1>0 :
+									print_("!!!")
+									r = min(t1,r) if r!=None else t1
 					r = min(r, self.options.tool_diameter)
-					p += [ [x1+nx*r,y1+ny*r] ]
+					p += [ [x1+nx*r,y1+ny*r,r] ]
 					inkex.etree.SubElement(	self.Group, inkex.addNS('path','svg'), 
 								{
 									
@@ -1065,21 +1065,44 @@ class Gcode_tools(inkex.Effect):
 				
 			#	Create Path that goes through this points 
 			cspm = []
+			w = []
 			m = [[0.0, 0.0, 0.0, 1.0], [0.015625, 0.140625, 0.421875, 0.421875], [0.421875, 0.421875, 0.140625, 0.015625], [1.0, 0.0, 0.0, 0.0]]
 			print_(csp_points)
+			cspml = 0
 			for p in csp_points:
 				m = numpy.array(m)
-				xi = numpy.array(p)
+				xi = numpy.array( [p[i][:2] for i in range(4)])
 				sp1,sp2 = [[0.,0.],[0.,0.],[0.,0.]], [[0.,0.],[0.,0.],[0.,0.]]
 				a,b,c,d = numpy.linalg.solve(m, xi).tolist()
 				sp1[1], sp1[0] = d, d
 				sp1[2] = c
 				sp2[0] = b
 				sp2[1], sp2[2] = a, a
-				cspm += [sp1[:],sp2[:]]
-		
+				if len(cspm)>0 :
+					cspm[-1][2] = sp1[2]
+					cspm += [sp2[:]]
+				else :
+					cspm += [sp1[:],sp2[:]]	
+				l = [cspml]
+				for t in [.25,.75]:	
+					sp3,sp4,sp5 = cspbezsplit(sp1, sp2, t)	
+					l += [cspml+cspseglength(sp3,sp4)]
+				l += [cspml+cspseglength(sp1,sp2)]
+				cspml = l[-1]
+				if len(w)>0 :
+					del w[-1]
+				w += [[p[i][2], l[i]] for i in range(4)]
+			d, d1 = "", ""
+			for i in xrange(len(w)):
+				d  += " L %f,%f" % (w[i][1],w[i][0])
+				d1 += " L %f,%f" % (w[-i-1][1],-w[-i-1][0])
+			d = "M 0,0 "+d+d1+" L 0,0"					
 				
-				
+			inkex.etree.SubElement(	self.Group, inkex.addNS('path','svg'), 
+										{
+											 "d":	 d,
+											'style':				biarc_style['biarc0']
+										})		
 			"""	
 				ri, m, xi = [], [], []
 				for ti in [.0,.25,.75,1.]:
