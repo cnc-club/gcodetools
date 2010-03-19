@@ -211,10 +211,44 @@ def point_to_csp_simple_bound_dist(p, csp):
 
 def point_to_csp_bound_dist(p, sp1, sp2 , max_needed_distance):
 	d = point_to_csp_simple_bound_dist(p, [[ sp1,sp2]] )
-	if max_needed_distance>=d :
+	if max_needed_distance<=d :
 		return d 
-	
-	
+	sp = sp1[1:]+sp2[:2]
+	d = None
+	int_count = 0
+	for i in xrange(4):
+		x1, y1, dx, dy = sp[i-1][0],sp[i-1][1], sp[i][0]-sp[i-1][0], sp[i][1]-sp[i-1][1]
+		if (dx**2+dy**2)>0 :
+			d1 = min( (p[0]-x1)**2 + (p[1]-y1)**2, (p[0]-sp[i][0])**2 + (p[1]-sp[i][1])**2 )
+			if 0<=((p[1]-y1)*dy+(p[0]-x1)*dx)/(dx**2+dy**2)<=1:
+				d1 = min( d1, ((p[0]-x1)*dy+(p[1]-y1)*dx)**2 )
+		else :
+			d1 = (p[0]-x1)**2 + (p[1]-y1)**2
+		d = min(d,d1) if d!=None else d1
+		# Get intersections with horisontal or vertical lines that goes throught p and x
+		if dx!=0 and 0<=(p[0]-x1)/dx<1 and (p[0]-x1)/dx*dy+y1>=p[1] :
+			if p[0]-x1/dx*dy+y1==p[1]:
+				return 0
+			int_count +=1 
+		 
+		elif x1==p[0] : 
+			if y1<=p[1]<=sp[i][1] or sp[i][1]<=p[1]<=y1:
+				return 0
+			elif y1<=p[1]: 
+				x2, y2, dx2, dy2 = sp[i-1][0],sp[i-1][1], sp[i][0]-sp[i-1][0], sp[i][1]-sp[i-1][1]
+				if dx2!=0 and dy!=0: 
+					if not (0<=(x1-x2)/dx2<=1 and 0<=(y2-y1+t1*dy2)/dy<=1):
+						int_count +=1 
+				elif x1!=x2:
+					int_count +=1 
+				
+	if int_count%2 == 0 :
+		return math.sqrt(d) 
+	else:
+		return -math.sqrt(d)
+		
+
+				
 
 def csp_at_t(sp1,sp2,t):
 	bez = (sp1[1][:],sp1[2][:],sp2[0][:],sp2[1][:])
@@ -1016,9 +1050,6 @@ class Gcode_tools(inkex.Effect):
 					x1,y1 = n[0]
 					nx,ny = n[1]
 					d, r = 0, None
-					print_()
-					print_()
-					print_(n)
 
 					inkex.etree.SubElement(	self.Group, inkex.addNS('path','svg'), 
 							{
@@ -1031,8 +1062,12 @@ class Gcode_tools(inkex.Effect):
 					if ti==0 and ki>0 and nl[ki-1][-1][2] == True :
 						r = 0
 					else :
-						for i in range(1,len(csp)):	
- 							print_((i,"@@@@@@@@@@@"))
+						for i in range(1,len(csp)):
+							d = point_to_csp_bound_dist([x1,y1], csp[i-1], csp[i], self.options.tool_diameter)
+							if d>=self.options.tool_diameter :
+								r = min(d/2,r) if r!=None else d/2	
+								continue
+
 							for n1 in range(5+1):
 								t = float(n1)/5	
 								bez1 = (csp[i-1][1][:],csp[i-1][2][:],csp[i][0][:],csp[i][1][:])
@@ -1040,20 +1075,16 @@ class Gcode_tools(inkex.Effect):
 		 						t1 = find_cutter_center((x1,y1),(nx,ny), csp[i-1],csp[i], t)
 		 						x3,y3 = bezmisc.bezierpointatt(bez1,t1[2])
 		 						d = t1[0]
-		 						print_((t1,d))
 		 						if d > engraving_tolerance and 0<=t1[2]<=1 and abs(t1[3])<engraving_tolerance:
-		 							print_("@!!!")
 		 							r = min(d,r) if r!=None else d	
 										
 						for i in range(0,len(csp)):	
 							x2,y2 = csp[i][1]
 							if (abs(x1-x2)>engraving_tolerance or abs(y1-y2)>engraving_tolerance ) and (x2*nx - x1*nx + y2*ny - y1*ny) != 0:
 								t1 = .5 * ( (x1-x2)**2+(y1-y2)**2 ) /  (x2*nx - x1*nx + y2*ny - y1*ny)
-								print_(( (x1,y1),(x2,y2),( (nx*t1)**2+(ny*t1)**2 , (x1+nx*t1-x2)**2+(y1+ny*t1-y2)**2 ) ))
 								if t1>0 :
-									print_("!!!")
 									r = min(t1,r) if r!=None else t1
-					r = min(r, self.options.tool_diameter)
+					r = min(r, self.options.tool_diameter/2)
 					p += [ [x1+nx*r,y1+ny*r,r] ]
 					inkex.etree.SubElement(	self.Group, inkex.addNS('path','svg'), 
 								{
