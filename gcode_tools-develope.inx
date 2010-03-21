@@ -68,6 +68,15 @@ Area will be filled with offsest, having radius equal to (n+1/2)*"tool diameter"
 			</_param>
 
 		</page>			
+		<page name='tab' _gui-text='Engraving'>	
+			<param name="engraving-sharp-angle-tollerance" type="float" min="0" max="180" _gui-text="Sharp angle tolerance">150</param>
+			<param name="engraving-max-dist" type="float" min="0" max="1000" _gui-text="Maximum distance for engraving">10</param>
+			<param name="engraving-newton-iterations" type="int" min="2" max="10" _gui-text="Number of sample points used to calculate distance">4</param>
+			<_param name="help" type="description">
+This function creates path to engrave sharp angles.
+			</_param>
+
+		</page>			
 			
 	</param>	
 	
