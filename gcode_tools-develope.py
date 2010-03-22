@@ -145,12 +145,12 @@ biarc_style_dark_i = {
 ###
 ###		Just simple output function for better debugging
 ###
-if os.path.isfile("/home/nick/output.txt") :os.remove("/home/nick/output.txt")
-def print_(s=''):
-	f = open("/home/nick/output.txt","a")
-	f.write(str(s))
-	f.write("\n")
-	f.close()
+#if os.path.isfile("/home/nick/output.txt") :os.remove("/home/nick/output.txt")
+#def print_(s=''):
+#	f = open("/home/nick/output.txt","a")
+#	f.write(str(s))
+#	f.write("\n")
+#	f.close()
 
 #if os.path.isfile("c:\output.txt") :os.remove("c:\output.txt")
 #def print_(s=''):
@@ -975,10 +975,6 @@ class Gcode_tools(inkex.Effect):
 								del csp[i]
 							else:
 								i += 1
-						print_()		
-						for i in csp:
-							print_(i)
-						print_()	
 						#	Create list containing normlas and points
 						nl = []
 						for i in range(1,len(csp)):
@@ -1042,7 +1038,7 @@ class Gcode_tools(inkex.Effect):
 												'style':	"stroke:#0000ff; stroke-opacity:0.46; stroke-width:0.1; fill:none",
 											})				
 								if ti==0 and nl[ki-1][-1][2] == True 	or 		ti==3 and nl[ki][ti][2] == True:
-									# Point is a sharp angle r=0
+									# Point is a sharp angle r=0p
 									r = 0
 								else :
 									for j in xrange(0,len(cspi)):
@@ -1089,7 +1085,6 @@ class Gcode_tools(inkex.Effect):
 							cspm = []
 							w = []
 							m = [[0.0, 0.0, 0.0, 1.0], [0.015625, 0.140625, 0.421875, 0.421875], [0.421875, 0.421875, 0.140625, 0.015625], [1.0, 0.0, 0.0, 0.0]]
-							print_(csp_points)
 							cspml = 0
 							for p in csp_points:
 								m = numpy.array(m)
