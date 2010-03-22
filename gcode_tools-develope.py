@@ -145,12 +145,12 @@ biarc_style_dark_i = {
 ###
 ###		Just simple output function for better debugging
 ###
-#if os.path.isfile("/home/nick/output.txt") :os.remove("/home/nick/output.txt")
-#def print_(s=''):
-#	f = open("/home/nick/output.txt","a")
-#	f.write(str(s))
-#	f.write("\n")
-#	f.close()
+if os.path.isfile("/home/nick/output.txt") :os.remove("/home/nick/output.txt")
+def print_(s=''):
+	f = open("/home/nick/output.txt","a")
+	f.write(str(s))
+	f.write("\n")
+	f.close()
 
 #if os.path.isfile("c:\output.txt") :os.remove("c:\output.txt")
 #def print_(s=''):
@@ -908,7 +908,17 @@ class Gcode_tools(inkex.Effect):
 				ax,ay,bx,by,cx,cy,dx,dy=bezmisc.bezierparameterize(bez)
 				fx=ax*(t3*t3*t3)+bx*(t3*t3)+cx*t3+dx
 				fy=ay*(t3*t3*t3)+by*(t3*t3)+cy*t3+dy
-				t = [ math.sqrt((x1-fx)**2 + (y1-fy)**2), 1./2, t3]
+				f1x=-(3*ay*(t3*t3)+2*by*t3+cy)
+				f1y=3*ax*(t3*t3)+2*bx*t3+cx
+				print_((nx*f1x+ny*f1y)/math.sqrt(f1x**2+f1y**2))
+				if abs(f1y*nx+f1x*ny)<.9 and :	
+					t1 = ((y1-fy)*nx+(fx-x1)*ny)/f1y*nx+f1x*ny
+				if (nx*f1x+ny*f1y)/math.sqrt(f1x**2+f1y**2)> .5 : 
+					
+					t = [math.sqrt((x1-fx)**2 + (y1-fy)**2)/2, math.sqrt((x1-fx)**2 + (y1-fy)**2)/(2*(f1x*f1x+f1y*f1y) ), t3]
+				else:
+					t = [self.options.tool_diameter/2, self.options.tool_diameter/(2*(f1x*f1x+f1y*f1y) ), t3]
+				
 				i = 0
 				F = [0.,0.,0.]
 				F1 = [[0.,0.,0.],[0.,0.,0.],[0.,0.,0.]]
@@ -1006,10 +1016,10 @@ class Gcode_tools(inkex.Effect):
 							bez1 = (csp[-2][1][:],csp[-2][2][:],csp[-1][0][:],csp[-1][1][:])
 							x1,y1 = bezmisc.bezierpointatt(bez1,1)
 							nx,ny = bezmisc.bezierslopeatt(bez1,1)
-							nx,ny = -ny2/math.sqrt(nx2**2+ny2**2),nx2/math.sqrt(nx2**2+ny2**2)
+							nx,ny = -ny/math.sqrt(nx**2+ny**2),nx/math.sqrt(nx**2+ny**2)
 							bez = (csp[0][1][:],csp[0][2][:],csp[1][0][:],csp[1][1][:])
 							nx2,ny2 = bezmisc.bezierslopeatt(bez,0)
-							nx2,ny2 = -ny/math.sqrt(nx**2+ny**2),nx/math.sqrt(nx**2+ny**2) 
+							nx2,ny2 = -ny2/math.sqrt(nx2**2+ny2**2),nx2/math.sqrt(nx2**2+ny2**2) 
 							ang = ny2*nx-ny*nx2
 							if abs(ang)>engraving_tolerance:
 								if ang > 0  and 180-math.acos(nx*nx2+ny*ny2)*180/math.pi < self.options.engraving_sharp_angle_tollerance :	# inner angle
@@ -1021,7 +1031,10 @@ class Gcode_tools(inkex.Effect):
 	 									n1 += [ [ [x1,y1], [nx*math.cos(a*t)-ny*math.sin(a*t),nx*math.sin(a*t)+ny*math.cos(a*t)], False, True, i ]  ]
 					 				nl += [ [n1] ] 
 							
-							
+#						for pasd in nl:	
+#							print_()
+#							for asd in pasd:
+#								print_(asd)	
 			 			# 	Calculate offset points	
 			 			csp_points = [] 
 						for ki in xrange(len(nl)):
@@ -1038,17 +1051,19 @@ class Gcode_tools(inkex.Effect):
 												'style':	"stroke:#0000ff; stroke-opacity:0.46; stroke-width:0.1; fill:none",
 											})				
 								if ti==0 and nl[ki-1][-1][2] == True 	or 		ti==3 and nl[ki][ti][2] == True:
-									# Point is a sharp angle r=0p
+									# Point is a sharp angle r=0
 									r = 0
 								else :
 									for j in xrange(0,len(cspi)):
 										for i in xrange(1,len(cspi[j])):
 											d = point_to_csp_bound_dist([x1,y1], cspi[j][i-1], cspi[j][i], self.options.engraving_max_dist*2)
+#											print_((ki,ti,i,d,r,'bound'))
 											if d>=self.options.engraving_max_dist*2 :
 												r = min(d/2,r) if r!=None else d/2	
 												continue
 											for n1 in xrange(self.options.engraving_newton_iterations):
 						 						t = find_cutter_center((x1,y1),(nx,ny), cspi[j][i-1], cspi[j][i], float(n1)/(self.options.engraving_newton_iterations-1))
+#												print_((ki,ti,i,t,r,))
 						 						if t[0] > engraving_tolerance and 0<=t[2]<=1 and abs(t[3])<engraving_tolerance:
 						 							r = min(t[0],r) if r!=None else t[0]	
 									for j in xrange(0,len(cspi)):
@@ -1057,6 +1072,9 @@ class Gcode_tools(inkex.Effect):
 											if (abs(x1-x2)>engraving_tolerance or abs(y1-y2)>engraving_tolerance ) and (x2*nx - x1*nx + y2*ny - y1*ny) != 0:
 												t1 = .5 * ( (x1-x2)**2+(y1-y2)**2 ) /  (x2*nx - x1*nx + y2*ny - y1*ny)
 												if t1>0 : r = min(t1,r) if r!=None else t1
+									if r == None: 
+										print_("!!!!!!!!!!")
+										r = self.options.engraving_max_dist
 								if self.options.engraving_draw_calculation_paths==True:
 									inkex.etree.SubElement(	self.Group, inkex.addNS('path','svg'), 
 											{'style':	"fill:#ff00ff; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x1+nx*r), inkex.addNS('cy','sodipodi'):		str(y1+ny*r), inkex.addNS('rx','sodipodi'):	str(1), inkex.addNS('ry','sodipodi'): str(1), inkex.addNS('type','sodipodi'):	'arc'})	
