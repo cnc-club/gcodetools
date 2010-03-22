@@ -222,7 +222,7 @@ def point_to_csp_bound_dist(p, sp1, sp2 , max_needed_distance):
 		if (dx**2+dy**2)>0 :
 			d1 = min( (p[0]-x1)**2 + (p[1]-y1)**2, (p[0]-sp[i][0])**2 + (p[1]-sp[i][1])**2 )
 			if 0<=((p[1]-y1)*dy+(p[0]-x1)*dx)/(dx**2+dy**2)<=1:
-				d1 = min( d1, ((p[0]-x1)*dy+(p[1]-y1)*dx)**2 )
+				d1 = min( d1, ((p[0]-x1)*dy+(y1-p[1])*dx)**2/(dx**2+dy**2) )
 		else :
 			d1 = (p[0]-x1)**2 + (p[1]-y1)**2
 		d = min(d,d1) if d!=None else d1
@@ -243,7 +243,6 @@ def point_to_csp_bound_dist(p, sp1, sp2 , max_needed_distance):
 						int_count +=1 
 				elif x1!=x2:
 					int_count +=1 
-				
 	if int_count%2 == 0 :
 		return math.sqrt(d) 
 	else:
@@ -545,41 +544,43 @@ class Gcode_tools(inkex.Effect):
 
 	def __init__(self):
 		inkex.Effect.__init__(self)
-		self.OptionParser.add_option("-d", "--directory",				action="store", type="string", 		dest="directory", default="/home/",				help="Directory for gcode file")
-		self.OptionParser.add_option("-f", "--filename",				action="store", type="string", 		dest="file", default="-1.0",					help="File name")			
-		self.OptionParser.add_option("-u", "--Xscale",					action="store", type="float", 		dest="Xscale", default="1.0",					help="Scale factor X")	
-		self.OptionParser.add_option("-v", "--Yscale",					action="store", type="float", 		dest="Yscale", default="1.0",					help="Scale factor Y")
-		self.OptionParser.add_option("",   "--Zscale",					action="store", type="float", 		dest="Zscale", default="1.0",					help="Scale factor Z")				
-		self.OptionParser.add_option("-x", "--Xoffset",					action="store", type="float", 		dest="Xoffset", default="0.0",					help="Offset along X")	
-		self.OptionParser.add_option("-y", "--Yoffset",					action="store", type="float", 		dest="Yoffset", default="0.0",					help="Offset along Y")
-		self.OptionParser.add_option("",   "--Zoffset",					action="store", type="float", 		dest="Zoffset", default="0.0",					help="Offset along Z")
-		self.OptionParser.add_option("-s", "--Zsafe",					action="store", type="float", 		dest="Zsafe", default="0.5",					help="Z above all obstacles")
-		self.OptionParser.add_option("-z", "--Zsurface",				action="store", type="float", 		dest="Zsurface", default="0.0",					help="Z of the surface")
-		self.OptionParser.add_option("-c", "--Zdepth",					action="store", type="float", 		dest="Zdepth", default="-0.125",				help="Z depth of cut")
-		self.OptionParser.add_option("",   "--Zstep",					action="store", type="float", 		dest="Zstep", default="-0.125",					help="Z step of cutting")		
-		self.OptionParser.add_option("-p", "--feed",					action="store", type="float", 		dest="feed", default="4.0",						help="Feed rate in unit/min")
+		self.OptionParser.add_option("-d", "--directory",					action="store", type="string", 		dest="directory", default="/home/",					help="Directory for gcode file")
+		self.OptionParser.add_option("-f", "--filename",					action="store", type="string", 		dest="file", default="-1.0",						help="File name")			
+		self.OptionParser.add_option("-u", "--Xscale",						action="store", type="float", 		dest="Xscale", default="1.0",						help="Scale factor X")	
+		self.OptionParser.add_option("-v", "--Yscale",						action="store", type="float", 		dest="Yscale", default="1.0",						help="Scale factor Y")
+		self.OptionParser.add_option("",   "--Zscale",						action="store", type="float", 		dest="Zscale", default="1.0",						help="Scale factor Z")				
+		self.OptionParser.add_option("-x", "--Xoffset",						action="store", type="float", 		dest="Xoffset", default="0.0",						help="Offset along X")	
+		self.OptionParser.add_option("-y", "--Yoffset",						action="store", type="float", 		dest="Yoffset", default="0.0",						help="Offset along Y")
+		self.OptionParser.add_option("",   "--Zoffset",						action="store", type="float", 		dest="Zoffset", default="0.0",						help="Offset along Z")
+		self.OptionParser.add_option("-s", "--Zsafe",						action="store", type="float", 		dest="Zsafe", default="0.5",						help="Z above all obstacles")
+		self.OptionParser.add_option("-z", "--Zsurface",					action="store", type="float", 		dest="Zsurface", default="0.0",						help="Z of the surface")
+		self.OptionParser.add_option("-c", "--Zdepth",						action="store", type="float", 		dest="Zdepth", default="-0.125",					help="Z depth of cut")
+		self.OptionParser.add_option("",   "--Zstep",						action="store", type="float", 		dest="Zstep", default="-0.125",						help="Z step of cutting")		
+		self.OptionParser.add_option("-p", "--feed",						action="store", type="float", 		dest="feed", default="4.0",							help="Feed rate in unit/min")
 
-		self.OptionParser.add_option("",   "--biarc-tolerance",			action="store", type="float", 		dest="biarc_tolerance", default="1",		help="Tolerance used when calculating biarc interpolation.")				
-		self.OptionParser.add_option("",   "--biarc-max-split-depth",	action="store", type="int", 		dest="biarc_max_split_depth", default="4",		help="Defines maximum depth of splitting while approximating using biarcs.")				
+		self.OptionParser.add_option("",   "--biarc-tolerance",				action="store", type="float", 		dest="biarc_tolerance", default="1",				help="Tolerance used when calculating biarc interpolation.")				
+		self.OptionParser.add_option("",   "--biarc-max-split-depth",		action="store", type="int", 		dest="biarc_max_split_depth", default="4",			help="Defines maximum depth of splitting while approximating using biarcs.")				
 
-		self.OptionParser.add_option("",   "--tool-diameter",			action="store", type="float", 		dest="tool_diameter", default="3",				help="Tool diameter used for area cutting")		
-		self.OptionParser.add_option("",   "--max-area-curves",			action="store", type="int", 		dest="max_area_curves", default="100",			help="Maximum area curves for each area")
-		self.OptionParser.add_option("",   "--area-inkscape-radius",	action="store", type="int", 		dest="area_inkscape_radius", default="-10",		help="Radius for preparing curves using inkscape")
-		self.OptionParser.add_option("",   "--unit",					action="store", type="string", 		dest="unit", default="G21 (All units in mm)\n",	help="Units")
-		self.OptionParser.add_option("",   "--function",				action="store", type="string", 		dest="function", default="Curve",				help="What to do: Curve|Area|Area inkscape")
-		self.OptionParser.add_option("",   "--tab",						action="store", type="string", 		dest="tab", default="",							help="Means nothing right now. Notebooks Tab.")
-		self.OptionParser.add_option("",   "--generate_not_parametric_code",action="store", type="inkbool",	dest="generate_not_parametric_code", default=False,help="Generated code will be not parametric.")		
+		self.OptionParser.add_option("",   "--tool-diameter",				action="store", type="float", 		dest="tool_diameter", default="3",					help="Tool diameter used for area cutting")		
+		self.OptionParser.add_option("",   "--max-area-curves",				action="store", type="int", 		dest="max_area_curves", default="100",				help="Maximum area curves for each area")
+		self.OptionParser.add_option("",   "--area-inkscape-radius",		action="store", type="int", 		dest="area_inkscape_radius", default="-10",			help="Radius for preparing curves using inkscape")
+		self.OptionParser.add_option("",   "--unit",						action="store", type="string", 		dest="unit", default="G21 (All units in mm)\n",		help="Units")
+		self.OptionParser.add_option("",   "--function",					action="store", type="string", 		dest="function", default="Curve",					help="What to do: Curve|Area|Area inkscape")
+		self.OptionParser.add_option("",   "--tab",							action="store", type="string", 		dest="tab", default="",								help="Means nothing right now. Notebooks Tab.")
+		self.OptionParser.add_option("",   "--generate_not_parametric_code",action="store", type="inkbool",		dest="generate_not_parametric_code", default=False,	help="Generated code will be not parametric.")		
 
-		self.OptionParser.add_option("",   "--loft-distances",			action="store", type="string", 		dest="loft_distances", default="10",			help="Distances between paths.")
-		self.OptionParser.add_option("",   "--loft-direction",			action="store", type="string", 		dest="loft_direction", default="crosswise",		help="Direction of loft's interpolation.")
-		self.OptionParser.add_option("",   "--loft-interpolation-degree",action="store", type="float",		dest="loft_interpolation_degree", default="2",	help="Which interpolation use to loft the paths smooth interpolation or staright.")
+		self.OptionParser.add_option("",   "--loft-distances",				action="store", type="string", 		dest="loft_distances", default="10",				help="Distances between paths.")
+		self.OptionParser.add_option("",   "--loft-direction",				action="store", type="string", 		dest="loft_direction", default="crosswise",			help="Direction of loft's interpolation.")
+		self.OptionParser.add_option("",   "--loft-interpolation-degree",	action="store", type="float",		dest="loft_interpolation_degree", default="2",		help="Which interpolation use to loft the paths smooth interpolation or staright.")
 
-		self.OptionParser.add_option("",   "--min-arc-radius",			action="store", type="float", 		dest="min_arc_radius", default=".1",			help="All arc having radius less than minimum will be considered as straight line")		
+		self.OptionParser.add_option("",   "--min-arc-radius",				action="store", type="float", 		dest="min_arc_radius", default=".1",				help="All arc having radius less than minimum will be considered as straight line")		
 
 
-		self.OptionParser.add_option("",   "--engraving-sharp-angle-tollerance",action="store", type="float",dest="engraving_sharp_angle_tollerance", default="150",			help="All angles thar are less than engraving-sharp-angle-tollerance will be thought sharp")		
-		self.OptionParser.add_option("",   "--engraving-max-dist",		action="store", type="float", 		dest="engraving_max_dist", default="10",			help="Distanse from original path where engraving is not needed (usualy it's cutting tool diameter)")		
-		self.OptionParser.add_option("",   "--engraving-newton-iterations", action="store", type="int", 	dest="engraving_newton_iterations", default="4",			help="Number of sample points used to calculate distance")		
+		self.OptionParser.add_option("",   "--engraving-sharp-angle-tollerance",action="store", type="float",	dest="engraving_sharp_angle_tollerance", default="150",	help="All angles thar are less than engraving-sharp-angle-tollerance will be thought sharp")		
+		self.OptionParser.add_option("",   "--engraving-max-dist",			action="store", type="float", 		dest="engraving_max_dist", default="10",			help="Distanse from original path where engraving is not needed (usualy it's cutting tool diameter)")		
+		self.OptionParser.add_option("",   "--engraving-newton-iterations", action="store", type="int", 		dest="engraving_newton_iterations", default="4",	help="Number of sample points used to calculate distance")		
+		self.OptionParser.add_option("",   "--engraving-draw-calculation-paths",action="store", type="inkbool",	dest="engraving_draw_calculation_paths", default=False,help="Draw additional graphics to debug engraving path")		
+
 		
 		
 	def parse_curve(self, p):
@@ -963,174 +964,173 @@ class Gcode_tools(inkex.Effect):
 			path = []
 			for id, node in self.selected.iteritems():
 				if node.tag == inkex.addNS('path','svg'):
-				csp = cubicsuperpath.parsePath(node.get('d'))
-				paths += [ csp ]
-				bounds += [[csp_simpe_bound(csp)]]
-											
-			for i in range(1,len(csp)):
-				csp[0] += csp[i]
-			csp = csp[0]
-			li, cspm = [], []
-			for i in csp:
-				if li!=[]:
-					if i[1] != li[1]: cspm += [i]
-				else:
-					cspm += [i]
-				li = i
-			csp = cspm		
-			for i in xrange(1,len(csp)):
-				if csp[i-1][1]==csp[i][1]:
-					csp[i-1][2] = csp[i][2]
-					i -= 1
-					del csp[i]
-			print_(csp)
-			print_(len(csp))
-			
-	
-			time_ = time.time()
+					cspi = cubicsuperpath.parsePath(node.get('d'))
 
-			#	Create list containing normlas and points
-			nl = []
-			for i in range(1,len(csp)):
-				n, n1 = [], []
-				sp1, sp2 = csp[i-1], csp[i]
-				bez = (sp1[1][:],sp1[2][:],sp2[0][:],sp2[1][:])
-				for ti in [.0,.25,.75,1.]:
-					#	Is following string is nedded or not??? (It makes t depend on form of the curve) 
-					#ti = bezmisc.beziertatlength(bez,ti)	
-					x1,y1 = bezmisc.bezierpointatt(bez,ti)
-					nx,ny = bezmisc.bezierslopeatt(bez,ti)
-					nx,ny = -ny/math.sqrt(nx**2+ny**2),nx/math.sqrt(nx**2+ny**2) 
-					n+=[ [ [x1,y1], [nx,ny], False, False, i] ] # [point coordinates, normal, is an inner corner, is an outer corner, csp's index]
-					if ti==1 and i<len(csp)-1:
-						bez1 = (csp[i][1][:],csp[i][2][:],csp[i+1][0][:],csp[i+1][1][:])
-						nx2, ny2 = bezmisc.bezierslopeatt(bez1,0)
-						nx2,ny2 = -ny2/math.sqrt(nx2**2+ny2**2),nx2/math.sqrt(nx2**2+ny2**2) 
-						ang = ny2*nx-ny*nx2
-						if abs(ang)>engraving_tolerance:
- 							if ang > 0  and 180-math.acos(nx*nx2+ny*ny2)*180/math.pi < self.options.engraving_sharp_angle_tollerance :	# inner angle
-								n[-1][2] = True
- 							elif ang < 0 and 180-math.acos(nx*nx2+ny*ny2)*180/math.pi < self.options.engraving_sharp_angle_tollerance :					# outer angle
- 								a = -math.acos(nx*nx2+ny*ny2)
- 								for t in [.0,.25,.75,1.]:
- 									n1 += [ [ [x1,y1], [nx*math.cos(a*t)-ny*math.sin(a*t),nx*math.sin(a*t)+ny*math.cos(a*t)], False, True, i ]  ]
- 				nl += [ n ] + ([ n1 ] if n1!=[] else [])
-				
- 			print_("Normals created in %f sec." % (time.time()-time_))	
- 			time_ = time.time()	
- 			num1, num2 = 0, 0
- 			# 	Calculate offset points	
- 			csp_points = [] 			
-			for ki in xrange(len(nl)):
-				p = []
-				for ti in xrange(3) if ki!=len(nl)-1 else xrange(4):
-					n = nl[ki][ti]
-					x1,y1 = n[0]
-					nx,ny = n[1]
-					d, r = 0, None
+					for csp in cspi:
+						# Remove zerro length segments
+						i = 1
+						while i<len(csp):
+							if abs(csp[i-1][1][0]-csp[i][1][0])<engraving_tolerance and abs(csp[i-1][1][1]-csp[i][1][1])<engraving_tolerance:
+								csp[i-1][2] = csp[i][2]
+								del csp[i]
+							else:
+								i += 1
+						print_()		
+						for i in csp:
+							print_(i)
+						print_()	
+						#	Create list containing normlas and points
+						nl = []
+						for i in range(1,len(csp)):
+							n, n1 = [], []
+							sp1, sp2 = csp[i-1], csp[i]
+							bez = (sp1[1][:],sp1[2][:],sp2[0][:],sp2[1][:])
+							for ti in [.0,.25,.75,1.]:
+								#	Is following string is nedded or not??? (It makes t depend on form of the curve) 
+								#ti = bezmisc.beziertatlength(bez,ti)	
+								x1,y1 = bezmisc.bezierpointatt(bez,ti)
+								nx,ny = bezmisc.bezierslopeatt(bez,ti)
+								nx,ny = -ny/math.sqrt(nx**2+ny**2),nx/math.sqrt(nx**2+ny**2) 
+								n+=[ [ [x1,y1], [nx,ny], False, False, i] ] # [point coordinates, normal, is an inner corner, is an outer corner, csp's index]
+								if ti==1 and i<len(csp)-1:
+									bez1 = (csp[i][1][:],csp[i][2][:],csp[i+1][0][:],csp[i+1][1][:])
+									nx2, ny2 = bezmisc.bezierslopeatt(bez1,0)
+									nx2,ny2 = -ny2/math.sqrt(nx2**2+ny2**2),nx2/math.sqrt(nx2**2+ny2**2) 
+									ang = ny2*nx-ny*nx2
+									if abs(ang)>engraving_tolerance:
+			 							if ang > 0  and 180-math.acos(nx*nx2+ny*ny2)*180/math.pi < self.options.engraving_sharp_angle_tollerance :	# inner angle
+											n[-1][2] = True
+			 							elif ang < 0 and 180-math.acos(nx*nx2+ny*ny2)*180/math.pi < self.options.engraving_sharp_angle_tollerance :					# outer angle
+			 								a = -math.acos(nx*nx2+ny*ny2)
+			 								for t in [.0,.25,.75,1.]:
+			 									n1 += [ [ [x1,y1], [nx*math.cos(a*t)-ny*math.sin(a*t),nx*math.sin(a*t)+ny*math.cos(a*t)], False, True, i ]  ]
+			 				nl += [ n ] + ([ n1 ] if n1!=[] else [])
+			 			# Modify first/last points if curve is closed
+						if abs(csp[-1][1][0]-csp[0][1][0])<engraving_tolerance and abs(csp[-1][1][1]-csp[0][1][1])<engraving_tolerance :
+							bez1 = (csp[-2][1][:],csp[-2][2][:],csp[-1][0][:],csp[-1][1][:])
+							x1,y1 = bezmisc.bezierpointatt(bez1,1)
+							nx,ny = bezmisc.bezierslopeatt(bez1,1)
+							nx,ny = -ny2/math.sqrt(nx2**2+ny2**2),nx2/math.sqrt(nx2**2+ny2**2)
+							bez = (csp[0][1][:],csp[0][2][:],csp[1][0][:],csp[1][1][:])
+							nx2,ny2 = bezmisc.bezierslopeatt(bez,0)
+							nx2,ny2 = -ny/math.sqrt(nx**2+ny**2),nx/math.sqrt(nx**2+ny**2) 
+							ang = ny2*nx-ny*nx2
+							if abs(ang)>engraving_tolerance:
+								if ang > 0  and 180-math.acos(nx*nx2+ny*ny2)*180/math.pi < self.options.engraving_sharp_angle_tollerance :	# inner angle
+									nl[-1][-1][2] = True
+	 							elif ang < 0 and 180-math.acos(nx*nx2+ny*ny2)*180/math.pi < self.options.engraving_sharp_angle_tollerance :					# outer angle
+	 								a = -math.acos(nx*nx2+ny*ny2)
+						 			n1 = []
+	 								for t in [.0,.25,.75,1.]:
+	 									n1 += [ [ [x1,y1], [nx*math.cos(a*t)-ny*math.sin(a*t),nx*math.sin(a*t)+ny*math.cos(a*t)], False, True, i ]  ]
+					 				nl += [ [n1] ] 
+							
+							
+			 			# 	Calculate offset points	
+			 			csp_points = [] 
+						for ki in xrange(len(nl)):
+							p = []
+							for ti in xrange(3) if ki!=len(nl)-1 else xrange(4):
+								n = nl[ki][ti]
+								x1,y1 = n[0]
+								nx,ny = n[1]
+								d, r = 0, None
+								if self.options.engraving_draw_calculation_paths==True:
+									inkex.etree.SubElement(	self.Group, inkex.addNS('path','svg'), 
+											{
+												 "d":	"M %f,%f L %f,%f" %(x1,y1,x1+nx*10,y1+ny*10),
+												'style':	"stroke:#0000ff; stroke-opacity:0.46; stroke-width:0.1; fill:none",
+											})				
+								if ti==0 and nl[ki-1][-1][2] == True 	or 		ti==3 and nl[ki][ti][2] == True:
+									# Point is a sharp angle r=0
+									r = 0
+								else :
+									for j in xrange(0,len(cspi)):
+										for i in xrange(1,len(cspi[j])):
+											d = point_to_csp_bound_dist([x1,y1], cspi[j][i-1], cspi[j][i], self.options.engraving_max_dist*2)
+											if d>=self.options.engraving_max_dist*2 :
+												r = min(d/2,r) if r!=None else d/2	
+												continue
+											for n1 in xrange(self.options.engraving_newton_iterations):
+						 						t = find_cutter_center((x1,y1),(nx,ny), cspi[j][i-1], cspi[j][i], float(n1)/(self.options.engraving_newton_iterations-1))
+						 						if t[0] > engraving_tolerance and 0<=t[2]<=1 and abs(t[3])<engraving_tolerance:
+						 							r = min(t[0],r) if r!=None else t[0]	
+									for j in xrange(0,len(cspi)):
+										for i in xrange(0,len(cspi[j])):
+											x2,y2 = cspi[j][i][1]
+											if (abs(x1-x2)>engraving_tolerance or abs(y1-y2)>engraving_tolerance ) and (x2*nx - x1*nx + y2*ny - y1*ny) != 0:
+												t1 = .5 * ( (x1-x2)**2+(y1-y2)**2 ) /  (x2*nx - x1*nx + y2*ny - y1*ny)
+												if t1>0 : r = min(t1,r) if r!=None else t1
+								if self.options.engraving_draw_calculation_paths==True:
+									inkex.etree.SubElement(	self.Group, inkex.addNS('path','svg'), 
+											{'style':	"fill:#ff00ff; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x1+nx*r), inkex.addNS('cy','sodipodi'):		str(y1+ny*r), inkex.addNS('rx','sodipodi'):	str(1), inkex.addNS('ry','sodipodi'): str(1), inkex.addNS('type','sodipodi'):	'arc'})	
+									inkex.etree.SubElement(	self.Group, inkex.addNS('path','svg'), 
+											{'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x1+nx*r),  inkex.addNS('cy','sodipodi'):		str(y1+ny*r),inkex.addNS('rx','sodipodi'):		str(r), inkex.addNS('ry','sodipodi'):		str(r), inkex.addNS('type','sodipodi'):	'arc'})
 
-					inkex.etree.SubElement(	self.Group, inkex.addNS('path','svg'), 
-							{
-								 "d":	"M %f,%f L %f,%f" %(x1,y1,x1+nx*10,y1+ny*10),
-								'style':	"stroke:#0000ff; stroke-opacity:0.46; fill:none",
+								r = min(r, self.options.engraving_max_dist)
+								p += [ [x1+nx*r,y1+ny*r,r] ]
+								
+							
+								
+							if len(csp_points)>0 : csp_points[-1] += [p[0]]						 			
+							csp_points += [ p ]
+						#	Splitting path to pieces each of them not further from path more than engraving_max_dist
+						engraving_path = [ [] ]
+						for p_ in csp_points :
+							for p in p_:
+								if p[2]<self.options.engraving_max_dist : break
+							if p[2]<self.options.engraving_max_dist: engraving_path[-1] += [p_]
+							else : 
+								if engraving_path[-1] != [] : engraving_path += [ [] ]
+						if engraving_path[-1] == [] : del engraving_path[-1] 
 						
-							})				
+						for csp_points in engraving_path :
+							#	Create Path that goes through this points 
+							cspm = []
+							w = []
+							m = [[0.0, 0.0, 0.0, 1.0], [0.015625, 0.140625, 0.421875, 0.421875], [0.421875, 0.421875, 0.140625, 0.015625], [1.0, 0.0, 0.0, 0.0]]
+							print_(csp_points)
+							cspml = 0
+							for p in csp_points:
+								m = numpy.array(m)
+								xi = numpy.array( [p[i][:2] for i in range(4)])
+								sp1,sp2 = [[0.,0.],[0.,0.],[0.,0.]], [[0.,0.],[0.,0.],[0.,0.]]
+								a,b,c,d = numpy.linalg.solve(m, xi).tolist()
+								sp1[1], sp1[0] = d, d
+								sp1[2] = c
+								sp2[0] = b
+								sp2[1], sp2[2] = a, a
+								if len(cspm)>0 :
+									cspm[-1][2] = sp1[2]
+									cspm += [sp2[:]]
+								else :
+									cspm += [sp1[:],sp2[:]]	
+								l = [cspml]
+								for t in [.25,.75]:	
+									sp3,sp4,sp5 = cspbezsplit(sp1, sp2, t)	
+									l += [cspml+cspseglength(sp3,sp4)]
+								l += [cspml+cspseglength(sp1,sp2)]
+								cspml = l[-1]
+								if len(w)>0 :
+									del w[-1]
+								w += [[p[i][2], l[i]] for i in range(4)]
+					
+#							d, d1 = "", ""
+#							for i in xrange(len(w)):
+#								d  += " L %f,%f" % (w[i][1],w[i][0])
+#								d1 += " L %f,%f" % (w[-i-1][1],-w[-i-1][0])
+#							d = "M 0,0 "+d+d1+" L 0,0"					
 
-					if ti==0 and ki>0 and nl[ki-1][-1][2] == True :
-						r = 0
-					else :
-						for i in xrange(1,len(csp)):
-							d = point_to_csp_bound_dist([x1,y1], csp[i-1], csp[i], self.options.engraving_max_dist)
-							if d>=self.options.engraving_max_dist :
-								r = min(d/2,r) if r!=None else d/2	
-								continue
-
-							for n1 in xrange(self.options.engraving_newton_iterations):
-		 						t = find_cutter_center((x1,y1),(nx,ny), csp[i-1],csp[i], float(n1)/self.options.engraving_newton_iterations)
-		 						if t[0] > engraving_tolerance and 0<=t[2]<=1 and abs(t[3])<engraving_tolerance:
-		 							r = min(t[0],r) if r!=None else t[0]	
-						for i in range(0,len(csp)):	
-							x2,y2 = csp[i][1]
-							if (abs(x1-x2)>engraving_tolerance or abs(y1-y2)>engraving_tolerance ) and (x2*nx - x1*nx + y2*ny - y1*ny) != 0:
-								t1 = .5 * ( (x1-x2)**2+(y1-y2)**2 ) /  (x2*nx - x1*nx + y2*ny - y1*ny)
-								if t1>0 :
-									r = min(t1,r) if r!=None else t1
-					r = min(r, self.options.tool_diameter/2)
-
-					p += [ [x1+nx*r,y1+ny*r,r] ]
-					"""inkex.etree.SubElement(	self.Group, inkex.addNS('path','svg'), 
-								{
-									
-									'style':	"fill:#ff00ff; fill-opacity:0.46; stroke:#000000",
-									 inkex.addNS('cx','sodipodi'):		str(x1+nx*r),
-									 inkex.addNS('cy','sodipodi'):		str(y1+ny*r),
-									 inkex.addNS('rx','sodipodi'):		str(1),
-									 inkex.addNS('ry','sodipodi'):		str(1),
-									 inkex.addNS('type','sodipodi'):	'arc',
-							
-								})	
-					inkex.etree.SubElement(	self.Group, inkex.addNS('path','svg'), 
-								{
-									
-									'style':	"fill:none; fill-opacity:0.46; stroke:#000000",
-									 inkex.addNS('cx','sodipodi'):		str(x1+nx*r),
-									 inkex.addNS('cy','sodipodi'):		str(y1+ny*r),
-									 inkex.addNS('rx','sodipodi'):		str(r),
-									 inkex.addNS('ry','sodipodi'):		str(r),
-									 inkex.addNS('type','sodipodi'):	'arc',
-							
-								})	"""
-
-				if len(csp_points)>0 : csp_points[-1] += [p[0]]						 			
-				csp_points += [ p ]		
-			print_("Offsets calculated in %f sec." % (time.time()-time_))	
- 			time_ = time.time()	
+#							inkex.etree.SubElement(	self.Group, inkex.addNS('path','svg'), 
+#														{
+#															 "d":	 d,
+#															'style':				biarc_style['biarc0']
+#														})		
 	
-			#	Create Path that goes through this points 
-			cspm = []
-			w = []
-			m = [[0.0, 0.0, 0.0, 1.0], [0.015625, 0.140625, 0.421875, 0.421875], [0.421875, 0.421875, 0.140625, 0.015625], [1.0, 0.0, 0.0, 0.0]]
-			print_(csp_points)
-			cspml = 0
-			for p in csp_points:
-				m = numpy.array(m)
-				xi = numpy.array( [p[i][:2] for i in range(4)])
-				sp1,sp2 = [[0.,0.],[0.,0.],[0.,0.]], [[0.,0.],[0.,0.],[0.,0.]]
-				a,b,c,d = numpy.linalg.solve(m, xi).tolist()
-				sp1[1], sp1[0] = d, d
-				sp1[2] = c
-				sp2[0] = b
-				sp2[1], sp2[2] = a, a
-				if len(cspm)>0 :
-					cspm[-1][2] = sp1[2]
-					cspm += [sp2[:]]
-				else :
-					cspm += [sp1[:],sp2[:]]	
-				l = [cspml]
-				for t in [.25,.75]:	
-					sp3,sp4,sp5 = cspbezsplit(sp1, sp2, t)	
-					l += [cspml+cspseglength(sp3,sp4)]
-				l += [cspml+cspseglength(sp1,sp2)]
-				cspml = l[-1]
-				if len(w)>0 :
-					del w[-1]
-				w += [[p[i][2], l[i]] for i in range(4)]
-			d, d1 = "", ""
-			for i in xrange(len(w)):
-				d  += " L %f,%f" % (w[i][1],w[i][0])
-				d1 += " L %f,%f" % (w[-i-1][1],-w[-i-1][0])
-			d = "M 0,0 "+d+d1+" L 0,0"					
-				
-			inkex.etree.SubElement(	self.Group, inkex.addNS('path','svg'), 
-										{
-											 "d":	 d,
-											'style':				biarc_style['biarc0']
-										})		
-	
-			node =  inkex.etree.SubElement(	self.Group, inkex.addNS('path','svg'), 										{
-										 "d":	 cubicsuperpath.formatPath([cspm]),
-										'style':				biarc_style_i['biarc1']
-									})
+							node =  inkex.etree.SubElement(	self.Group, inkex.addNS('path','svg'), 										{
+														 "d":	 cubicsuperpath.formatPath([cspm]),
+														'style':				biarc_style_i['biarc1']
+													})
 								
 
 			
@@ -1148,8 +1148,8 @@ e.affect()
 		
 		
 		
-		
-		
+
+	
 		
 		
 		
