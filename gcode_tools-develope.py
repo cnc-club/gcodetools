@@ -145,12 +145,12 @@ biarc_style_dark_i = {
 ###
 ###		Just simple output function for better debugging
 ###
-if os.path.isfile("/home/nick/output.txt") :os.remove("/home/nick/output.txt")
-def print_(s=''):
-	f = open("/home/nick/output.txt","a")
-	f.write(str(s))
-	f.write("\n")
-	f.close()
+#if os.path.isfile("/home/nick/output.txt") :os.remove("/home/nick/output.txt")
+#def print_(s=''):
+#	f = open("/home/nick/output.txt","a")
+#	f.write(str(s))
+#	f.write("\n")
+#	f.close()
 
 #if os.path.isfile("c:\output.txt") :os.remove("c:\output.txt")
 #def print_(s=''):
@@ -703,6 +703,15 @@ class Gcode_tools(inkex.Effect):
 				f.close()
 			else:
 				self.footer = defaults['footer']
+		
+			self.header += self.options.unit + ( """#4  = %f (Feed)
+#5  = %f (Scale xy)
+#7  = %f (Scale z)
+#8  = %f (Offset x)
+#9  = %f (Offset y)
+#10 = %f (Offset z)
+#11 = %f (Safe distanse)\n""" % (self.options.feed, self.options.Xscale if self.options.Xscale==self.options.Yscale else 1, self.options.Zscale, self.options.Xoffset, self.options.Yoffset, self.options.Zoffset, self.options.Zsafe)
+			if not self.options.generate_not_parametric_code else "" )
 			return True
 		else: 
 			inkex.errormsg(_("Directory does not exist!"))
@@ -772,18 +781,7 @@ class Gcode_tools(inkex.Effect):
 	
 		if self.options.function == 'Curve':
 			if not self.check_dir() : return
-			
-			gcode = self.header + self.options.unit
-			if not self.options.generate_not_parametric_code:
-				gcode += """
-#4  = %f (Feed)
-#5  = %f (Scale xy)
-#7  = %f (Scale z)
-#8  = %f (Offset x)
-#9  = %f (Offset y)
-#10 = %f (Offset z)
-#11 = %f (Safe distanse)
-			""" % (self.options.feed, self.options.Xscale if self.options.Xscale==self.options.Yscale else 1, self.options.Zscale, self.options.Xoffset, self.options.Yoffset, self.options.Zoffset, self.options.Zsafe)
+			gcode = self.header
 
 			#	Set group
 			if len(self.options.ids)>0:
@@ -925,7 +923,8 @@ class Gcode_tools(inkex.Effect):
 ################################################################################
 			
 			if not self.check_dir() : return
-			
+			gcode = self.header
+
 			def inv(a): # invert matrix 3x3
 				det = float(a[0][0]*a[1][1]*a[2][2] + a[0][1]*a[1][2]*a[2][0] + a[1][0]*a[2][1]*a[0][2] - a[0][2]*a[1][1]*a[2][0] - a[0][0]*a[2][1]*a[1][2] - a[0][1]*a[2][2]*a[1][0])
 				if det==0: return None
@@ -954,7 +953,7 @@ class Gcode_tools(inkex.Effect):
 				i = 0
 				F = [0.,0.,0.]
 				F1 = [[0.,0.,0.],[0.,0.,0.],[0.,0.,0.]]
-				while i==0 or abs( F[0]+F[1]+F[2] )>engraving_tolerance and i<10:
+				while i==0 or abs(F[0])+abs(F[1])+math.sqrt(abs(F[2])) >engraving_tolerance and i<10:
 					t1,t2,t3 = t[0],t[1],t[2]
 					fx=ax*(t3*t3*t3)+bx*(t3*t3)+cx*t3+dx
 					fy=ay*(t3*t3*t3)+by*(t3*t3)+cy*t3+dy
@@ -988,7 +987,7 @@ class Gcode_tools(inkex.Effect):
 						t[1] -=  F1[1][0]*F[0] + F1[1][1]*F[1] + F1[1][2]*F[2]
 						t[2] -=  F1[2][0]*F[0] + F1[2][1]*F[1] + F1[2][2]*F[2]
 					else: break	
-				return t+[F[0]+F[1]+F[2],i]	
+				return t+[abs(F[0])+abs(F[1])+math.sqrt(abs(F[2])),i]	
 
 			def csp_simpe_bound(csp):
 				minx,miny,maxx,maxy = None,None,None
@@ -1003,7 +1002,8 @@ class Gcode_tools(inkex.Effect):
 						
 						
 			self.Group = inkex.etree.SubElement( self.selected[self.options.ids[0]].getparent(), inkex.addNS('g','svg') )
-			path = []
+			cspe =[]
+			we = []
 			for id, node in self.selected.iteritems():
 				if node.tag == inkex.addNS('path','svg'):
 					cspi = cubicsuperpath.parsePath(node.get('d'))
@@ -1101,16 +1101,22 @@ class Gcode_tools(inkex.Effect):
 													ax,ay,bx,by,cx,cy,dx,dy=bezmisc.bezierparameterize((cspi[j][i-1][1],cspi[j][i-1][2],cspi[j][i][0],cspi[j][i][1]))
 													x2=ax*(t3*t3*t3)+bx*(t3*t3)+cx*t3+dx
 													y2=ay*(t3*t3*t3)+by*(t3*t3)+cy*t3+dy
+#													print_((ki,ti,i,j,t,r))
+#													print_((abs(x2-x1), abs(y2-y1)))
+													
 													if abs(x2-x1)<engraving_tolerance and abs(y2-y1)<engraving_tolerance:
 														f1x = 3*ax*(t3*t3)+2*bx*t3+cx
 														f1y = 3*ay*(t3*t3)+2*by*t3+cy
 														f2x = 6*ax*t3+2*bx
 														f2y = 6*ay*t3+2*by
-														d = f2x*f2x+f2y*f2y
-														if d!=0 and f2x*f2y>=0:
-															r = min( (f1x*f1x+f1y*f1y)/math.sqrt(d),r) if r!=None else (f1x*f1x+f1y*f1y)/math.sqrt(d)
-														else :
-															r = min(r,self.options.engraving_max_dist)
+														d = f1x*f2y-f1y*f2x
+														if d!=0 :
+															d = math.sqrt((f1x*f1x+f1y*f1y)**3)/d
+															if d>0:
+																r = min( d,r) if r!=None else d
+															else :
+																r = min(r,self.options.engraving_max_dist) if r!=None else self.options.engraving_max_dist
+#															print_(r)
 													else:						
 							 							r = min(t[0],r) if r!=None else t[0]	
 									for j in xrange(0,len(cspi)):
@@ -1143,8 +1149,6 @@ class Gcode_tools(inkex.Effect):
 						if engraving_path[-1] == [] : del engraving_path[-1] 
 						
 						
-						cspe =[]
-						we = []
 						for csp_points in engraving_path :
 							#	Create Path that goes through this points 
 							cspm = []
@@ -1180,39 +1184,25 @@ class Gcode_tools(inkex.Effect):
 							cspe += [cspm]
 							we   +=	[w]				
 
-							print_(we)
-							gcode = self.header + self.options.unit
-							if not self.options.generate_not_parametric_code:
-								gcode += """
-#4  = %f (Feed)
-#5  = %f (Scale xy)
-#7  = %f (Scale z)
-#8  = %f (Offset x)
-#9  = %f (Offset y)
-#10 = %f (Offset z)
-#11 = %f (Safe distanse)""" % (self.options.feed, self.options.Xscale if self.options.Xscale==self.options.Yscale else 1, self.options.Zscale, self.options.Xoffset, self.options.Yoffset, self.options.Zoffset, self.options.Zsafe)
+#			print_(we)
+			if self.options.engraving_cutter_shape_function != "":
+				f = eval('lambda w: ' + self.options.engraving_cutter_shape_function.strip('"'))
+			else: f = lambda w: w
 
+			curve = self.parse_curve(cspe,we,f)
+			self.draw_curve(curve,self.Group)
 
-							if self.options.engraving_cutter_shape_function != "":
-								f = eval('lambda w: ' + self.options.engraving_cutter_shape_function.strip('"'))
-							else: f = lambda w: w
-
-
-							curve = self.parse_curve(cspe,we,f)
-							self.draw_curve(curve,self.Group)
-			
-
-							gcode += self.generate_gcode(curve,self.options.Zsurface)
-						gcode += self.footer
-						try: 	
-							f = open(self.options.directory+'/'+self.options.file, "w")	
-							f.write(gcode)
-							f.close()							
-						except:
-							inkex.errormsg(_("Can not write to specified file!"))
-							return
-							
-								
+			gcode += self.generate_gcode(curve,self.options.Zsurface)
+			gcode += self.footer
+			try: 	
+				f = open(self.options.directory+'/'+self.options.file, "w")	
+				f.write(gcode)
+				f.close()							
+			except:
+				inkex.errormsg(_("Can not write to specified file!"))
+				return
+	
+		
 
 			
 					
