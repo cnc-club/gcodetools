@@ -73,8 +73,18 @@ Area will be filled with offsest, having radius equal to (n+1/2)*"tool diameter"
 			<param name="engraving-max-dist" type="float" min="0" max="1000" _gui-text="Maximum distance for engraving">10</param>
 			<param name="engraving-newton-iterations" type="int" min="2" max="10" _gui-text="Number of sample points used to calculate distance">4</param>
 			<param name="engraving-draw-calculation-paths" type="boolean" _gui-text="Draw additional graphics to debug engraving path">false</param>
+			<param name="engraving-cutter-shape-function" type="string" _gui-text="Cutter shape function z(w)=">w</param>
+			
 			<_param name="help" type="description">
 This function creates path to engrave sharp angles.
+Cutter shape function is a function which defines shape of the cutter. Some simple shapes:
+45 degree cone: w
+cone having 10 unit height and 3 unit diameter: 10/3 w
+shpere having r unit diameter: math.sqrt(max(0,r**2-w**2))
+ellips having r and r*4 unit diameter: math.sqrt(max(0,r**2-w**2))*4
+
+
+
 			</_param>
 
 		</page>			
