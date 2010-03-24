@@ -1081,7 +1081,7 @@ class Gcode_tools(inkex.Effect):
 							p = []
 							for ti in xrange(3) if ki!=len(nl)-1 else xrange(4):
 								n = nl[ki][ti]
-#								print_(n)
+#								print_((ki,ti,"@@@@@@@"))
 								x1,y1 = n[0]
 								nx,ny = n[1]
 								d, r = 0, None
@@ -1089,13 +1089,17 @@ class Gcode_tools(inkex.Effect):
 									# Point is a sharp angle r=0p
 									r = 0
 								else :
+#									print_((ki,ti,"@@@@@@@!!!!!!!!!!"))
 									for j in xrange(0,len(cspi)):
 										for i in xrange(1,len(cspi[j])):
+#											print_(i)
 											d = point_to_csp_bound_dist([x1,y1], cspi[j][i-1], cspi[j][i], self.options.engraving_max_dist*2)
+#											print_(d)
 											if d>=self.options.engraving_max_dist*2 :
 												r = min(d/2,r) if r!=None else d/2	
 												continue
 											for n1 in xrange(self.options.engraving_newton_iterations):
+#												print_(n1)
 						 						t = find_cutter_center((x1,y1),(nx,ny), cspi[j][i-1], cspi[j][i], float(n1)/(self.options.engraving_newton_iterations-1))
 												if t[0] > engraving_tolerance and 0<=t[2]<=1 and abs(t[3])<engraving_tolerance:
 													t3 = t[2]
@@ -1117,7 +1121,7 @@ class Gcode_tools(inkex.Effect):
 																r = min( d,r) if r!=None else d
 															else :
 																r = min(r,self.options.engraving_max_dist) if r!=None else self.options.engraving_max_dist
-#															print_(r)
+#															print_((r,d))
 													else:						
 							 							r = min(t[0],r) if r!=None else t[0]	
 									for j in xrange(0,len(cspi)):
@@ -1182,6 +1186,10 @@ class Gcode_tools(inkex.Effect):
 														 "d":	 cubicsuperpath.formatPath([cspm]),
 														'style':				biarc_style_i['biarc1']
 													})
+							for i in xrange(len(cspm)):
+								inkex.etree.SubElement(	self.Group, inkex.addNS('path','svg'), 
+											{'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(cspm[i][1][0]),  inkex.addNS('cy','sodipodi'):		str(cspm[i][1][1]),inkex.addNS('rx','sodipodi'):		str(w[i]), inkex.addNS('ry','sodipodi'):		str(w[i]), inkex.addNS('type','sodipodi'):	'arc'})
+
 							cspe += [cspm]
 							we   +=	[w]				
 

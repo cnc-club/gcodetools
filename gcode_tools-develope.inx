@@ -78,14 +78,12 @@ Area will be filled with offsest, having radius equal to (n+1/2)*"tool diameter"
 			<_param name="help" type="description">
 This function creates path to engrave sharp angles.
 Cutter shape function is a function which defines shape of the cutter. Some simple shapes:
+
 45 degree cone: w
 cone having 10 unit height and 3 unit diameter: 10/3 w
-shpere having r unit diameter: math.sqrt(max(0,r**2-w**2))
+sphere having r unit diameter: math.sqrt(max(0,r**2-w**2))
 ellips having r and r*4 unit diameter: math.sqrt(max(0,r**2-w**2))*4
-
-
-
-			</_param>
+</_param>
 
 		</page>			
 			
