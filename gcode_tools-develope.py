@@ -637,7 +637,7 @@ class Gcode_tools(inkex.Effect):
 				for i in range(1,len(subpath)):
 					sp1 = [  [subpath[i-1][j][0]*xs, subpath[i-1][j][1]*ys] for j in range(3)]
 					sp2 = [  [subpath[i  ][j][0]*xs, subpath[i  ][j][1]*ys] for j in range(3)]
-					print_(w)
+#					print_(w)
 					c += biarc(sp1,sp2,0,0) if w==None else biarc(sp1,sp2,-f(w[k][i-1]),-f(w[k][i]))
 				c += [ [ [subpath[-1][1][0]*xs,subpath[-1][1][1]*ys]  ,'end',0,0] ]
 			return c
@@ -1060,7 +1060,7 @@ class Gcode_tools(inkex.Effect):
 					 			n1 = []
  								for t in [.0,.25,.75,1.]:
  									n1 += [ [ [x1,y1], [nx*math.cos(a*t)-ny*math.sin(a*t),nx*math.sin(a*t)+ny*math.cos(a*t)], False, True, i ]  ]
-				 				nl += [ [n1] ] 
+				 				nl += [ n1 ] 
 
 
 
@@ -1081,6 +1081,7 @@ class Gcode_tools(inkex.Effect):
 							p = []
 							for ti in xrange(3) if ki!=len(nl)-1 else xrange(4):
 								n = nl[ki][ti]
+#								print_(n)
 								x1,y1 = n[0]
 								nx,ny = n[1]
 								d, r = 0, None
