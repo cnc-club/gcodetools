@@ -142,22 +142,19 @@ biarc_style_dark_i = {
 ################################################################################
 
 
+def isnan(x): return type(x) is float and x != x
+def isinf(x): inf = 1e5000; return x == inf or x == -inf
+
 ###
 ###		Just simple output function for better debugging
 ###
-#if os.path.isfile("/home/nick/output.txt") :os.remove("/home/nick/output.txt")
-#def print_(s=''):
-#	f = open("/home/nick/output.txt","a")
-#	f.write(str(s))
-#	f.write("\n")
-#	f.close()
 
-#if os.path.isfile("c:\output.txt") :os.remove("c:\output.txt")
-#def print_(s=''):
-#	f = open("c:\output.txt","a")
-#	f.write(str(s))
-#	f.write("\n")
-#	f.close()
+def print_(s=''):
+	f = open(options.log_filename,"a")
+	f.write(str(s))
+	f.write("\n")
+	f.close()
+
 
 
 
@@ -582,35 +579,8 @@ class Gcode_tools(inkex.Effect):
 		self.OptionParser.add_option("",   "--engraving-draw-calculation-paths",action="store", type="inkbool",	dest="engraving_draw_calculation_paths", default=False,help="Draw additional graphics to debug engraving path")		
 		self.OptionParser.add_option("",   "--engraving-cutter-shape-function",action="store", type="string", 	dest="engraving_cutter_shape_function", default="w",help="Cutter shape function z(w). Ex. cone: w. ")
 
-		
-#	def parse_curve(self, p):
-#			c = []
-#			if self.options.Xscale!=self.options.Yscale:
-#				xs,ys = self.options.Xscale,self.options.Yscale
-#				self.options.Xscale,self.options.Yscale = 1.0, 1.0
-#			else :
-#				xs,ys = 1.0,1.0
-#			### Sort to reduce Rapid distance	
-#			np = [p[0]]
-#			del p[0]
-#			while len(p)>0:
-#				end = np[-1][-1][1]
-#				dist = None
-#				for i in range(len(p)):
-#					start = p[i][0][1]
-#					dist = max(   ( -( ( end[0]-start[0])**2+(end[1]-start[1])**2 ) ,i)    ,   dist )
-#				np += [p[dist[1]][:]]
-#				del p[dist[1]]
-#			p = np[:]		
-#			for subpath in p:
-#				c += [ [    [subpath[0][1][0]*xs,subpath[0][1][1]*ys]   , 'move', 0, 0] ]
-#				for i in range(1,len(subpath)):
-#					sp1 = [  [subpath[i-1][j][0]*xs, subpath[i-1][j][1]*ys] for j in range(3)]
-#					sp2 = [  [subpath[i  ][j][0]*xs, subpath[i  ][j][1]*ys] for j in range(3)]
-#					c += biarc(sp1,sp2,0,0)
-#				c += [ [ [subpath[-1][1][0]*xs,subpath[-1][1][1]*ys]  ,'end',0,0] ]
-
-#			return c
+		self.OptionParser.add_option("",   "--create-log",					action="store", type="inkbool", 	dest="log_create_log", default=False,	help="Create log files")
+		self.OptionParser.add_option("",   "--log-filename",				action="store", type="string", 		dest="log_filename", default='',		help="Create log files")
 
 	def parse_curve(self, p, w = None, f = None):
 			c = []
@@ -630,14 +600,12 @@ class Gcode_tools(inkex.Effect):
 					dist = max(   ( -( ( end[0]-start[0])**2+(end[1]-start[1])**2 ) ,i)    ,   dist )
 				keys += [k[dist[1]]]
 				del k[dist[1]]
-			
 			for k in keys:
 				subpath = p[k]
 				c += [ [    [subpath[0][1][0]*xs,subpath[0][1][1]*ys]   , 'move', 0, 0] ]
 				for i in range(1,len(subpath)):
 					sp1 = [  [subpath[i-1][j][0]*xs, subpath[i-1][j][1]*ys] for j in range(3)]
 					sp2 = [  [subpath[i  ][j][0]*xs, subpath[i  ][j][1]*ys] for j in range(3)]
-#					print_(w)
 					c += biarc(sp1,sp2,0,0) if w==None else biarc(sp1,sp2,-f(w[k][i-1]),-f(w[k][i]))
 				c += [ [ [subpath[-1][1][0]*xs,subpath[-1][1][1]*ys]  ,'end',0,0] ]
 			return c
@@ -752,7 +720,7 @@ class Gcode_tools(inkex.Effect):
 					r1, r2 = (P(s[0])-P(s[2])), (P(si[0])-P(s[2]))
 					if abs(r1.mag()-r2.mag()) < 0.001 :
 						if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + feed + "\n"
-						g += ("G02" if s[3]>0 else "G03") + c(si[0]+[ s[5][1]+depth, (s[2][0]-s[0][0]),(s[2][1]-s[0][1]), (s[5][1]-s[5][0])/2  ]) + feed + "\n"
+						g += ("G02" if s[3]>0 else "G03") + c(si[0]+[ s[5][1]+depth, (s[2][0]-s[0][0]),(s[2][1]-s[0][1])  ]) + feed + "\n"
 					else:
 						r = (r1.mag()+r2.mag())/2
 						g += ("G02" if s[3]>0 else "G03") + c(si[0]+[s[5][1]+depth]) + " R%f" % (r*self.options.Xscale) + feed  + "\n"
@@ -765,14 +733,38 @@ class Gcode_tools(inkex.Effect):
 			g += "G00" + c([None,None,zs]) + "\n"
 		return g
 	
+
+################################################################################
+###
+###		Effect
+###
+###		Main function of Gcode tools class
+###
+################################################################################
+
 	
 	
 	def effect(self):
 		global options
 		options = self.options
+		
+		# define print_ function 
+		global print_
+		if self.options.log_create_log :
+			try :
+				if os.path.isfile(self.options.log_filename) : os.remove(self.options.log_filename)
+				f = open(self.options.log_filename,"a")
+				f.write("Gcode tools log file.\nStarted at %s.\n%s" % (time.strftime("%d.%m.%Y %H:%M:%S"),options.log_filename))
+				f.close()
+			except :
+				print_  = lambda x : None 
+		else : print_  = lambda x : None 
+
 		if len(self.options.ids)<=0:
 			inkex.errormsg(_("This extension requires at least one selected path."))
 			return
+			
+			
 ################################################################################
 ###
 ###		Curve to Gcode
@@ -949,6 +941,7 @@ class Gcode_tools(inkex.Effect):
 				if (ny*f1x-nx*f1y)==0 or t1<0 or t2<0 : 	
 					t1 = self.options.tool_diameter
 					t2 = self.options.tool_diameter/math.sqrt(f1x*f1x+f1y*f1y)
+					
 				t = [ t1, t2, t3 ]					
 				i = 0
 				F = [0.,0.,0.]
@@ -982,11 +975,16 @@ class Gcode_tools(inkex.Effect):
 
 					F1 = inv(F1)
 				
-					if F1!= None:
+					if (	 isnan(F[0]) or isnan(F[1]) or isnan(F[2]) or 
+							 isinf(F[0]) or isinf(F[1]) or  isinf(F[2]) ):
+						return t+[1e100,i]	
+				
+					if F1!= None :
 						t[0] -=  F1[0][0]*F[0] + F1[0][1]*F[1] + F1[0][2]*F[2]
 						t[1] -=  F1[1][0]*F[0] + F1[1][1]*F[1] + F1[1][2]*F[2]
 						t[2] -=  F1[2][0]*F[0] + F1[2][1]*F[1] + F1[2][2]*F[2]
 					else: break	
+					
 				return t+[abs(F[0])+abs(F[1])+math.sqrt(abs(F[2])),i]	
 
 			def csp_simpe_bound(csp):
@@ -1008,15 +1006,16 @@ class Gcode_tools(inkex.Effect):
 				if node.tag == inkex.addNS('path','svg'):
 					cspi = cubicsuperpath.parsePath(node.get('d'))
 
-					for csp in cspi:
+					for j in xrange(len(cspi)):
 						# Remove zerro length segments
 						i = 1
-						while i<len(csp):
-							if abs(csp[i-1][1][0]-csp[i][1][0])<engraving_tolerance and abs(csp[i-1][1][1]-csp[i][1][1])<engraving_tolerance:
-								csp[i-1][2] = csp[i][2]
-								del csp[i]
+						while i<len(cspi[j]):
+							if abs(cspi[j][i-1][1][0]-cspi[j][i][1][0])<engraving_tolerance and abs(cspi[j][i-1][1][1]-cspi[j][i][1][1])<engraving_tolerance:
+								cspi[j][i-1][2] = cspi[j][i][2]
+								del cspi[j][i]
 							else:
 								i += 1
+					for csp in cspi:
 						#	Create list containing normlas and points
 						nl = []
 						for i in range(1,len(csp)):
@@ -1081,7 +1080,6 @@ class Gcode_tools(inkex.Effect):
 							p = []
 							for ti in xrange(3) if ki!=len(nl)-1 else xrange(4):
 								n = nl[ki][ti]
-#								print_((ki,ti,"@@@@@@@"))
 								x1,y1 = n[0]
 								nx,ny = n[1]
 								d, r = 0, None
@@ -1089,26 +1087,20 @@ class Gcode_tools(inkex.Effect):
 									# Point is a sharp angle r=0p
 									r = 0
 								else :
-#									print_((ki,ti,"@@@@@@@!!!!!!!!!!"))
 									for j in xrange(0,len(cspi)):
 										for i in xrange(1,len(cspi[j])):
-#											print_(i)
 											d = point_to_csp_bound_dist([x1,y1], cspi[j][i-1], cspi[j][i], self.options.engraving_max_dist*2)
-#											print_(d)
 											if d>=self.options.engraving_max_dist*2 :
 												r = min(d/2,r) if r!=None else d/2	
 												continue
 											for n1 in xrange(self.options.engraving_newton_iterations):
-#												print_(n1)
 						 						t = find_cutter_center((x1,y1),(nx,ny), cspi[j][i-1], cspi[j][i], float(n1)/(self.options.engraving_newton_iterations-1))
 												if t[0] > engraving_tolerance and 0<=t[2]<=1 and abs(t[3])<engraving_tolerance:
 													t3 = t[2]
 													ax,ay,bx,by,cx,cy,dx,dy=bezmisc.bezierparameterize((cspi[j][i-1][1],cspi[j][i-1][2],cspi[j][i][0],cspi[j][i][1]))
 													x2=ax*(t3*t3*t3)+bx*(t3*t3)+cx*t3+dx
 													y2=ay*(t3*t3*t3)+by*(t3*t3)+cy*t3+dy
-#													print_((ki,ti,i,j,t,r))
-#													print_((abs(x2-x1), abs(y2-y1)))
-													
+												
 													if abs(x2-x1)<engraving_tolerance and abs(y2-y1)<engraving_tolerance:
 														f1x = 3*ax*(t3*t3)+2*bx*t3+cx
 														f1y = 3*ay*(t3*t3)+2*by*t3+cy
@@ -1121,7 +1113,6 @@ class Gcode_tools(inkex.Effect):
 																r = min( d,r) if r!=None else d
 															else :
 																r = min(r,self.options.engraving_max_dist) if r!=None else self.options.engraving_max_dist
-#															print_((r,d))
 													else:						
 							 							r = min(t[0],r) if r!=None else t[0]	
 									for j in xrange(0,len(cspi)):
@@ -1193,23 +1184,23 @@ class Gcode_tools(inkex.Effect):
 							cspe += [cspm]
 							we   +=	[w]				
 
-#			print_(we)
 			if self.options.engraving_cutter_shape_function != "":
 				f = eval('lambda w: ' + self.options.engraving_cutter_shape_function.strip('"'))
 			else: f = lambda w: w
+			if cspe!=[]:
+				curve = self.parse_curve(cspe,we,f)
+				self.draw_curve(curve,self.Group)
 
-			curve = self.parse_curve(cspe,we,f)
-			self.draw_curve(curve,self.Group)
-
-			gcode += self.generate_gcode(curve,self.options.Zsurface)
-			gcode += self.footer
-			try: 	
-				f = open(self.options.directory+'/'+self.options.file, "w")	
-				f.write(gcode)
-				f.close()							
-			except:
-				inkex.errormsg(_("Can not write to specified file!"))
-				return
+				gcode += self.generate_gcode(curve,self.options.Zsurface)
+				gcode += self.footer
+				try: 	
+					f = open(self.options.directory+'/'+self.options.file, "w")	
+					f.write(gcode)
+					f.close()							
+				except:
+					inkex.errormsg(_("Can not write to specified file!"))
+					return
+			else : 	inkex.errormsg(_("No need to engrave sharp angles."))
 	
 		
 

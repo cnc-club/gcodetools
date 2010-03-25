@@ -50,6 +50,9 @@ Gcode tools ver. 1.2 22.02.2010.
 			</param>
 
 			<param name="tool-diameter" type="float" precision="5" min="0" max="1000" _gui-text="Tool diameter">3</param>
+			<param name="create-log" type="boolean" _gui-text="Create log file">false</param>			
+			<param name="log-filename" type="string" _gui-text="Log file"></param>			
+			
 		</page>	
 		<page name='tab' _gui-text='Path to Gcode'>	
 				<param name="biarc-tolerance" type='float' _gui-text='Biarc interpolation tolerance'>1</param>
