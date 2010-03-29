@@ -23,12 +23,12 @@ Gcode tools ver. 1.2 22.02.2010.
 			</_param>	
 		</page>
 		<page name='tab' _gui-text='Options'>
-			<param name="Xscale" type="float" precision="5" min="-1000" max="1000"  _gui-text="Scale along X axis">1</param>
-			<param name="Yscale" type="float" precision="5" min="-1000" max="1000" _gui-text="Scale along Y axis">1</param>
-			<param name="Zscale" type="float" precision="5" min="-1000" max="1000" _gui-text="Scale along Z axis">1</param>			
-			<param name="Xoffset" type="float" precision="5" min="-1000" max="1000" _gui-text="Offset along X axis">0.0</param>
-			<param name="Yoffset" type="float" precision="5" min="-1000" max="1000" _gui-text="Offset along Y axis">0.0</param>
-			<param name="Zoffset" type="float" precision="5" min="-1000" max="1000" _gui-text="Offset along Z axis">0.0</param>
+			<param name="Xscale" type="float" precision="5" min="-100000" max="100000"  _gui-text="Scale along X axis">1</param>
+			<param name="Yscale" type="float" precision="5" min="-100000" max="100000" _gui-text="Scale along Y axis">1</param>
+			<param name="Zscale" type="float" precision="5" min="-100000" max="100000" _gui-text="Scale along Z axis">1</param>			
+			<param name="Xoffset" type="float" precision="5" min="-100000" max="100000" _gui-text="Offset along X axis">0.0</param>
+			<param name="Yoffset" type="float" precision="5" min="-100000" max="100000" _gui-text="Offset along Y axis">0.0</param>
+			<param name="Zoffset" type="float" precision="5" min="-100000" max="100000" _gui-text="Offset along Z axis">0.0</param>
 			<param name="generate_not_parametric_code" type="boolean" _gui-text="Generate not parametric code">false</param>
 			<param name="min-arc-radius" type="float" precision="5" min="-1000" max="1000"  _gui-text="Minimum arc radius">0.05</param>
 		</page>
