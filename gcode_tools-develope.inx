@@ -4,8 +4,8 @@
     <id>ru.cnc-club.filter.gcode_tools_develope</id>
 	<dependency type="executable" location="extensions">gcode_tools-develope.py</dependency>
 	<dependency type="executable" location="extensions">inkex.py</dependency>
-	<param name='tab' type="notebook">
-		<page name='tab' _gui-text='Help'>
+	<param name='active-tab' type="notebook">
+		<page name='help' _gui-text='Help'>
 			<_param name="fullhelp" type="description">
 Gcode tools plug-in converts paths to Gcode. 
 This plug-in calculates Gcode for paths using circular interpolation or linear motion when needed.
@@ -22,7 +22,7 @@ English support forum:
 Gcode tools ver. 1.2 22.02.2010.
 			</_param>	
 		</page>
-		<page name='tab' _gui-text='Options'>
+		<page name='options' _gui-text='Options'>
 			<param name="Xscale" type="float" precision="5" min="-100000" max="100000"  _gui-text="Scale along X axis">1</param>
 			<param name="Yscale" type="float" precision="5" min="-100000" max="100000" _gui-text="Scale along Y axis">1</param>
 			<param name="Zscale" type="float" precision="5" min="-100000" max="100000" _gui-text="Scale along Z axis">1</param>			
@@ -33,7 +33,7 @@ Gcode tools ver. 1.2 22.02.2010.
 			<param name="min-arc-radius" type="float" precision="5" min="-1000" max="1000"  _gui-text="Minimum arc radius">0.05</param>
 		</page>
 		
-		<page name='tab' _gui-text='Preferences'>
+		<page name='preferences' _gui-text='Preferences'>
 			<param name="filename" type="string" _gui-text="File">output.ngc</param>
 			<param name="directory" type="string" _gui-text="Directory">/home</param>
 
@@ -54,7 +54,7 @@ Gcode tools ver. 1.2 22.02.2010.
 			<param name="log-filename" type="string" _gui-text="Log file"></param>			
 			
 		</page>	
-		<page name='tab' _gui-text='Path to Gcode'>	
+		<page name='path-to-gcode' _gui-text='Path to Gcode'>	
 				<param name="biarc-tolerance" type='float' _gui-text='Biarc interpolation tolerance'>1</param>
 				<param name="biarc-max-split-depth" type="int" _gui-text="Maximum splitting depth">4</param>
 				<_param name="help" type="description">
@@ -62,7 +62,7 @@ Biarc interpolation tolerance is maximum distance between path and it approximat
 If distance between path's segment and it's approximation is greater than biarc interpolation tolerance the segment will be split into two segments.
 				</_param>
 		</page>
-		<page name='tab' _gui-text='Area'>	
+		<page name='area' _gui-text='Area'>	
 			<param name="max-area-curves" type="int" min="0" max="1000" _gui-text="Maximum area cutting curves">100</param>
 			<param name="area-inkscape-radius" type="int" min="-1000" max="1000" _gui-text="Area radius">-10</param>
 			<_param name="help" type="description">
@@ -71,7 +71,7 @@ Area will be filled with offsest, having radius equal to (n+1/2)*"tool diameter"
 			</_param>
 
 		</page>			
-		<page name='tab' _gui-text='Engraving'>	
+		<page name='engraving' _gui-text='Engraving'>	
 			<param name="engraving-sharp-angle-tollerance" type="float" min="0" max="180" _gui-text="Sharp angle tolerance">150</param>
 			<param name="engraving-max-dist" type="float" min="0" max="1000" _gui-text="Maximum distance for engraving">10</param>
 			<param name="engraving-newton-iterations" type="int" min="2" max="10" _gui-text="Number of sample points used to calculate distance">4</param>
@@ -89,21 +89,44 @@ ellips having r and r*4 unit diameter: math.sqrt(max(0,r**2-w**2))*4
 </_param>
 
 		</page>			
+		<page name='orientation' _gui-text='Orientation'>	
+			<param name="orientation-point1x" type="float" min="-100000" max="100000" _gui-text="Orientation point 1 X">0.0</param>
+			<param name="orientation-point1y" type="float" min="-100000" max="100000" _gui-text="Orientation point 1 Y">0.0</param>
+			<param name="orientation-point2x" type="float" min="-100000" max="100000" _gui-text="Orientation point 2 X">100.</param>
+			<param name="orientation-point2y" type="float" min="-100000" max="100000" _gui-text="Orientation point 2 Y">0.</param>
+			<param name="orientation-point2x" type="float" min="-100000" max="100000" _gui-text="Orientation point 3 X">0.</param>
+			<param name="orientation-point2y" type="float" min="-100000" max="100000" _gui-text="Orientation point 4 Y">100.</param>
+			<_param name="help" type="description">
+Press apply to create three control points. The transformation (offset,scale,rotation in XY plane) of the path will be automaticaly calculated depending on this points.
+
+You can apply transormations to this points, move them. Just make sure that they are not on one line.
+
+You can modify coordinates that are in the brackets right in the image usin text tool.
+			</_param>
+
+		</page>
 			
 	</param>	
 	
 	
-	<param type='optiongroup' name='function' _gui-text="What to do:">
-		<option value='Curve'>Path to G-code</option>
-		<option value='Area curves'>Calculate area curves</option>
-		<option value='Engraving'>Engraving</option>
-	</param>
-
-	
-    <effect>
+    <effect needs-live-preview="false">
 		<object-type>path</object-type>
     </effect>
     <script>
         <command reldir="extensions" interpreter="python">gcode_tools-develope.py</command>
     </script>
 </inkscape-extension>
+
+
+
+
+
+
+
+
+
+
+
+
+
+

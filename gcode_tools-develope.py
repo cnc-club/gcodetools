@@ -562,8 +562,8 @@ class Gcode_tools(inkex.Effect):
 		self.OptionParser.add_option("",   "--max-area-curves",				action="store", type="int", 		dest="max_area_curves", default="100",				help="Maximum area curves for each area")
 		self.OptionParser.add_option("",   "--area-inkscape-radius",		action="store", type="int", 		dest="area_inkscape_radius", default="-10",			help="Radius for preparing curves using inkscape")
 		self.OptionParser.add_option("",   "--unit",						action="store", type="string", 		dest="unit", default="G21 (All units in mm)\n",		help="Units")
-		self.OptionParser.add_option("",   "--function",					action="store", type="string", 		dest="function", default="Curve",					help="What to do: Curve|Area|Area inkscape")
-		self.OptionParser.add_option("",   "--tab",							action="store", type="string", 		dest="tab", default="",								help="Means nothing right now. Notebooks Tab.")
+		self.OptionParser.add_option("",   "--active-tab",					action="store", type="string", 		dest="active_tab", default="",						help="Defines which tab is active")
+
 		self.OptionParser.add_option("",   "--generate_not_parametric_code",action="store", type="inkbool",		dest="generate_not_parametric_code", default=False,	help="Generated code will be not parametric.")		
 
 		self.OptionParser.add_option("",   "--loft-distances",				action="store", type="string", 		dest="loft_distances", default="10",				help="Distances between paths.")
@@ -581,6 +581,14 @@ class Gcode_tools(inkex.Effect):
 
 		self.OptionParser.add_option("",   "--create-log",					action="store", type="inkbool", 	dest="log_create_log", default=False,	help="Create log files")
 		self.OptionParser.add_option("",   "--log-filename",				action="store", type="string", 		dest="log_filename", default='',		help="Create log files")
+
+		self.OptionParser.add_option("",   "--orientation-point1x",			action="store", type="float", 		dest="orientation_point1x", default='0',		help="Orientation point")
+		self.OptionParser.add_option("",   "--orientation-point1y",			action="store", type="float", 		dest="orientation_point1y", default='0',		help="Orientation point")
+		self.OptionParser.add_option("",   "--orientation-point2x",			action="store", type="float", 		dest="orientation_point2x", default='100',		help="Orientation point")
+		self.OptionParser.add_option("",   "--orientation-point2y",			action="store", type="float", 		dest="orientation_point2y", default='0',		help="Orientation point")
+		self.OptionParser.add_option("",   "--orientation-point3x",			action="store", type="float", 		dest="orientation_point3x", default='0',		help="Orientation point")
+		self.OptionParser.add_option("",   "--orientation-point3y",			action="store", type="float", 		dest="orientation_point3y", default='100',		help="Orientation point")
+
 
 	def parse_curve(self, p, w = None, f = None):
 			c = []
@@ -745,24 +753,23 @@ class Gcode_tools(inkex.Effect):
 	
 	
 	def effect(self):
+		
 		global options
 		options = self.options
-		
+			
 		# define print_ function 
 		global print_
 		if self.options.log_create_log :
 			try :
 				if os.path.isfile(self.options.log_filename) : os.remove(self.options.log_filename)
 				f = open(self.options.log_filename,"a")
-				f.write("Gcode tools log file.\nStarted at %s.\n%s" % (time.strftime("%d.%m.%Y %H:%M:%S"),options.log_filename))
+				f.write("Gcode tools log file.\nStarted at %s.\n%s\n" % (time.strftime("%d.%m.%Y %H:%M:%S"),options.log_filename))
+				f.write("%s tab is active.\n" % self.options.active_tab)
 				f.close()
 			except :
 				print_  = lambda x : None 
 		else : print_  = lambda x : None 
-
-		if len(self.options.ids)<=0:
-			inkex.errormsg(_("This extension requires at least one selected path."))
-			return
+		
 			
 			
 ################################################################################
@@ -770,8 +777,15 @@ class Gcode_tools(inkex.Effect):
 ###		Curve to Gcode
 ###
 ################################################################################
-	
-		if self.options.function == 'Curve':
+		if self.options.active_tab not in ['"path-to-gcode"', '"area"', '"engraving"', '"orientation"']:
+			inkex.errormsg(_("Select one of the active tabs - Path to Gcode, Area, Engraving or Orientation."))
+			return
+		elif self.options.active_tab == '"path-to-gcode"':
+
+			if len(self.options.ids)<=0:
+				inkex.errormsg(_("This extension requires at least one selected path."))
+				return
+
 			if not self.check_dir() : return
 			gcode = self.header
 
@@ -812,7 +826,7 @@ class Gcode_tools(inkex.Effect):
 ###
 ################################################################################
 
-		elif self.options.function=='Area curves' :
+		elif self.options.active_tab == '"area"' :
 			if self.options.tool_diameter<=0 : 
 							inkex.errormsg(_("Tool diameter must be > 0!"))				
 							return
@@ -905,7 +919,7 @@ class Gcode_tools(inkex.Effect):
 ###
 ################################################################################
 
-		elif self.options.function=='Engraving' :
+		elif self.options.active_tab == '"engraving"' :
 		
 ################################################################################			
 ###			
@@ -1202,12 +1216,65 @@ class Gcode_tools(inkex.Effect):
 					return
 			else : 	inkex.errormsg(_("No need to engrave sharp angles."))
 	
-		
 
+################################################################################
+###
+###		Orientation
+###
+################################################################################
+
+		elif self.options.active_tab == '"orientation"' :
 			
-					
+			root = self.document.getroot()
+			points = [[self.options.orientation_point1x, self.options.orientation_point1y], [self.options.orientation_point2x, self.options.orientation_point2y], [self.options.orientation_point3x, self.options.orientation_point3y]]
+			for i in points :
+				print_(i)
+				inkex.etree.SubElement(	root, inkex.addNS('path','svg'), 
+					{
+						'style':	"stroke:none;fill:#000000;", 	
+						'd':'m %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z z' % (i[0], i[1]),
+						'comment': "Gcode tools orientation point"
+					})
+				t = inkex.etree.SubElement(	root, inkex.addNS('text','svg'), 
+					{
+						'style':	"font-size:10px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
+						'x':	str(i[0]+10),
+						'y':	str(i[1]-10),
+					})
+				t = inkex.etree.SubElement(	t, inkex.addNS('text','svg'), 
+					{
+						inkex.addNS("role","sodipodi"):'line',
+						'x':	str(i[0]+10),
+						'y':	str(i[1]-10),
+					})
+				t.text = "(%f, %f)" % (i[0],i[1])
+		
+		
+		
+							
 e = Gcode_tools()
 e.affect()					
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
 		
 		
 		
