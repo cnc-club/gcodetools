@@ -1,6 +1,6 @@
 #!/usr/bin/env python 
 """
-Copyright (C) 2009 Nick Drobchenko, nick@cnc-club.ru
+gright (C) 2009 Nick Drobchenko, nick@cnc-club.ru
 based on gcode.py (C) 2007 hugomatic... 
 based on addnodes.py (C) 2005,2007 Aaron Spike, aaron@ekips.org
 based on dots.py (C) 2005 Aaron Spike, aaron@ekips.org
@@ -592,7 +592,11 @@ class Gcode_tools(inkex.Effect):
 
 	def parse_curve(self, p, w = None, f = None):
 			c = []
+			if len(p)==0 : 
+				inkex.errormsg(_("Nothing to do. Check that all paths are actually paths."))
+				return []
 			p = self.transform_csp(p)
+
 			### Sort to reduce Rapid distance	
 			k = range(1,len(p))
 			keys = [0]
@@ -627,7 +631,8 @@ class Gcode_tools(inkex.Effect):
 		a,b,c = self.transform(a,True), self.transform(b,True), self.transform(b,True)
 		if ((b[0]-a[0])*(c[1]-a[1])-(c[0]-a[0])*(b[1]-a[1]))*k < 0 : reverse_angle = 1
 		else : reverse_angle = -1 
-		for si in curve:
+		for sk in curve:
+			si = sk[:]
 			si[0], si[2] = self.transform(si[0],True), (self.transform(si[2],True) if type(si[2])==type([]) and len(si[2])==2 else si[2])
 			
 			if s!='':
@@ -709,7 +714,7 @@ class Gcode_tools(inkex.Effect):
 				m,a = [1,1,self.options.Zscale,1,1,self.options.Zscale], [0,0,self.options.Zoffset,0,0,0]
 			else :
 				s,s1 = [" X[", " Y[", " Z[", " I[", " J[", " K["], [ "*#5+#8]", "*#5+#9]", "*#7+#10]", "*#5]",  "*#5]", "*#7]"]
-				m,a = [1,-1,1,1,-1,1], [0,0,0,0,0,0]
+				m,a = [1,1,1,1,1,1], [0,0,0,0,0,0]
 			r = ''	
 			for i in range(6):
 				if c[i]!=None:
@@ -735,10 +740,10 @@ class Gcode_tools(inkex.Effect):
 					r1, r2 = (P(s[0])-P(s[2])), (P(si[0])-P(s[2]))
 					if abs(r1.mag()-r2.mag()) < 0.001 :
 						if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + feed + "\n"
-						g += ("G02" if s[3]>0 else "G03") + c(si[0]+[ s[5][1]+depth, (s[2][0]-s[0][0]),(s[2][1]-s[0][1])  ]) + feed + "\n"
+						g += ("G02" if s[3]<0 else "G03") + c(si[0]+[ s[5][1]+depth, (s[2][0]-s[0][0]),(s[2][1]-s[0][1])  ]) + feed + "\n"
 					else:
 						r = (r1.mag()+r2.mag())/2
-						g += ("G02" if s[3]>0 else "G03") + c(si[0]+[s[5][1]+depth]) + " R%f" % (r) + feed  + "\n"
+						g += ("G02" if s[3]<0 else "G03") + c(si[0]+[s[5][1]+depth]) + " R%f" % (r) + feed  + "\n"
 					lg = 'G02'
 				else:
 					if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + "\n"	
@@ -768,7 +773,7 @@ class Gcode_tools(inkex.Effect):
 				if i.tag == inkex.addNS("g",'svg') and i.get("comment") == "Gcode tools orientation point":
 					p += [i]
 				elif i.tag == inkex.addNS("g",'svg'):
-					p1 = search_in_group(g)
+					p1 = search_in_group(i)
 					if len(p1)==3: return p1
 				if len(p)==3 : return p
 			return []
@@ -812,7 +817,6 @@ class Gcode_tools(inkex.Effect):
 					else : self.transform_matrix = [[1,0,0],[0,1,0],[0,0,1]]
 				else : self.transform_matrix = [[1,0,0],[0,1,0],[0,0,1]]
 			else : self.transform_matrix = [[1,0,0],[0,1,0],[0,0,1]]
-			print_(self.transform_matrix)
 		x,y = source_point[0],	source_point[1]
 		if not reverse :
 			t = self.transform_matrix
@@ -820,6 +824,9 @@ class Gcode_tools(inkex.Effect):
 		else :
 			t = self.transform_matrix_reverse
 			return [t[0][0]*x+t[0][1]*y+t[0][2], t[1][0]*x+t[1][1]*y+t[1][2]]
+			
+			
+
 
 	def transform_csp(self,csp):
 		for i in xrange(len(csp)):
@@ -1288,7 +1295,6 @@ class Gcode_tools(inkex.Effect):
 			if cspe!=[]:
 				curve = self.parse_curve(cspe,we,f)
 				self.draw_curve(curve,self.Group)
-
 				gcode += self.generate_gcode(curve,self.options.Zsurface)
 				gcode += self.footer
 				try: 	
