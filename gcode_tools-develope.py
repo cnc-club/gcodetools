@@ -443,14 +443,14 @@ def csp_line_intersection(l1,l2,sp1,sp2):
 ################################################################################
 
 
-def biarc(sp1, sp2, z1, z2, depth=0,):
+def biarc(sp1, sp2, z1, z2, depth=0):
 	def biarc_split(sp1,sp2, z1, z2, depth): 
 		if depth<options.biarc_max_split_depth:
 			sp1,sp2,sp3 = cspbezsplit(sp1,sp2)
 			l1, l2 = cspseglength(sp1,sp2), cspseglength(sp2,sp3)
 			if l1+l2 == 0 : zm = z1
 			else : zm = z1+(z2-z1)*l1/(l1+l2)
-			return biarc(sp1,sp2,depth+1,z1,zm)+biarc(sp2,sp3,depth+1,z1,zm)
+			return biarc(sp1,sp2,z1,zm,depth+1)+biarc(sp2,sp3,z1,zm,depth+1)
 		else: return [ [sp1[1],'line', 0, 0, sp2[1], [z1,z2]] ]
 
 	P0, P4 = P(sp1[1]), P(sp2[1])
@@ -592,11 +592,7 @@ class Gcode_tools(inkex.Effect):
 
 	def parse_curve(self, p, w = None, f = None):
 			c = []
-			if self.options.Xscale!=self.options.Yscale:
-				xs,ys = self.options.Xscale,self.options.Yscale
-				self.options.Xscale,self.options.Yscale = 1.0, 1.0
-			else :
-				xs,ys = 1.0,1.0
+			p = self.transform_csp(p)
 			### Sort to reduce Rapid distance	
 			k = range(1,len(p))
 			keys = [0]
@@ -610,12 +606,12 @@ class Gcode_tools(inkex.Effect):
 				del k[dist[1]]
 			for k in keys:
 				subpath = p[k]
-				c += [ [    [subpath[0][1][0]*xs,subpath[0][1][1]*ys]   , 'move', 0, 0] ]
+				c += [ [    [subpath[0][1][0],subpath[0][1][1]]   , 'move', 0, 0] ]
 				for i in range(1,len(subpath)):
-					sp1 = [  [subpath[i-1][j][0]*xs, subpath[i-1][j][1]*ys] for j in range(3)]
-					sp2 = [  [subpath[i  ][j][0]*xs, subpath[i  ][j][1]*ys] for j in range(3)]
+					sp1 = [  [subpath[i-1][j][0], subpath[i-1][j][1]] for j in range(3)]
+					sp2 = [  [subpath[i  ][j][0], subpath[i  ][j][1]] for j in range(3)]
 					c += biarc(sp1,sp2,0,0) if w==None else biarc(sp1,sp2,-f(w[k][i-1]),-f(w[k][i]))
-				c += [ [ [subpath[-1][1][0]*xs,subpath[-1][1][1]*ys]  ,'end',0,0] ]
+				c += [ [ [subpath[-1][1][0],subpath[-1][1][1]]  ,'end',0,0] ]
 			return c
 
 
@@ -624,7 +620,16 @@ class Gcode_tools(inkex.Effect):
 		if group==None:
 			group = inkex.etree.SubElement( self.biarcGroup, inkex.addNS('g','svg') )
 		s, arcn = '', 0
+		
+		
+		a,b,c = [0.,0.], [1.,0.], [0.,1.]
+		k = (b[0]-a[0])*(c[1]-a[1])-(c[0]-a[0])*(b[1]-a[1])
+		a,b,c = self.transform(a,True), self.transform(b,True), self.transform(b,True)
+		if ((b[0]-a[0])*(c[1]-a[1])-(c[0]-a[0])*(b[1]-a[1]))*k < 0 : reverse_angle = 1
+		else : reverse_angle = -1 
 		for si in curve:
+			si[0], si[2] = self.transform(si[0],True), (self.transform(si[2],True) if type(si[2])==type([]) and len(si[2])==2 else si[2])
+			
 			if s!='':
 				if s[1] == 'line':
 					inkex.etree.SubElement(	group, inkex.addNS('path','svg'), 
@@ -638,6 +643,8 @@ class Gcode_tools(inkex.Effect):
 					arcn += 1
 					sp = s[0]
 					c = s[2]
+					s[3] = s[3]*reverse_angle
+						
 					a =  ( (P(si[0])-P(c)).angle() - (P(s[0])-P(c)).angle() )%math.pi2 #s[3]
 					if s[3]*a<0: 
 							if a>0:	a = a-math.pi2
@@ -681,12 +688,12 @@ class Gcode_tools(inkex.Effect):
 				self.footer = defaults['footer']
 		
 			self.header += self.options.unit + ( """#4  = %f (Feed)
-#5  = %f (Scale xy)
+#5  = 1 (Scale xy)
 #7  = %f (Scale z)
-#8  = %f (Offset x)
-#9  = %f (Offset y)
+#8  = 0 (Offset x)
+#9  = 0 (Offset y)
 #10 = %f (Offset z)
-#11 = %f (Safe distanse)\n""" % (self.options.feed, self.options.Xscale if self.options.Xscale==self.options.Yscale else 1, self.options.Zscale, self.options.Xoffset, self.options.Yoffset, self.options.Zoffset, self.options.Zsafe)
+#11 = %f (Safe distanse)\n""" % (self.options.feed, self.options.Zscale, self.options.Zoffset, self.options.Zsafe)
 			if not self.options.generate_not_parametric_code else "" )
 			return True
 		else: 
@@ -699,7 +706,7 @@ class Gcode_tools(inkex.Effect):
 			if c[5] == 0 : c[5]=None
 			if self.options.generate_not_parametric_code:
 				s,s1 = [" X", " Y", " Z", " I", " J", " K"], ["","","","","",""]
-				m,a = [self.options.Xscale,-self.options.Xscale,self.options.Zscale,self.options.Xscale,-self.options.Xscale,self.options.Zscale], [self.options.Xoffset,self.options.Yoffset,self.options.Zoffset,0,0,0]
+				m,a = [1,1,self.options.Zscale,1,1,self.options.Zscale], [0,0,self.options.Zoffset,0,0,0]
 			else :
 				s,s1 = [" X[", " Y[", " Z[", " I[", " J[", " K["], [ "*#5+#8]", "*#5+#9]", "*#7+#10]", "*#5]",  "*#5]", "*#7]"]
 				m,a = [1,-1,1,1,-1,1], [0,0,0,0,0,0]
@@ -724,14 +731,14 @@ class Gcode_tools(inkex.Effect):
 				lg = 'G01'
 			elif s[1] == 'arc':
 				r = [(s[2][0]-s[0][0]), (s[2][1]-s[0][1])]
-				if (r[0]**2 + r[1]**2)*self.options.Xscale>self.options.min_arc_radius:
+				if (r[0]**2 + r[1]**2)>self.options.min_arc_radius:
 					r1, r2 = (P(s[0])-P(s[2])), (P(si[0])-P(s[2]))
 					if abs(r1.mag()-r2.mag()) < 0.001 :
 						if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + feed + "\n"
 						g += ("G02" if s[3]>0 else "G03") + c(si[0]+[ s[5][1]+depth, (s[2][0]-s[0][0]),(s[2][1]-s[0][1])  ]) + feed + "\n"
 					else:
 						r = (r1.mag()+r2.mag())/2
-						g += ("G02" if s[3]>0 else "G03") + c(si[0]+[s[5][1]+depth]) + " R%f" % (r*self.options.Xscale) + feed  + "\n"
+						g += ("G02" if s[3]>0 else "G03") + c(si[0]+[s[5][1]+depth]) + " R%f" % (r) + feed  + "\n"
 					lg = 'G02'
 				else:
 					if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + "\n"	
@@ -741,7 +748,85 @@ class Gcode_tools(inkex.Effect):
 			g += "G00" + c([None,None,zs]) + "\n"
 		return g
 	
+	def apply_transforms(self,g,csp):
+		root = self.document.getroot()
+		i=0
+		while (g.getparent()!=root) and i<10:
+			if 'transform' in g.keys():
+				trans = g.get('transform')
+				trans = simpletransform.parseTransform(trans)
+				simpletransform.applyTransformToPath(trans, csp)
+			g=g.getparent()
 
+		return csp
+
+
+	def transform(self,source_point, reverse=False):
+		def search_in_group(g):
+			p = []
+			for i in g:
+				if i.tag == inkex.addNS("g",'svg') and i.get("comment") == "Gcode tools orientation point":
+					p += [i]
+				elif i.tag == inkex.addNS("g",'svg'):
+					p1 = search_in_group(g)
+					if len(p1)==3: return p1
+				if len(p)==3 : return p
+			return []
+				 
+		if self.transform_matrix==None:
+			# Search orientation points in current Layer firs then in whole painting 
+			for g in [self.current_layer, self.document.getroot()] if self.current_layer is not None else [self.document.getroot()]:
+				p = search_in_group(g)
+				if len(p)==3 : break
+			if len(p)==3:
+				points = []
+				for g in p:
+					point = [[],[]]	
+					for node in g:
+						if node.get('comment') == "Gcode tools orientation point arrow":
+							point[0] = self.apply_transforms(node,cubicsuperpath.parsePath(node.get("d")))[0][0][1]
+						if node.get('comment') == "Gcode tools orientation point text":
+							r = re.match(r'(?i)\s*\(\s*(\d*(,|\.)*\d*)\s*;\s*(\d*(,|\.)*\d*)\)\s*',node.text)
+							point[1] = [float(r.group(1)),float(r.group(3))]
+					if point[0]!=[] and point[1]!=[]:	points += [point]
+				if len(points)==3:
+					matrix = numpy.array([
+								[points[0][0][0], points[0][0][1], 1, 0, 0, 0, 0, 0, 0],
+								[0, 0, 0, points[0][0][0], points[0][0][1], 1, 0, 0, 0],
+								[0, 0, 0, 0, 0, 0, points[0][0][0], points[0][0][1], 1],
+								[points[1][0][0], points[1][0][1], 1, 0, 0, 0, 0, 0, 0],
+								[0, 0, 0, points[1][0][0], points[1][0][1], 1, 0, 0, 0],
+								[0, 0, 0, 0, 0, 0, points[1][0][0], points[1][0][1], 1],
+								[points[2][0][0], points[2][0][1], 1, 0, 0, 0, 0, 0, 0],
+								[0, 0, 0, points[2][0][0], points[2][0][1], 1, 0, 0, 0],
+								[0, 0, 0, 0, 0, 0, points[2][0][0], points[2][0][1], 1]
+							])
+					if numpy.linalg.det(matrix)!=0 :
+						m = numpy.linalg.solve(matrix,
+							numpy.array(
+								[[points[0][1][0]], [points[0][1][1]], [1], [points[1][1][0]], [points[1][1][1]], [1], [points[2][1][0]], [points[2][1][1]], [1]]	
+										)
+							).tolist()
+						self.transform_matrix = [[m[j*3+i][0] for i in range(3)] for j in range(3)]
+						self.transform_matrix_reverse = numpy.linalg.inv(self.transform_matrix)
+					else : self.transform_matrix = [[1,0,0],[0,1,0],[0,0,1]]
+				else : self.transform_matrix = [[1,0,0],[0,1,0],[0,0,1]]
+			else : self.transform_matrix = [[1,0,0],[0,1,0],[0,0,1]]
+			print_(self.transform_matrix)
+		x,y = source_point[0],	source_point[1]
+		if not reverse :
+			t = self.transform_matrix
+			return [t[0][0]*x+t[0][1]*y+t[0][2], t[1][0]*x+t[1][1]*y+t[1][2]]
+		else :
+			t = self.transform_matrix_reverse
+			return [t[0][0]*x+t[0][1]*y+t[0][2], t[1][0]*x+t[1][1]*y+t[1][2]]
+
+	def transform_csp(self,csp):
+		for i in xrange(len(csp)):
+			for j in xrange(len(csp[i])): 
+				for k in xrange(len(csp[i][j])): 
+					csp[i][j][k] = self.transform(csp[i][j][k])
+		return csp
 ################################################################################
 ###
 ###		Effect
@@ -750,7 +835,6 @@ class Gcode_tools(inkex.Effect):
 ###
 ################################################################################
 
-	
 	
 	def effect(self):
 		
@@ -770,7 +854,7 @@ class Gcode_tools(inkex.Effect):
 				print_  = lambda x : None 
 		else : print_  = lambda x : None 
 		
-			
+		self.transform_matrix = None	
 			
 ################################################################################
 ###
@@ -786,13 +870,13 @@ class Gcode_tools(inkex.Effect):
 				inkex.errormsg(_("This extension requires at least one selected path."))
 				return
 
-			if not self.check_dir() : return
+			if not self.check_dir() : 
+				return
 			gcode = self.header
 
 			#	Set group
-			if len(self.options.ids)>0:
-				self.biarcGroup = inkex.etree.SubElement( self.selected[self.options.ids[0]].getparent(), inkex.addNS('g','svg') )
-				options.Group = self.biarcGroup
+			self.biarcGroup = inkex.etree.SubElement( self.selected[self.options.ids[0]].getparent(), inkex.addNS('g','svg') )
+			options.Group = self.biarcGroup
 			p = []	
 			
 			for id, node in self.selected.iteritems():
@@ -803,7 +887,6 @@ class Gcode_tools(inkex.Effect):
 						trans = simpletransform.parseTransform(trans)
 						simpletransform.applyTransformToPath(trans, csp)
 					p += csp
-					 
 #					gcode += '(Found path %s)\n' % node.get('id').replace('(','').replace(')','').replace('\n','')
 			curve = self.parse_curve(p)
 			self.draw_curve(curve)
@@ -1142,7 +1225,8 @@ class Gcode_tools(inkex.Effect):
 											{'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x1+nx*r),  inkex.addNS('cy','sodipodi'):		str(y1+ny*r),inkex.addNS('rx','sodipodi'):		str(r), inkex.addNS('ry','sodipodi'):		str(r), inkex.addNS('type','sodipodi'):	'arc'})
 
 								r = min(r, self.options.engraving_max_dist)
-								p += [ [x1+nx*r,y1+ny*r,r] ]
+								w = min(r, self.options.tool_diameter)
+								p += [ [x1+nx*w,y1+ny*w,r,w] ]
 								
 							
 								
@@ -1182,10 +1266,10 @@ class Gcode_tools(inkex.Effect):
 									if len(cspm)>0 :
 										cspm[-1][2] = sp1[2]
 										cspm += [sp2[:], sp3[:], sp4[:]]
-										w +=  [p[i][2] for i in range(1,4)] 
+										w +=  [p[i][3] for i in range(1,4)] 
 									else :
 										cspm += [sp1[:], sp2[:], sp3[:], sp4[:]]	
-										w += [p[i][2] for i in range(4)]
+										w += [p[i][3] for i in range(4)]
 
 							node =  inkex.etree.SubElement(	self.Group, inkex.addNS('path','svg'), 										{
 														 "d":	 cubicsuperpath.formatPath([cspm]),
@@ -1228,27 +1312,26 @@ class Gcode_tools(inkex.Effect):
 			root = self.document.getroot()
 			points = [[self.options.orientation_point1x, self.options.orientation_point1y], [self.options.orientation_point2x, self.options.orientation_point2y], [self.options.orientation_point3x, self.options.orientation_point3y]]
 			for i in points :
-				print_(i)
-				inkex.etree.SubElement(	root, inkex.addNS('path','svg'), 
+			
+				if self.current_layer is not None :
+					g = inkex.etree.SubElement(self.current_layer, inkex.addNS('g','svg'), {'comment': "Gcode tools orientation point"})
+				else :
+					g = inkex.etree.SubElement(	root, inkex.addNS('g','svg'), {'comment': "Gcode tools orientation point"})
+				inkex.etree.SubElement(	g, inkex.addNS('path','svg'), 
 					{
 						'style':	"stroke:none;fill:#000000;", 	
-						'd':'m %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z z' % (i[0], i[1]),
-						'comment': "Gcode tools orientation point"
+						'd':'m %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z z' % (i[0], -i[1]),
+						'comment': "Gcode tools orientation point arrow"
 					})
-				t = inkex.etree.SubElement(	root, inkex.addNS('text','svg'), 
+				t = inkex.etree.SubElement(	g, inkex.addNS('text','svg'), 
 					{
 						'style':	"font-size:10px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
 						'x':	str(i[0]+10),
-						'y':	str(i[1]-10),
+						'y':	str(-i[1]-10),
+						'comment': "Gcode tools orientation point text"
 					})
-				t = inkex.etree.SubElement(	t, inkex.addNS('text','svg'), 
-					{
-						inkex.addNS("role","sodipodi"):'line',
-						'x':	str(i[0]+10),
-						'y':	str(i[1]-10),
-					})
-				t.text = "(%f, %f)" % (i[0],i[1])
-		
+				t.text = "(%s; %s)" % (i[0],i[1])
+				
 		
 		
 							
@@ -1256,40 +1339,3 @@ e = Gcode_tools()
 e.affect()					
 		
 		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-
-	
-		
-		
-		
-		
-	
