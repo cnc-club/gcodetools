@@ -97,7 +97,7 @@ ellips having r and r*4 unit diameter: math.sqrt(max(0,r**2-w**2))*4
 			<param name="orientation-point3x" type="float" precision="5" min="-100000" max="100000" _gui-text="Orientation point 3 X">0.</param>
 			<param name="orientation-point3y" type="float" precision="5" min="-100000" max="100000" _gui-text="Orientation point 4 Y">100.</param>
 			
-			<param name="orientation-scale" type="float" precision="10" min="-100000" max="100000" _gui-text="Initial scale">3,543307087</param>
+			<param name="orientation-scale" type="float" precision="10" min="-100000" max="100000" _gui-text="Initial scale">3.543307087</param>
 			
 			<_param name="help" type="description">
 Press apply to create three control points. The transformation (offset,scale,rotation in XY plane) of the path will be automaticaly calculated depending on this points.
@@ -108,8 +108,8 @@ You can modify coordinates that are in the brackets right in the image usin text
 
 
 Initial scale is helpfull if you want to use mm or inches. 
-For mm set Initial scale to 3,543307087 
-For inches set Initial scale to 90.
+For mm set Initial scale to 3.543307087 
+For inches set Initial scale to 90
 
 			</_param>
 
