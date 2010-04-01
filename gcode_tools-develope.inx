@@ -55,7 +55,7 @@ Gcode tools ver. 1.2 22.02.2010.
 			
 		</page>	
 		<page name='path-to-gcode' _gui-text='Path to Gcode'>	
-				<param name="biarc-tolerance" type='float' _gui-text='Biarc interpolation tolerance'>1</param>
+				<param name="biarc-tolerance" type='float' precision="5" _gui-text='Biarc interpolation tolerance'>1</param>
 				<param name="biarc-max-split-depth" type="int" _gui-text="Maximum splitting depth">4</param>
 				<_param name="help" type="description">
 Biarc interpolation tolerance is maximum distance between path and it approximation. 
@@ -72,8 +72,8 @@ Area will be filled with offsest, having radius equal to (n+1/2)*"tool diameter"
 
 		</page>			
 		<page name='engraving' _gui-text='Engraving'>	
-			<param name="engraving-sharp-angle-tollerance" type="float" min="0" max="180" _gui-text="Sharp angle tolerance">150</param>
-			<param name="engraving-max-dist" type="float" min="0" max="1000" _gui-text="Maximum distance for engraving">10</param>
+			<param name="engraving-sharp-angle-tollerance" type="float"  precision="5" min="0" max="180" _gui-text="Sharp angle tolerance">150</param>
+			<param name="engraving-max-dist" type="float" precision="5" min="0" max="1000" _gui-text="Maximum distance for engraving">10</param>
 			<param name="engraving-newton-iterations" type="int" min="2" max="10" _gui-text="Number of sample points used to calculate distance">4</param>
 			<param name="engraving-draw-calculation-paths" type="boolean" _gui-text="Draw additional graphics to debug engraving path">false</param>
 			<param name="engraving-cutter-shape-function" type="string" _gui-text="Cutter shape function z(w)=">w</param>
@@ -90,18 +90,27 @@ ellips having r and r*4 unit diameter: math.sqrt(max(0,r**2-w**2))*4
 
 		</page>			
 		<page name='orientation' _gui-text='Orientation'>	
-			<param name="orientation-point1x" type="float" min="-100000" max="100000" _gui-text="Orientation point 1 X">0.0</param>
-			<param name="orientation-point1y" type="float" min="-100000" max="100000" _gui-text="Orientation point 1 Y">0.0</param>
-			<param name="orientation-point2x" type="float" min="-100000" max="100000" _gui-text="Orientation point 2 X">100.</param>
-			<param name="orientation-point2y" type="float" min="-100000" max="100000" _gui-text="Orientation point 2 Y">0.</param>
-			<param name="orientation-point3x" type="float" min="-100000" max="100000" _gui-text="Orientation point 3 X">0.</param>
-			<param name="orientation-point3y" type="float" min="-100000" max="100000" _gui-text="Orientation point 4 Y">100.</param>
+			<param name="orientation-point1x" type="float" precision="5" min="-100000" max="100000" _gui-text="Orientation point 1 X">0.0</param>
+			<param name="orientation-point1y" type="float" precision="5" min="-100000" max="100000" _gui-text="Orientation point 1 Y">0.0</param>
+			<param name="orientation-point2x" type="float" precision="5" min="-100000" max="100000" _gui-text="Orientation point 2 X">100.</param>
+			<param name="orientation-point2y" type="float" precision="5" min="-100000" max="100000" _gui-text="Orientation point 2 Y">0.</param>
+			<param name="orientation-point3x" type="float" precision="5" min="-100000" max="100000" _gui-text="Orientation point 3 X">0.</param>
+			<param name="orientation-point3y" type="float" precision="5" min="-100000" max="100000" _gui-text="Orientation point 4 Y">100.</param>
+			
+			<param name="orientation-scale" type="float" precision="10" min="-100000" max="100000" _gui-text="Initial scale">3,543307087</param>
+			
 			<_param name="help" type="description">
 Press apply to create three control points. The transformation (offset,scale,rotation in XY plane) of the path will be automaticaly calculated depending on this points.
 
 You can apply transormations to this points, move them. Just make sure that they are not on one line.
 
 You can modify coordinates that are in the brackets right in the image usin text tool.
+
+
+Initial scale is helpfull if you want to use mm or inches. 
+For mm set Initial scale to 3,543307087 
+For inches set Initial scale to 90.
+
 			</_param>
 
 		</page>

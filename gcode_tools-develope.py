@@ -588,6 +588,7 @@ class Gcode_tools(inkex.Effect):
 		self.OptionParser.add_option("",   "--orientation-point2y",			action="store", type="float", 		dest="orientation_point2y", default='0',		help="Orientation point")
 		self.OptionParser.add_option("",   "--orientation-point3x",			action="store", type="float", 		dest="orientation_point3x", default='0',		help="Orientation point")
 		self.OptionParser.add_option("",   "--orientation-point3y",			action="store", type="float", 		dest="orientation_point3y", default='100',		help="Orientation point")
+		self.OptionParser.add_option("",   "--orientation-scale",			action="store", type="float", 		dest="orientation_scale", default='2.8222222',	help="Orientation points initial scale")
 
 
 	def parse_curve(self, p, w = None, f = None):
@@ -628,8 +629,8 @@ class Gcode_tools(inkex.Effect):
 		
 		a,b,c = [0.,0.], [1.,0.], [0.,1.]
 		k = (b[0]-a[0])*(c[1]-a[1])-(c[0]-a[0])*(b[1]-a[1])
-		a,b,c = self.transform(a,True), self.transform(b,True), self.transform(b,True)
-		if ((b[0]-a[0])*(c[1]-a[1])-(c[0]-a[0])*(b[1]-a[1]))*k < 0 : reverse_angle = 1
+		a,b,c = self.transform(a,True), self.transform(b,True), self.transform(c,True)
+		if ((b[0]-a[0])*(c[1]-a[1])-(c[0]-a[0])*(b[1]-a[1]))*k > 0 : reverse_angle = 1
 		else : reverse_angle = -1 
 		for sk in curve:
 			si = sk[:]
@@ -813,10 +814,14 @@ class Gcode_tools(inkex.Effect):
 										)
 							).tolist()
 						self.transform_matrix = [[m[j*3+i][0] for i in range(3)] for j in range(3)]
-						self.transform_matrix_reverse = numpy.linalg.inv(self.transform_matrix)
 					else : self.transform_matrix = [[1,0,0],[0,1,0],[0,0,1]]
 				else : self.transform_matrix = [[1,0,0],[0,1,0],[0,0,1]]
 			else : self.transform_matrix = [[1,0,0],[0,1,0],[0,0,1]]
+			self.transform_matrix_reverse = numpy.linalg.inv(self.transform_matrix).tolist()		
+			print_("\n Transformation matrixes:")
+			print_(self.transform_matrix)
+			print_(self.transform_matrix_reverse)
+			
 		x,y = source_point[0],	source_point[1]
 		if not reverse :
 			t = self.transform_matrix
@@ -1314,26 +1319,22 @@ class Gcode_tools(inkex.Effect):
 ################################################################################
 
 		elif self.options.active_tab == '"orientation"' :
-			
-			root = self.document.getroot()
 			points = [[self.options.orientation_point1x, self.options.orientation_point1y], [self.options.orientation_point2x, self.options.orientation_point2y], [self.options.orientation_point3x, self.options.orientation_point3y]]
+			orientation_group = inkex.etree.SubElement(self.current_layer if self.current_layer is not None else self.document.getroot(), inkex.addNS('g','svg'))
 			for i in points :
-			
-				if self.current_layer is not None :
-					g = inkex.etree.SubElement(self.current_layer, inkex.addNS('g','svg'), {'comment': "Gcode tools orientation point"})
-				else :
-					g = inkex.etree.SubElement(	root, inkex.addNS('g','svg'), {'comment': "Gcode tools orientation point"})
+				si = [i[0]*self.options.orientation_scale, i[1]*self.options.orientation_scale]
+				g = inkex.etree.SubElement(orientation_group, inkex.addNS('g','svg'), {'comment': "Gcode tools orientation point"})
 				inkex.etree.SubElement(	g, inkex.addNS('path','svg'), 
 					{
 						'style':	"stroke:none;fill:#000000;", 	
-						'd':'m %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z z' % (i[0], -i[1]),
+						'd':'m %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z z' % (si[0], -si[1]),
 						'comment': "Gcode tools orientation point arrow"
 					})
 				t = inkex.etree.SubElement(	g, inkex.addNS('text','svg'), 
 					{
 						'style':	"font-size:10px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
-						'x':	str(i[0]+10),
-						'y':	str(-i[1]-10),
+						'x':	str(si[0]+10),
+						'y':	str(-si[1]-10),
 						'comment': "Gcode tools orientation point text"
 					})
 				t.text = "(%s; %s)" % (i[0],i[1])
