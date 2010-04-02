@@ -561,7 +561,7 @@ class Gcode_tools(inkex.Effect):
 		self.OptionParser.add_option("",   "--tool-diameter",				action="store", type="float", 		dest="tool_diameter", default="3",					help="Tool diameter used for area cutting")		
 		self.OptionParser.add_option("",   "--max-area-curves",				action="store", type="int", 		dest="max_area_curves", default="100",				help="Maximum area curves for each area")
 		self.OptionParser.add_option("",   "--area-inkscape-radius",		action="store", type="int", 		dest="area_inkscape_radius", default="-10",			help="Radius for preparing curves using inkscape")
-		self.OptionParser.add_option("",   "--unit",						action="store", type="string", 		dest="unit", default="G21 (All units in mm)\n",		help="Units")
+		self.OptionParser.add_option("",   "--unit",						action="store", type="string", 		dest="unit", default="G21 (All units in mm)",		help="Units")
 		self.OptionParser.add_option("",   "--active-tab",					action="store", type="string", 		dest="active_tab", default="",						help="Defines which tab is active")
 
 		self.OptionParser.add_option("",   "--generate_not_parametric_code",action="store", type="inkbool",		dest="generate_not_parametric_code", default=False,	help="Generated code will be not parametric.")		
@@ -693,7 +693,8 @@ class Gcode_tools(inkex.Effect):
 			else:
 				self.footer = defaults['footer']
 		
-			self.header += self.options.unit + ( """#4  = %f (Feed)
+			self.header += self.options.unit + ( """
+#4  = %f (Feed)
 #5  = 1 (Scale xy)
 #7  = %f (Scale z)
 #8  = 0 (Offset x)
@@ -721,7 +722,8 @@ class Gcode_tools(inkex.Effect):
 				if c[i]!=None:
 					r += s[i] + ("%f" % (c[i]*m[i]+a[i])) + s1[i]
 			return r
-		g, lg, zs, f = '', 'G00', self.options.Zsafe, " F%f"%self.options.feed if self.options.generate_not_parametric_code else "F#4" 
+		if len(curve)==0 : return ""	
+		g, lg, zs, f = '', 'G00', self.options.Zsafe, " F%f"%self.options.feed if self.options.generate_not_parametric_code else "F#4"
 		for i in range(1,len(curve)):
 			s, si = curve[i-1], curve[i]
 			feed = f if lg not in ['G01','G02','G03'] else ''
