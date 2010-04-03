@@ -66,8 +66,9 @@ If distance between path's segment and it's approximation is greater than biarc 
 			<param name="max-area-curves" type="int" min="0" max="1000" _gui-text="Maximum area cutting curves">100</param>
 			<param name="area-inkscape-radius" type="int" min="-1000" max="1000" _gui-text="Area radius">-10</param>
 			<_param name="help" type="description">
-This function creates several Inkscape path offsets to fill original path's area. Fill in in "Area radius" and press apply.
-Area will be filled with offsest, having radius equal to (n+1/2)*"tool diameter" where n is offset number.
+This function creates several Inkscape path offsets to fill original path's area up to "Area radius" value. 
+Outlines start from tool_diameter/2 to "Area radius" with tool_diameter steps.
+Fill in "Area radius" and press apply.
 			</_param>
 
 		</page>			

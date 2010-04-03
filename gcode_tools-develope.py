@@ -994,7 +994,9 @@ class Gcode_tools(inkex.Effect):
 					d = re.sub(r'(?i)\s*([A-Za-z])\s*',r' \1 ',d)
 					r = self.options.area_inkscape_radius 							
 					sign=1 if r>0 else -1
-					tool_d = self.options.tool_diameter
+					a = self.transform([0,0],True)
+					b = self.transform([self.options.tool_diameter,0],True)
+					tool_d = math.sqrt( (b[0]-a[0])**2 + (b[1]-a[1])**2 )
 					for i in range(self.options.max_area_curves):
 						radius = - tool_d * (i+0.5) * sign
 						if abs(radius)>abs(r): 
