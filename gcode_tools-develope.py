@@ -22,7 +22,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 """
 
 ###
-###		Gcode tools v 1.2
+###		Gcode tools v 1.5 develope
 ###
 
 import inkex, simplestyle, simplepath
@@ -590,6 +590,25 @@ class Gcode_tools(inkex.Effect):
 		self.OptionParser.add_option("",   "--orientation-point3y",			action="store", type="float", 		dest="orientation_point3y", default='100',		help="Orientation point")
 		self.OptionParser.add_option("",   "--orientation-scale",			action="store", type="float", 		dest="orientation_scale", default='2.8222222',	help="Orientation points initial scale")
 
+		self.OptionParser.add_option("",   "--tools-library-type",			action="store", type="string", 		dest="tools_library_type", default='cylinder cutter',	help="Create tools defention")
+
+		self.default_tool = {
+					"name": "Default tool",
+					"id": "default tool",
+					"diameter":10,
+					"form": "w",
+					"penetration angle":"",
+					"depth step":"",
+					"feed":"",
+					"in trajectotry":"",
+					"out trajectotry":"",
+					"gcode before path":"",
+					"gcode after path":"",
+					"sog":"",
+					"spinlde rpm":"",
+					"CW or CCW":"",
+				}			
+
 
 	def parse_curve(self, p, w = None, f = None):
 			c = []
@@ -841,6 +860,9 @@ class Gcode_tools(inkex.Effect):
 				for k in xrange(len(csp[i][j])): 
 					csp[i][j][k] = self.transform(csp[i][j][k])
 		return csp
+		
+
+		
 ################################################################################
 ###
 ###		Effect
@@ -875,8 +897,8 @@ class Gcode_tools(inkex.Effect):
 ###		Curve to Gcode
 ###
 ################################################################################
-		if self.options.active_tab not in ['"path-to-gcode"', '"area"', '"engraving"', '"orientation"']:
-			inkex.errormsg(_("Select one of the active tabs - Path to Gcode, Area, Engraving or Orientation."))
+		if self.options.active_tab not in ['"path-to-gcode"', '"area"', '"engraving"', '"orientation"', '"tools_library"']:
+			inkex.errormsg(_("Select one of the active tabs - Path to Gcode, Area, Engraving, Orientation ot Tools library."))
 			return
 		elif self.options.active_tab == '"path-to-gcode"':
 
@@ -994,12 +1016,14 @@ class Gcode_tools(inkex.Effect):
 					d = re.sub(r'(?i)\s*([A-Za-z])\s*',r' \1 ',d)
 					r = self.options.area_inkscape_radius 							
 					sign=1 if r>0 else -1
+
 					a = self.transform([0,0],True)
 					b = self.transform([self.options.tool_diameter,0],True)
 					tool_d = math.sqrt( (b[0]-a[0])**2 + (b[1]-a[1])**2 )
 					c = self.transform([r,0],True)
 					r = math.sqrt( (c[0]-a[0])**2 + (c[1]-a[1])**2 )
 					print_("tool_diameter=%10.3f, r=%10.3f" % (tool_d, r))
+
 					for i in range(self.options.max_area_curves):
 						radius = - tool_d * (i+0.5) * sign
 						if abs(radius)>abs(r): 
@@ -1347,9 +1371,108 @@ class Gcode_tools(inkex.Effect):
 				t.text = "(%s; %s)" % (i[0],i[1])
 				
 		
+################################################################################
+###
+###		Tools library
+###
+################################################################################
+		elif self.options.active_tab == '"tools_library"' :
+			
+			tool = {
+					"name": "Default tool",
+					"id": "default tool\nsdf\nfdg",
+					"diameter":10,
+					"form": "w\s423\ndfsf\ndfg\n",
+					"penetration angle":"",
+					"depth step":"",
+			}
+			
+			for k in self.tool:
+				print_(k)		
+			tools_group = inkex.etree.SubElement(self.current_layer if self.current_layer is not None else self.document.getroot(), inkex.addNS('g','svg'), {'gcode_tools': "Gcode tools tool defenition"})
+			bg = inkex.etree.SubElement(	tools_group, inkex.addNS('path','svg'), 
+						{'style':	"fill:#eeeeee;stroke:#444444; stroke-width:1px;"})
+
+			y = 0
+			for key in self.tool :
+				g = inkex.etree.SubElement(tools_group, inkex.addNS('g','svg'), {'gcode_tools': "Gcode tools tool parameter"})
+			
+				t = inkex.etree.SubElement(	g, inkex.addNS('text','svg'), 
+						{
+							'style':	"font-size:10px;font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
+							'x':	str(self.view_center[0]-150),
+							'y':	str(self.view_center[1]+y),
+							'gcode_tools': "Gcode tools tool defention field name"
+						})
+				t.text = str(key)
+				v = str(self.tool[key]).split("\n")
+				t = inkex.etree.SubElement(	g, inkex.addNS('text','svg'), 
+						{
+							'style':	"font-size:10px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
+							'x':	str(self.view_center[0]),
+							'y':	str(self.view_center[1]+y),
+							'gcode_tools': "Gcode tools tool defention field value"
+						})
+				for s in v :
+					span = inkex.etree.SubElement( t, inkex.addNS('tspan','svg'), 
+						{
+							'style':	"font-size:10px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
+							'x':	str(self.view_center[0]),
+							'y':	str(self.view_center[1]+y),
+							'gcode_tools': "Gcode tools tool defention field value"
+						})					
+					y += 15
+					span.text = s
+			bg.set('d',"m %f,%f l %f,%f %f,%f %f,%f z " % (self.view_center[0]-170, self.view_center[1]-20, 300,0, 0,y+50, -300, 0) )	
+			
+			self.tool = []
+			self.get_tool()
+
+
+	def get_tool(self):
+		def search_in_group(g):
+			for i in g:
+				if i.tag == inkex.addNS("g",'svg') and i.get("gcode_tools") == "Gcode tools tool defenition":
+					return i	
+				elif i.tag == inkex.addNS("g",'svg'): 
+					k = search_in_group(i)
+					if k!=[] : return k
+			return []
+	
+		for g in [self.current_layer, self.document.getroot()] if self.current_layer is not None else [self.document.getroot()]:
+			p = search_in_group(g)
+			if p!=[] : break
 		
-							
+		self.tool = self.default_tool
+
+		if p==[]: 
+			return 
+		
+		for i in p:
+			#	Get parameters
+			if i.get("gcode_tools") == "Gcode tools tool parameter" :
+				key = ""
+				value = ""
+				for j in p:
+					if j.get("gcode_tools") == "Gcode tools tool defention field name":
+						key = j.text
+					if j.get("gcode_tools") == "Gcode tools tool defention field value":
+						key = j.text
+						for k in j :
+							if k.tag == inkex.addNS('tspan','svg') and k.get("gcode_tools") == "Gcode tools tool defention field value":
+								value += "\n" + k.text if value != "" else k.text
+				if key in self.default_tool.keys() :
+					 try :
+						self.tool[key] = type(self.default_tool[key])(value)
+					 except :
+						self.tool[key] = self.default_tool[key]
+						print_("Warning! Tool's and default tool's parameter's (%s) types are not the same ( type('%s') != type('%s') )." % (key, value, self.default_tool[key]))
+				else :
+					self.tool[key] = value
+					print_("Warning! Tool has parameter that default tool heve not ( '%s': '%s' )." % (key, value)
+					
+					
+					
 e = Gcode_tools()
 e.affect()					
-		
-		
+

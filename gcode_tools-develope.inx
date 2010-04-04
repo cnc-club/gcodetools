@@ -19,15 +19,11 @@ Russian support forum:
 English support forum:
 	http://www.cnc-club.ru/forum/viewtopic.php?t=35
 
-Gcode tools ver. 1.2 22.02.2010.
+Gcode tools ver. 1.5 develope
 			</_param>	
 		</page>
 		<page name='options' _gui-text='Options'>
-			<param name="Xscale" type="float" precision="5" min="-100000" max="100000"  _gui-text="Scale along X axis">1</param>
-			<param name="Yscale" type="float" precision="5" min="-100000" max="100000" _gui-text="Scale along Y axis">1</param>
 			<param name="Zscale" type="float" precision="5" min="-100000" max="100000" _gui-text="Scale along Z axis">1</param>			
-			<param name="Xoffset" type="float" precision="5" min="-100000" max="100000" _gui-text="Offset along X axis">0.0</param>
-			<param name="Yoffset" type="float" precision="5" min="-100000" max="100000" _gui-text="Offset along Y axis">0.0</param>
 			<param name="Zoffset" type="float" precision="5" min="-100000" max="100000" _gui-text="Offset along Z axis">0.0</param>
 			<param name="generate_not_parametric_code" type="boolean" _gui-text="Generate not parametric code">false</param>
 			<param name="min-arc-radius" type="float" precision="5" min="-1000" max="1000"  _gui-text="Minimum arc radius">0.05</param>
@@ -86,10 +82,9 @@ Cutter shape function is a function which defines shape of the cutter. Some simp
 45 degree cone: w
 cone having 10 unit height and 3 unit diameter: 10/3 w
 sphere having r unit diameter: math.sqrt(max(0,r**2-w**2))
-ellips having r and r*4 unit diameter: math.sqrt(max(0,r**2-w**2))*4
-</_param>
-
+ellips having r and r*4 unit diameter: math.sqrt(max(0,r**2-w**2))*4</_param>
 		</page>			
+		
 		<page name='orientation' _gui-text='Orientation'>	
 			<param name="orientation-point1x" type="float" precision="5" min="-100000" max="100000" _gui-text="Orientation point 1 X">0.0</param>
 			<param name="orientation-point1y" type="float" precision="5" min="-100000" max="100000" _gui-text="Orientation point 1 Y">0.0</param>
@@ -110,11 +105,26 @@ You can modify coordinates that are in the brackets right in the image usin text
 
 Initial scale is helpfull if you want to use mm or inches. 
 For mm set Initial scale to 3.543307087 
-For inches set Initial scale to 90
-
-			</_param>
-
+For inches set Initial scale to 90</_param>
 		</page>
+
+		<page name='tools_library' _gui-text='Tools library'>	
+			
+			<param type='optiongroup' name='tools-library-type' _gui-text="Tools type:">
+				<option value='cylinder cutter'>Cylinder cutter</option>
+				<option value='cone cutter'>Cone cutter</option>
+				<option value='plasma cutter'>Plasma cutter</option>
+			</param>
+			
+			<_param name="help" type="description">
+Press apply to create new tool. Selecting tools type just changes default values for the tool.
+
+All parameters (field names and values) can be changed using the text tool.
+
+You can create a number of tools, Gcode tools will use topmost (in z order) tool in the active layer. Or if there's no tools in the active layer plug-in will search for tools in whole image.</_param>
+		</page>
+			
+			
 			
 	</param>	
     <effect>
