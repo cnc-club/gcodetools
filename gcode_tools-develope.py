@@ -450,7 +450,7 @@ def biarc(sp1, sp2, z1, z2, depth=0):
 			l1, l2 = cspseglength(sp1,sp2), cspseglength(sp2,sp3)
 			if l1+l2 == 0 : zm = z1
 			else : zm = z1+(z2-z1)*l1/(l1+l2)
-			return biarc(sp1,sp2,z1,zm,depth+1)+biarc(sp2,sp3,z1,zm,depth+1)
+			return biarc(sp1,sp2,z1,zm,depth+1)+biarc(sp2,sp3,zm,z2,depth+1)
 		else: return [ [sp1[1],'line', 0, 0, sp2[1], [z1,z2]] ]
 
 	P0, P4 = P(sp1[1]), P(sp2[1])
