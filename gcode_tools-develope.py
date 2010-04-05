@@ -520,7 +520,7 @@ def biarc(sp1, sp2, z1, z2, depth=0):
 	if d > options.biarc_tolerance and depth<options.biarc_max_split_depth	 : return biarc_split(sp1, sp2, z1, z2, depth)
 	else:
 		if R2.mag()*a2 == 0 : zm = z2
-		else : zm  = z1 + (z2-z1)*(R1.mag()*a1)/(R2.mag()*a2+R1.mag()*a1)  
+		else : zm  = z1 + (z2-z1)*(abs(R1.mag()*a1))/(abs(R2.mag()*a2)+abs(R1.mag()*a1)) 
 		return [	[ sp1[1], 'arc', [R1.x,R1.y], a1, [P2.x,P2.y], [z1,zm] ], [ [P2.x,P2.y], 'arc', [R2.x,R2.y], a2, [P4.x,P4.y], [zm,z2] ]		]
 
 
@@ -650,6 +650,8 @@ class Gcode_tools(inkex.Effect):
 					sp1 = [  [subpath[i-1][j][0], subpath[i-1][j][1]] for j in range(3)]
 					sp2 = [  [subpath[i  ][j][0], subpath[i  ][j][1]] for j in range(3)]
 					c += biarc(sp1,sp2,0,0) if w==None else biarc(sp1,sp2,-f(w[k][i-1]),-f(w[k][i]))
+#					l1 = biarc(sp1,sp2,0,0) if w==None else biarc(sp1,sp2,-f(w[k][i-1]),-f(w[k][i]))
+#					print_((-f(w[k][i-1]),-f(w[k][i]), [i1[5] for i1 in l1]) )
 				c += [ [ [subpath[-1][1][0],subpath[-1][1][1]]  ,'end',0,0] ]
 			return c
 
