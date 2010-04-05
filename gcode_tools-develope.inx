@@ -115,6 +115,7 @@ For inches set Initial scale to 90</_param>
 				<option value='cylinder cutter'>Cylinder cutter</option>
 				<option value='cone cutter'>Cone cutter</option>
 				<option value='plasma cutter'>Plasma cutter</option>
+				<option value='default tool'>Default tool (all parameters)</option>
 			</param>
 			
 			<_param name="help" type="description">

@@ -765,10 +765,10 @@ class Gcode_tools(inkex.Effect):
 			s, si = curve[i-1], curve[i]
 			feed = f if lg not in ['G01','G02','G03'] else ''
 			if s[1]	== 'move':
-				g += go_to_safe_distance + "G00" + c(si[0]) + "\n"
+				g += go_to_safe_distance + "G00" + c(si[0]) + "\n" + self.tool['gcode before path'] + "\n"
 				lg = 'G00'
 			elif s[1] == 'end':
-				g += go_to_safe_distance
+				g += go_to_safe_distance + self.tool['gcode after path'] + "\n"
 				lg = 'G00'
 			elif s[1] == 'line':
 				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + penetration_feed +"\n"	
@@ -789,7 +789,7 @@ class Gcode_tools(inkex.Effect):
 					g += "G01" +c(si[0]+[s[5][1]+depth]) + feed + "\n"
 					lg = 'G01'
 		if si[1] == 'end':
-			g += "G00" + c([None,None,zs]) + "\n"
+			g += go_to_safe_distance + self.tool['gcode after path'] + "\n"
 		return g
 	
 	def apply_transforms(self,g,csp):
@@ -1421,6 +1421,21 @@ class Gcode_tools(inkex.Effect):
 						"penetration feed":"100",
 						"depth step":"1",
 				}
+			elif self.options.tools_library_type == "plasma cutter":	
+				tool = {
+					"name": "Plasma cutter",
+					"id": "Plasma cutter 0001",
+					"diameter":10,
+					"penetration feed":100,
+					"feed":400,
+					"gcode before path":"""G31 Z-100 F500 (find metal)
+G92 Z0 (zerro z)
+G00 Z10 F500 (going up)
+M03 (turn on plasma)
+G04 P0.2 (pause)
+G01 Z1 (going to cutting z)\n""",
+					"gcode after path":"M05 (turn off plasma)\n",
+				}
 			else :
 				tool = self.default_tool
 				
@@ -1440,8 +1455,7 @@ class Gcode_tools(inkex.Effect):
 			
 				t = inkex.etree.SubElement(	g, inkex.addNS('text','svg'), 
 						{
-							'style':	("font-size:10px;" if key!="name" else "font-size:20px;") +	"font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;" 
-								,
+							'style':	("font-size:10px;" if key!="name" else "font-size:20px;") +	"font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
 							'x':	str(self.view_center[0]-150),
 							'y':	str(self.view_center[1]+y),
 							'gcode_tools': "Gcode tools tool defention field name"
@@ -1501,7 +1515,7 @@ class Gcode_tools(inkex.Effect):
 					if j.get("gcode_tools") == "Gcode tools tool defention field value":
 						for k in j :
 							if k.tag == inkex.addNS('tspan','svg') and k.get("gcode_tools") == "Gcode tools tool defention field value":
-								value += "\n" + k.text if value != None else k.text
+								if k.text!=None : value = value +"\n" + k.text if value != None else k.text
 				if value == None or key == None: continue
 #				print_("Found tool parameter '%s':'%s'" % (key,value))
 				if key in self.default_tool.keys() :
