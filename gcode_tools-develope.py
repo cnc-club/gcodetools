@@ -591,7 +591,6 @@ class Gcode_tools(inkex.Effect):
 		self.OptionParser.add_option("",   "--orientation-point3y",			action="store", type="float", 		dest="orientation_point3y", default='100',		help="Orientation point")
 		self.OptionParser.add_option("",   "--orientation-scale",			action="store", type="float", 		dest="orientation_scale", default='2.8222222',	help="Orientation points initial scale")
 
-
 	def parse_curve(self, p, w = None, f = None):
 			c = []
 			if len(p)==0 : 
@@ -721,7 +720,6 @@ class Gcode_tools(inkex.Effect):
 			r = ''	
 			for i in range(6):
 				if c[i]!=None:
-					print_(c[i])
 					r += s[i] + ("%f" % (c[i]*m[i]+a[i])) + s1[i]
 			return r
 		if len(curve)==0 : return ""	
@@ -873,6 +871,10 @@ class Gcode_tools(inkex.Effect):
 		else : print_  = lambda x : None 
 		
 		self.transform_matrix = None	
+		if (self.options.orientation_scale < 0):
+			self.options.orientation_scale = float("3.5433070660")
+			print_("orientation_scale < 0 ===> switching to mm units=%0.10f"%self.options.orientation_scale )
+	
 			
 ################################################################################
 ###
