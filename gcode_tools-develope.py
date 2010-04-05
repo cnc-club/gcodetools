@@ -624,6 +624,7 @@ class Gcode_tools(inkex.Effect):
 				]
 
 
+
 	def parse_curve(self, p, w = None, f = None):
 			c = []
 			if len(p)==0 : 
@@ -726,8 +727,8 @@ class Gcode_tools(inkex.Effect):
 			else:
 				self.footer = defaults['footer']
 		
-			self.header += self.options.unit +"\n"+ ( """
-#4  = %s (Feed)
+
+			self.header += self.options.unit + "\n" + ( """#4  = %f (Feed)
 #5  = 1 (Scale xy)
 #7  = %s (Scale z)
 #8  = 0 (Offset x)
@@ -906,9 +907,15 @@ class Gcode_tools(inkex.Effect):
 				print_  = lambda x : None 
 		else : print_  = lambda x : None 
 		
-		self.transform_matrix = None
+		self.transform_matrix = None	
+		if (self.options.orientation_scale < 0):
+			self.options.orientation_scale = 3.5433070660
+			print_("orientation_scale < 0 ===> switching to mm units=%0.10f"%self.options.orientation_scale )
+		
+	
 		if self.options.active_tab !=  '"tools_library"':	
 			self.get_tool()	
+	
 ################################################################################
 ###
 ###		Curve to Gcode
