@@ -41,6 +41,7 @@ Gcode tools ver. 1.2 22.02.2010.
 			<param name="Zsafe" type="float" precision="5" min="-1000" max="1000" _gui-text="Z safe">5</param>
 			<param name="Zsurface" type="float" precision="5" min="-1000" max="1000" _gui-text="Z surface">0</param>
 			<param name="Zdepth" type="float" precision="5" min="-1000" max="1000" _gui-text="Z depth">-1</param>
+			<param name="Zspeed" type="float" precision="5" min="0" max="1000" _gui-text="Z speed">-1</param>
 			<param name="Zstep" type="float" precision="5" min="-1000" max="1000" _gui-text="Z step for each cycle">1</param>
 			<param name="feed" type="float" precision="5" min="0" max="1000" _gui-text="Feed rate (unit/min)">4.0</param>
 			

@@ -550,6 +550,7 @@ class Gcode_tools(inkex.Effect):
 		self.OptionParser.add_option("-y", "--Yoffset",						action="store", type="float", 		dest="Yoffset", default="0.0",						help="Offset along Y")
 		self.OptionParser.add_option("",   "--Zoffset",						action="store", type="float", 		dest="Zoffset", default="0.0",						help="Offset along Z")
 		self.OptionParser.add_option("-s", "--Zsafe",						action="store", type="float", 		dest="Zsafe", default="0.5",						help="Z above all obstacles")
+		self.OptionParser.add_option("",   "--Zspeed",						action="store", type="float", 		dest="Zspeed", default="0.5",						help="Z speed")
 		self.OptionParser.add_option("-z", "--Zsurface",					action="store", type="float", 		dest="Zsurface", default="0.0",						help="Z of the surface")
 		self.OptionParser.add_option("-c", "--Zdepth",						action="store", type="float", 		dest="Zdepth", default="-0.125",					help="Z depth of cut")
 		self.OptionParser.add_option("",   "--Zstep",						action="store", type="float", 		dest="Zstep", default="-0.125",						help="Z step of cutting")		
@@ -693,14 +694,14 @@ class Gcode_tools(inkex.Effect):
 			else:
 				self.footer = defaults['footer']
 		
-			self.header += self.options.unit + ( """
-#4  = %f (Feed)
+			self.header += self.options.unit + "\n" + ( """#4  = %f (Feed)
 #5  = 1 (Scale xy)
 #7  = %f (Scale z)
 #8  = 0 (Offset x)
 #9  = 0 (Offset y)
 #10 = %f (Offset z)
-#11 = %f (Safe distanse)\n""" % (self.options.feed, self.options.Zscale, self.options.Zoffset, self.options.Zsafe)
+#11 = %f (Safe distanse)
+#12 = %f (Zspeed)\n""" % (self.options.feed, self.options.Zscale, self.options.Zoffset, self.options.Zsafe, self.options.Zspeed)
 			if not self.options.generate_not_parametric_code else "" )
 			return True
 		else: 
@@ -720,6 +721,7 @@ class Gcode_tools(inkex.Effect):
 			r = ''	
 			for i in range(6):
 				if c[i]!=None:
+					print_(c[i])
 					r += s[i] + ("%f" % (c[i]*m[i]+a[i])) + s1[i]
 			return r
 		if len(curve)==0 : return ""	
@@ -727,14 +729,16 @@ class Gcode_tools(inkex.Effect):
 		for i in range(1,len(curve)):
 			s, si = curve[i-1], curve[i]
 			feed = f if lg not in ['G01','G02','G03'] else ''
-			if s[1]	== 'move':
-				g += "G00" + c([None,None,zs]) + "\nG00" + c(si[0]) + "\n"
+			go_to_safe_distance = "G00" + c([None,None,zs]) + "\n" if self.options.generate_not_parametric_code else 'G00 Z[#11*#7+#10]\n'
+			if s[1]   == 'move':
+				g += go_to_safe_distance + "G00" + c(si[0]) + "\n"
 				lg = 'G00'
 			elif s[1] == 'end':
-				g += "G00" + c([None,None,zs]) + "\n"
+				g += go_to_safe_distance
 				lg = 'G00'
 			elif s[1] == 'line':
-				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + feed +"\n"	
+				zspd="%f"%self.options.Zspeed if self.options.generate_not_parametric_code else "F#12"
+				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + zspd +"\n"	
 				g += "G01" +c(si[0]+[s[5][1]+depth]) + feed + "\n"
 				lg = 'G01'
 			elif s[1] == 'arc':
