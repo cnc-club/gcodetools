@@ -450,7 +450,7 @@ def biarc(sp1, sp2, z1, z2, depth=0):
 			l1, l2 = cspseglength(sp1,sp2), cspseglength(sp2,sp3)
 			if l1+l2 == 0 : zm = z1
 			else : zm = z1+(z2-z1)*l1/(l1+l2)
-			return biarc(sp1,sp2,z1,zm,depth+1)+biarc(sp2,sp3,z1,zm,depth+1)
+			return biarc(sp1,sp2,z1,zm,depth+1)+biarc(sp2,sp3,zm,z2,depth+1)
 		else: return [ [sp1[1],'line', 0, 0, sp2[1], [z1,z2]] ]
 
 	P0, P4 = P(sp1[1]), P(sp2[1])
@@ -543,11 +543,7 @@ class Gcode_tools(inkex.Effect):
 		inkex.Effect.__init__(self)
 		self.OptionParser.add_option("-d", "--directory",					action="store", type="string", 		dest="directory", default="/home/",					help="Directory for gcode file")
 		self.OptionParser.add_option("-f", "--filename",					action="store", type="string", 		dest="file", default="-1.0",						help="File name")			
-		self.OptionParser.add_option("-u", "--Xscale",						action="store", type="float", 		dest="Xscale", default="1.0",						help="Scale factor X")	
-		self.OptionParser.add_option("-v", "--Yscale",						action="store", type="float", 		dest="Yscale", default="1.0",						help="Scale factor Y")
 		self.OptionParser.add_option("",   "--Zscale",						action="store", type="float", 		dest="Zscale", default="1.0",						help="Scale factor Z")				
-		self.OptionParser.add_option("-x", "--Xoffset",						action="store", type="float", 		dest="Xoffset", default="0.0",						help="Offset along X")	
-		self.OptionParser.add_option("-y", "--Yoffset",						action="store", type="float", 		dest="Yoffset", default="0.0",						help="Offset along Y")
 		self.OptionParser.add_option("",   "--Zoffset",						action="store", type="float", 		dest="Zoffset", default="0.0",						help="Offset along Z")
 		self.OptionParser.add_option("-s", "--Zsafe",						action="store", type="float", 		dest="Zsafe", default="0.5",						help="Z above all obstacles")
 		self.OptionParser.add_option("-z", "--Zsurface",					action="store", type="float", 		dest="Zsurface", default="0.0",						help="Z of the surface")
@@ -596,10 +592,11 @@ class Gcode_tools(inkex.Effect):
 					"name": "Default tool",
 					"id": "default tool",
 					"diameter":10,
-					"form": "w",
-					"penetration angle":"",
-					"depth step":"",
-					"feed":"",
+					"shape": "10",
+					"penetration angle":90,
+					"penetration feed":100,
+					"depth step":1,
+					"feed":400,
 					"in trajectotry":"",
 					"out trajectotry":"",
 					"gcode before path":"",
@@ -608,6 +605,23 @@ class Gcode_tools(inkex.Effect):
 					"spinlde rpm":"",
 					"CW or CCW":"",
 				}			
+		self.tools_field_order = [
+					'name',
+					'id',
+					'diameter',
+					'feed',
+					'shape',
+					'penetration angle',
+					'penetration feed',
+					'depth step',
+					"in trajectotry",
+					"out trajectotry",
+					"gcode before path",
+					"gcode after path",
+					"sog",
+					"spinlde rpm",
+					"CW or CCW"
+				]
 
 
 	def parse_curve(self, p, w = None, f = None):
@@ -712,14 +726,15 @@ class Gcode_tools(inkex.Effect):
 			else:
 				self.footer = defaults['footer']
 		
-			self.header += self.options.unit + ( """
-#4  = %f (Feed)
+			self.header += self.options.unit +"\n"+ ( """
+#4  = %s (Feed)
 #5  = 1 (Scale xy)
-#7  = %f (Scale z)
+#7  = %s (Scale z)
 #8  = 0 (Offset x)
 #9  = 0 (Offset y)
-#10 = %f (Offset z)
-#11 = %f (Safe distanse)\n""" % (self.options.feed, self.options.Zscale, self.options.Zoffset, self.options.Zsafe)
+#10 = %s (Offset z)
+#11 = %s (Safe distanse)
+#12 = %s (Penetration feed)\n""" % (self.tool['feed'], self.options.Zscale, self.options.Zoffset, self.options.Zsafe, self.tool['penetration feed'])
 			if not self.options.generate_not_parametric_code else "" )
 			return True
 		else: 
@@ -742,33 +757,34 @@ class Gcode_tools(inkex.Effect):
 					r += s[i] + ("%f" % (c[i]*m[i]+a[i])) + s1[i]
 			return r
 		if len(curve)==0 : return ""	
-		g, lg, zs, f = '', 'G00', self.options.Zsafe, " F%f"%self.options.feed if self.options.generate_not_parametric_code else "F#4"
+		g, lg, zs, f = '', 'G00', self.options.Zsafe, " F%f"%self.tool['feed'] if self.options.generate_not_parametric_code else " F#4"
+		go_to_safe_distance = "G00" + c([None,None,zs]) + "\n" if self.options.generate_not_parametric_code else 'G00 Z[#11*#7+#10]\n' 
+		penetration_feed = " F%s"%self.tool['penetration feed'] if self.options.generate_not_parametric_code else " F#12"
 		for i in range(1,len(curve)):
 			s, si = curve[i-1], curve[i]
 			feed = f if lg not in ['G01','G02','G03'] else ''
 			if s[1]	== 'move':
-				g += "G00" + c([None,None,zs]) + "\nG00" + c(si[0]) + "\n"
+				g += go_to_safe_distance + "G00" + c(si[0]) + "\n"
 				lg = 'G00'
 			elif s[1] == 'end':
-				g += "G00" + c([None,None,zs]) + "\n"
+				g += go_to_safe_distance
 				lg = 'G00'
 			elif s[1] == 'line':
-				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + feed +"\n"	
+				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + penetration_feed +"\n"	
 				g += "G01" +c(si[0]+[s[5][1]+depth]) + feed + "\n"
 				lg = 'G01'
 			elif s[1] == 'arc':
 				r = [(s[2][0]-s[0][0]), (s[2][1]-s[0][1])]
+				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + penetration_feed + "\n"				
 				if (r[0]**2 + r[1]**2)>self.options.min_arc_radius:
 					r1, r2 = (P(s[0])-P(s[2])), (P(si[0])-P(s[2]))
 					if abs(r1.mag()-r2.mag()) < 0.001 :
-						if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + feed + "\n"
 						g += ("G02" if s[3]<0 else "G03") + c(si[0]+[ s[5][1]+depth, (s[2][0]-s[0][0]),(s[2][1]-s[0][1])  ]) + feed + "\n"
 					else:
 						r = (r1.mag()+r2.mag())/2
 						g += ("G02" if s[3]<0 else "G03") + c(si[0]+[s[5][1]+depth]) + " R%f" % (r) + feed  + "\n"
 					lg = 'G02'
 				else:
-					if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + "\n"	
 					g += "G01" +c(si[0]+[s[5][1]+depth]) + feed + "\n"
 					lg = 'G01'
 		if si[1] == 'end':
@@ -890,8 +906,9 @@ class Gcode_tools(inkex.Effect):
 				print_  = lambda x : None 
 		else : print_  = lambda x : None 
 		
-		self.transform_matrix = None	
-			
+		self.transform_matrix = None
+		if self.options.active_tab !=  '"tools_library"':	
+			self.get_tool()	
 ################################################################################
 ###
 ###		Curve to Gcode
@@ -926,9 +943,9 @@ class Gcode_tools(inkex.Effect):
 #					gcode += '(Found path %s)\n' % node.get('id').replace('(','').replace(')','').replace('\n','')
 			curve = self.parse_curve(p)
 			self.draw_curve(curve)
-			if self.options.Zstep == 0 : Zstep = 1
-			for step in range( 0,  int(math.ceil( abs( (self.options.Zdepth-self.options.Zsurface)/self.options.Zstep )) ) ):
-				Zpos = max(		self.options.Zdepth,		 self.options.Zsurface - abs(self.options.Zstep*(step+1))	)
+			if self.tool["depth step"] == 0 : self.tool["depth step"] = 1
+			for step in range( 0,  int(math.ceil( abs( (self.options.Zdepth-self.options.Zsurface)/self.tool["depth step"] )) ) ):
+				Zpos = max(		self.options.Zdepth,		 self.options.Zsurface - abs(self.tool["depth step"]*(step+1))	)
 				gcode += self.generate_gcode(curve,Zpos)
 			gcode += self.footer
 			try: 	
@@ -946,7 +963,7 @@ class Gcode_tools(inkex.Effect):
 ################################################################################
 
 		elif self.options.active_tab == '"area"' :
-			if self.options.tool_diameter<=0 : 
+			if self.tool['diameter']<=0 : 
 							inkex.errormsg(_("Tool diameter must be > 0!"))				
 							return
 			for id, node in self.selected.iteritems():
@@ -1018,11 +1035,11 @@ class Gcode_tools(inkex.Effect):
 					sign=1 if r>0 else -1
 
 					a = self.transform([0,0],True)
-					b = self.transform([self.options.tool_diameter,0],True)
+					b = self.transform([self.tool['diameter'],0],True)
 					tool_d = math.sqrt( (b[0]-a[0])**2 + (b[1]-a[1])**2 )
 					c = self.transform([r,0],True)
 					r = math.sqrt( (c[0]-a[0])**2 + (c[1]-a[1])**2 )
-					print_("tool_diameter=%10.3f, r=%10.3f" % (tool_d, r))
+					print_("tool diameter=%s, r=%s" % (tool_d, r))
 
 					for i in range(self.options.max_area_curves):
 						radius = - tool_d * (i+0.5) * sign
@@ -1079,8 +1096,8 @@ class Gcode_tools(inkex.Effect):
 					t1 = ((fy-y1)*f1x - (fx-x1)*f1y)/(ny*f1x-nx*f1y)
 					t2 = (x1-fx-t1*nx)/f1x if f1x != 0 else (y1-fy-t1*ny)/f1y
 				if (ny*f1x-nx*f1y)==0 or t1<0 or t2<0 : 	
-					t1 = self.options.tool_diameter
-					t2 = self.options.tool_diameter/math.sqrt(f1x*f1x+f1y*f1y)
+					t1 = self.tool['diameter']
+					t2 = self.tool['diameter']/math.sqrt(f1x*f1x+f1y*f1y)
 					
 				t = [ t1, t2, t3 ]					
 				i = 0
@@ -1268,7 +1285,7 @@ class Gcode_tools(inkex.Effect):
 											{'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x1+nx*r),  inkex.addNS('cy','sodipodi'):		str(y1+ny*r),inkex.addNS('rx','sodipodi'):		str(r), inkex.addNS('ry','sodipodi'):		str(r), inkex.addNS('type','sodipodi'):	'arc'})
 
 								r = min(r, self.options.engraving_max_dist)
-								w = min(r, self.options.tool_diameter)
+								w = min(r, self.tool['diameter'])
 								p += [ [x1+nx*w,y1+ny*w,r,w] ]
 								
 							
@@ -1325,8 +1342,8 @@ class Gcode_tools(inkex.Effect):
 							cspe += [cspm]
 							we   +=	[w]				
 
-			if self.options.engraving_cutter_shape_function != "":
-				f = eval('lambda w: ' + self.options.engraving_cutter_shape_function.strip('"'))
+			if self.tool['shape'] != "":
+				f = eval('lambda w: ' + self.tool['shape'].strip('"'))
 			else: f = lambda w: w
 			if cspe!=[]:
 				curve = self.parse_curve(cspe,we,f)
@@ -1377,38 +1394,56 @@ class Gcode_tools(inkex.Effect):
 ###
 ################################################################################
 		elif self.options.active_tab == '"tools_library"' :
-			
-			tool = {
-					"name": "Default tool",
-					"id": "default tool\nsdf\nfdg",
-					"diameter":10,
-					"form": "w\s423\ndfsf\ndfg\n",
-					"penetration angle":"",
-					"depth step":"",
-			}
-			
-			for k in self.tool:
-				print_(k)		
+			if self.options.tools_library_type == "cylinder cutter" :
+				tool = {
+						"name": "Cilindrical cutter",
+						"id": "Cilindrical cutter 0001",
+						"diameter":10,
+						"penetration angle":90,
+						"feed":"400",
+						"penetration feed":"100",
+						"depth step":"1",
+				}
+			elif self.options.tools_library_type == "cone cutter":	
+				tool = {
+						"name": "Cone cutter",
+						"id": "Cone cutter 0001",
+						"diameter":10,
+						"shape":"w",
+						"feed":"400",
+						"penetration feed":"100",
+						"depth step":"1",
+				}
+			else :
+				tool = self.default_tool
+				
+					
 			tools_group = inkex.etree.SubElement(self.current_layer if self.current_layer is not None else self.document.getroot(), inkex.addNS('g','svg'), {'gcode_tools': "Gcode tools tool defenition"})
 			bg = inkex.etree.SubElement(	tools_group, inkex.addNS('path','svg'), 
 						{'style':	"fill:#eeeeee;stroke:#444444; stroke-width:1px;"})
 
 			y = 0
-			for key in self.tool :
+			keys = []
+			for key in self.tools_field_order:
+				if key in tool: keys += [key]
+			for key in tool:
+				if key not in self.tools_field_order: keys += [key]
+			for key in keys :
 				g = inkex.etree.SubElement(tools_group, inkex.addNS('g','svg'), {'gcode_tools': "Gcode tools tool parameter"})
 			
 				t = inkex.etree.SubElement(	g, inkex.addNS('text','svg'), 
 						{
-							'style':	"font-size:10px;font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
+							'style':	("font-size:10px;" if key!="name" else "font-size:20px;") +	"font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;" 
+								,
 							'x':	str(self.view_center[0]-150),
 							'y':	str(self.view_center[1]+y),
 							'gcode_tools': "Gcode tools tool defention field name"
 						})
 				t.text = str(key)
-				v = str(self.tool[key]).split("\n")
+				v = str(tool[key]).split("\n")
 				t = inkex.etree.SubElement(	g, inkex.addNS('text','svg'), 
 						{
-							'style':	"font-size:10px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
+							'style':	("font-size:10px;" if key!="name" else "font-size:20px;") + "font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
 							'x':	str(self.view_center[0]),
 							'y':	str(self.view_center[1]+y),
 							'gcode_tools': "Gcode tools tool defention field value"
@@ -1416,22 +1451,21 @@ class Gcode_tools(inkex.Effect):
 				for s in v :
 					span = inkex.etree.SubElement( t, inkex.addNS('tspan','svg'), 
 						{
-							'style':	"font-size:10px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
 							'x':	str(self.view_center[0]),
 							'y':	str(self.view_center[1]+y),
 							'gcode_tools': "Gcode tools tool defention field value"
 						})					
-					y += 15
+					y += 15 if key!='name' else 20
 					span.text = s
-			bg.set('d',"m %f,%f l %f,%f %f,%f %f,%f z " % (self.view_center[0]-170, self.view_center[1]-20, 300,0, 0,y+50, -300, 0) )	
-			
-			self.tool = []
-			self.get_tool()
+			bg.set('d',"m %f,%f l %f,%f %f,%f %f,%f z " % (self.view_center[0]-170, self.view_center[1]-20, 400,0, 0,y+50, -400, 0) )	
+			tool = []
 
 
 	def get_tool(self):
 		def search_in_group(g):
-			for i in g:
+			items = g.getchildren()
+			items.reverse()
+			for i in items :
 				if i.tag == inkex.addNS("g",'svg') and i.get("gcode_tools") == "Gcode tools tool defenition":
 					return i	
 				elif i.tag == inkex.addNS("g",'svg'): 
@@ -1446,6 +1480,7 @@ class Gcode_tools(inkex.Effect):
 		self.tool = self.default_tool
 
 		if p==[]: 
+			print_("Have not found any tool. Using default tool: %s" % self.tool)			
 			return 
 		
 		for i in p:
@@ -1453,14 +1488,14 @@ class Gcode_tools(inkex.Effect):
 			if i.get("gcode_tools") == "Gcode tools tool parameter" :
 				key = ""
 				value = ""
-				for j in p:
+				for j in i:
 					if j.get("gcode_tools") == "Gcode tools tool defention field name":
 						key = j.text
 					if j.get("gcode_tools") == "Gcode tools tool defention field value":
-						key = j.text
 						for k in j :
 							if k.tag == inkex.addNS('tspan','svg') and k.get("gcode_tools") == "Gcode tools tool defention field value":
 								value += "\n" + k.text if value != "" else k.text
+#				print_("Found tool parameter '%s':'%s'" % (key,value))
 				if key in self.default_tool.keys() :
 					 try :
 						self.tool[key] = type(self.default_tool[key])(value)
@@ -1469,8 +1504,8 @@ class Gcode_tools(inkex.Effect):
 						print_("Warning! Tool's and default tool's parameter's (%s) types are not the same ( type('%s') != type('%s') )." % (key, value, self.default_tool[key]))
 				else :
 					self.tool[key] = value
-					print_("Warning! Tool has parameter that default tool heve not ( '%s': '%s' )." % (key, value)
-					
+					print_("Warning! Tool has parameter that default tool has not ( '%s': '%s' )." % (key, value) )
+		print_("Using tool: %s" % self.tool)			
 					
 					
 e = Gcode_tools()
