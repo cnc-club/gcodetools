@@ -1493,15 +1493,16 @@ class Gcode_tools(inkex.Effect):
 		for i in p:
 			#	Get parameters
 			if i.get("gcode_tools") == "Gcode tools tool parameter" :
-				key = ""
-				value = ""
+				key = None
+				value = None
 				for j in i:
 					if j.get("gcode_tools") == "Gcode tools tool defention field name":
 						key = j.text
 					if j.get("gcode_tools") == "Gcode tools tool defention field value":
 						for k in j :
 							if k.tag == inkex.addNS('tspan','svg') and k.get("gcode_tools") == "Gcode tools tool defention field value":
-								value += "\n" + k.text if value != "" else k.text
+								value += "\n" + k.text if value != None else k.text
+				if value == None or key == None: continue
 #				print_("Found tool parameter '%s':'%s'" % (key,value))
 				if key in self.default_tool.keys() :
 					 try :
