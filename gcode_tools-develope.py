@@ -807,8 +807,10 @@ class Gcode_tools(inkex.Effect):
 
 	def transform(self,source_point, reverse=False):
 		def search_in_group(g):
+			items = g.getchildren()
+			items.reverse()
 			p = []
-			for i in g:
+			for i in items:
 				if i.tag == inkex.addNS("g",'svg') and i.get("comment") == "Gcode tools orientation point":
 					p += [i]
 				elif i.tag == inkex.addNS("g",'svg'):
