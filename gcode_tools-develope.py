@@ -1403,8 +1403,8 @@ class Gcode_tools(inkex.Effect):
 		elif self.options.active_tab == '"tools_library"' :
 			if self.options.tools_library_type == "cylinder cutter" :
 				tool = {
-						"name": "Cilindrical cutter",
-						"id": "Cilindrical cutter 0001",
+						"name": "Cylindrical cutter",
+						"id": "Cylindrical cutter 0001",
 						"diameter":10,
 						"penetration angle":90,
 						"feed":"400",
