@@ -631,6 +631,7 @@ class Gcode_tools(inkex.Effect):
 				inkex.errormsg(_("Nothing to do. Check that all paths are actually paths."))
 				return []
 			p = self.transform_csp(p)
+			
 
 			### Sort to reduce Rapid distance	
 			k = range(1,len(p))
@@ -728,8 +729,6 @@ class Gcode_tools(inkex.Effect):
 				f.close()
 			else:
 				self.footer = defaults['footer']
-		
-
 			self.header += self.options.unit + "\n" + ( """#4  = %f (Feed)
 #5  = 1 (Scale xy)
 #7  = %s (Scale z)
@@ -750,10 +749,10 @@ class Gcode_tools(inkex.Effect):
 			if c[5] == 0 : c[5]=None
 			if self.options.generate_not_parametric_code:
 				s,s1 = [" X", " Y", " Z", " I", " J", " K"], ["","","","","",""]
-				m,a = [1,1,self.options.Zscale,1,1,self.options.Zscale], [0,0,self.options.Zoffset,0,0,0]
+				m,a = [1,1,self.options.Zscale*self.options.Zauto_scale,1,1,self.options.Zscale*self.options.Zauto_scale], [0,0,self.options.Zoffset,0,0,0]
 			else :
 				s,s1 = [" X[", " Y[", " Z[", " I[", " J[", " K["], [ "*#5+#8]", "*#5+#9]", "*#7+#10]", "*#5]",  "*#5]", "*#7]"]
-				m,a = [1,1,1,1,1,1], [0,0,0,0,0,0]
+				m,a = [1,1,self.options.Zauto_scale,1,1,self.options.Zauto_scale], [0,0,0,0,0,0]
 			r = ''	
 			for i in range(6):
 				if c[i]!=None:
@@ -863,7 +862,8 @@ class Gcode_tools(inkex.Effect):
 			print_("\n Transformation matrixes:")
 			print_(self.transform_matrix)
 			print_(self.transform_matrix_reverse)
-			
+			self.options.Zauto_scale  = math.sqrt( (self.transform_matrix[0][0]**2 + self.transform_matrix[1][1]**2)/2 )
+			print_("Z automatic scale = %s (computed according orientation points)" % self.options.Zauto_scale)
 		x,y = source_point[0],	source_point[1]
 		if not reverse :
 			t = self.transform_matrix
@@ -916,9 +916,9 @@ class Gcode_tools(inkex.Effect):
 			self.options.orientation_scale = 3.5433070660
 			print_("orientation_scale < 0 ===> switching to mm units=%0.10f"%self.options.orientation_scale )
 		
-	
 		if self.options.active_tab !=  '"tools_library"':	
 			self.get_tool()	
+		self.transform([0,0]) # Calculate transform matrixes and Zscale 
 	
 ################################################################################
 ###
@@ -1042,15 +1042,12 @@ class Gcode_tools(inkex.Effect):
 					d = re.sub(r'(?i)(m[^mz]+)',r'\1 Z ',d)
 					d = re.sub(r'(?i)\s*z\s*z\s*',r' Z ',d)
 					d = re.sub(r'(?i)\s*([A-Za-z])\s*',r' \1 ',d)
-					r = self.options.area_inkscape_radius 							
 					sign=1 if r>0 else -1
-
-					a = self.transform([0,0],True)
-					b = self.transform([self.tool['diameter'],0],True)
-					tool_d = math.sqrt( (b[0]-a[0])**2 + (b[1]-a[1])**2 )
-					c = self.transform([r,0],True)
-					r = math.sqrt( (c[0]-a[0])**2 + (c[1]-a[1])**2 )
-					print_("tool diameter=%s, r=%s" % (tool_d, r))
+					# scale = sqrt(Xscale**2 + Yscale**2) / sqrt(1**2 + 1**2)
+					scale = math.sqrt( (self.transform_matrix_reverse[0][0]**2 + self.transform_matrix_reverse[1][1]**2)/2 )
+					tool_d = self.tool['diameter']*scale
+					r = self.options.area_inkscape_radius * scale
+					print_("Tool diameter = %s, r = %s" % (tool_d, r))
 
 					for i in range(self.options.max_area_curves):
 						radius = - tool_d * (i+0.5) * sign

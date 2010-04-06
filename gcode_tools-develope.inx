@@ -37,15 +37,12 @@ Gcode tools ver. 1.5 develope
 			<param name="Zsafe" type="float" precision="5" min="-1000" max="1000" _gui-text="Z safe">5</param>
 			<param name="Zsurface" type="float" precision="5" min="-1000" max="1000" _gui-text="Z surface">0</param>
 			<param name="Zdepth" type="float" precision="5" min="-1000" max="1000" _gui-text="Z depth">-1</param>
-			<param name="Zstep" type="float" precision="5" min="-1000" max="1000" _gui-text="Z step for each cycle">1</param>
-			<param name="feed" type="float" precision="5" min="0" max="1000" _gui-text="Feed rate (unit/min)">4.0</param>
 			
 			<param name="unit" type="enum" _gui-text="Unit: ">
 				<item value="G21 (All units in mm)">mm</item>
 				<item value="G20 (All units in inches)">in</item>
 			</param>
 
-			<param name="tool-diameter" type="float" precision="5" min="0" max="1000" _gui-text="Tool diameter">3</param>
 			<param name="create-log" type="boolean" _gui-text="Create log file">false</param>			
 			<param name="log-filename" type="string" _gui-text="Log file"></param>			
 			
@@ -73,7 +70,6 @@ Fill in "Area radius" and press apply.
 			<param name="engraving-max-dist" type="float" precision="5" min="0" max="1000" _gui-text="Maximum distance for engraving">10</param>
 			<param name="engraving-newton-iterations" type="int" min="2" max="10" _gui-text="Number of sample points used to calculate distance">4</param>
 			<param name="engraving-draw-calculation-paths" type="boolean" _gui-text="Draw additional graphics to debug engraving path">false</param>
-			<param name="engraving-cutter-shape-function" type="string" _gui-text="Cutter shape function z(w)=">w</param>
 			
 			<_param name="help" type="description">
 This function creates path to engrave sharp angles.
