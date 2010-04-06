@@ -912,9 +912,6 @@ class Gcode_tools(inkex.Effect):
 		else : print_  = lambda x : None 
 		
 		self.transform_matrix = None	
-		if (self.options.orientation_scale < 0):
-			self.options.orientation_scale = 3.5433070660
-			print_("orientation_scale < 0 ===> switching to mm units=%0.10f"%self.options.orientation_scale )
 		
 		if self.options.active_tab !=  '"tools_library"':	
 			self.get_tool()	
@@ -1377,6 +1374,13 @@ class Gcode_tools(inkex.Effect):
 		elif self.options.active_tab == '"orientation"' :
 			points = [[self.options.orientation_point1x, self.options.orientation_point1y], [self.options.orientation_point2x, self.options.orientation_point2y], [self.options.orientation_point3x, self.options.orientation_point3y]]
 			orientation_group = inkex.etree.SubElement(self.current_layer if self.current_layer is not None else self.document.getroot(), inkex.addNS('g','svg'))
+			if (self.options.orientation_scale < 0):
+				if self.options.unit == "G21 (All units in mm)" : 
+					self.options.orientation_scale = 3.5433070660
+					print_("orientation_scale < 0 ===> switching to mm units=%0.10f"%self.options.orientation_scale )
+				elif self.options.																								unit == "G20 (All units in inches)" : 
+					self.options.orientation_scale = 90
+					print_("orientation_scale < 0 ===> switching to inches units=%0.10f"%self.options.orientation_scale )
 			for i in points :
 				si = [i[0]*self.options.orientation_scale, i[1]*self.options.orientation_scale]
 				g = inkex.etree.SubElement(orientation_group, inkex.addNS('g','svg'), {'comment': "Gcode tools orientation point"})
