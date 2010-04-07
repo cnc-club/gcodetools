@@ -35,9 +35,6 @@ Gcode tools ver. 1.5 develope
 
 		
 			<param name="Zsafe" type="float" precision="5" min="-1000" max="1000" _gui-text="Z safe">5</param>
-			<param name="Zsurface" type="float" precision="5" min="-1000" max="1000" _gui-text="Z surface">0</param>
-			<param name="Zdepth" type="float" precision="5" min="-1000" max="1000" _gui-text="Z depth">-1</param>
-			
 			<param name="unit" type="enum" _gui-text="Unit: ">
 				<item value="G21 (All units in mm)">mm</item>
 				<item value="G20 (All units in inches)">in</item>
@@ -82,15 +79,19 @@ ellips having r and r*4 unit diameter: math.sqrt(max(0,r**2-w**2))*4</_param>
 		</page>			
 		
 		<page name='orientation' _gui-text='Orientation'>	
-			<param name="orientation-point1x" type="float" precision="5" min="-100000" max="100000" _gui-text="Orientation point 1 X">0.0</param>
-			<param name="orientation-point1y" type="float" precision="5" min="-100000" max="100000" _gui-text="Orientation point 1 Y">0.0</param>
-			<param name="orientation-point2x" type="float" precision="5" min="-100000" max="100000" _gui-text="Orientation point 2 X">100.</param>
-			<param name="orientation-point2y" type="float" precision="5" min="-100000" max="100000" _gui-text="Orientation point 2 Y">0.</param>
-			<param name="orientation-point3x" type="float" precision="5" min="-100000" max="100000" _gui-text="Orientation point 3 X">0.</param>
-			<param name="orientation-point3y" type="float" precision="5" min="-100000" max="100000" _gui-text="Orientation point 4 Y">100.</param>
-			
-			<param name="orientation-scale" type="float" precision="10" min="-100000" max="100000" _gui-text="Initial scale">-1</param>
-			
+
+			<param name="orientation-points-count" type="optiongroup" _gui-text="Orientation type: ">
+<option value="2">2 Orientation points 
+(allows movement, rotation,
+scale along both X and Y axis)</option>
+<option value="3">3 Orientation points 
+(allows movement, rotation, scale along
+both X and Y axis separate and mirroring)</option>
+			</param>
+			<param name="Zsurface" type="float" precision="5" min="-1000" max="1000" _gui-text="Z surface">0</param>
+			<param name="Zdepth" type="float" precision="5" min="-1000" max="1000" _gui-text="Z depth">-1</param>
+
+
 			<_param name="help" type="description">
 Press apply to create three control points. The transformation (offset,scale,rotation in XY plane) of the path will be automaticaly calculated depending on this points.
 
@@ -108,10 +109,10 @@ For inches set Initial scale to 90</_param>
 		<page name='tools_library' _gui-text='Tools library'>	
 			
 			<param type='optiongroup' name='tools-library-type' _gui-text="Tools type:">
-				<option value='cylinder cutter'>Cylinder cutter</option>
-				<option value='cone cutter'>Cone cutter</option>
-				<option value='plasma cutter'>Plasma cutter</option>
-				<option value='default tool'>Default tool (all parameters)</option>
+<option value='cylinder cutter'>Cylinder cutter</option>
+<option value='cone cutter'>Cone cutter</option>
+<option value='plasma cutter'>Plasma cutter</option>
+<option value='default tool'>Default tool (all parameters)</option>
 			</param>
 			
 			<_param name="help" type="description">

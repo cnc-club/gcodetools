@@ -578,13 +578,7 @@ class Gcode_tools(inkex.Effect):
 		self.OptionParser.add_option("",   "--create-log",					action="store", type="inkbool", 	dest="log_create_log", default=False,	help="Create log files")
 		self.OptionParser.add_option("",   "--log-filename",				action="store", type="string", 		dest="log_filename", default='',		help="Create log files")
 
-		self.OptionParser.add_option("",   "--orientation-point1x",			action="store", type="float", 		dest="orientation_point1x", default='0',		help="Orientation point")
-		self.OptionParser.add_option("",   "--orientation-point1y",			action="store", type="float", 		dest="orientation_point1y", default='0',		help="Orientation point")
-		self.OptionParser.add_option("",   "--orientation-point2x",			action="store", type="float", 		dest="orientation_point2x", default='100',		help="Orientation point")
-		self.OptionParser.add_option("",   "--orientation-point2y",			action="store", type="float", 		dest="orientation_point2y", default='0',		help="Orientation point")
-		self.OptionParser.add_option("",   "--orientation-point3x",			action="store", type="float", 		dest="orientation_point3x", default='0',		help="Orientation point")
-		self.OptionParser.add_option("",   "--orientation-point3y",			action="store", type="float", 		dest="orientation_point3y", default='100',		help="Orientation point")
-		self.OptionParser.add_option("",   "--orientation-scale",			action="store", type="float", 		dest="orientation_scale", default='2.8222222',	help="Orientation points initial scale")
+		self.OptionParser.add_option("",   "--orientation-points-count",			action="store", type="int", 	dest="orientation_points_count", default='2',		help="Orientation points count")
 
 		self.OptionParser.add_option("",   "--tools-library-type",			action="store", type="string", 		dest="tools_library_type", default='cylinder cutter',	help="Create tools defention")
 
@@ -810,14 +804,17 @@ class Gcode_tools(inkex.Effect):
 		def search_in_group(g):
 			items = g.getchildren()
 			items.reverse()
-			p = []
+			p2, p3 = [], []
 			for i in items:
-				if i.tag == inkex.addNS("g",'svg') and i.get("comment") == "Gcode tools orientation point":
-					p += [i]
+				if i.tag == inkex.addNS("g",'svg') and i.get("gcode_tools") == "Gcode tools orientation point (2 points)":
+					p2 += [i]
+				if i.tag == inkex.addNS("g",'svg') and i.get("gcode_tools") == "Gcode tools orientation point (3 points)":
+					p3 += [i]
 				elif i.tag == inkex.addNS("g",'svg'):
 					p1 = search_in_group(i)
-					if len(p1)==3: return p1
-				if len(p)==3 : return p
+					if len(p1) in [2,3]: return p1
+				if len(p2)==2 : return p2 
+				if len(p3)==3 : return p3 
 			return []
 				 
 		if self.transform_matrix==None:
@@ -825,18 +822,27 @@ class Gcode_tools(inkex.Effect):
 			for g in [self.current_layer, self.document.getroot()] if self.current_layer is not None else [self.document.getroot()]:
 				p = search_in_group(g)
 				if len(p)==3 : break
-			if len(p)==3:
+			if len(p) in [2,3]:
 				points = []
 				for g in p:
 					point = [[],[]]	
 					for node in g:
-						if node.get('comment') == "Gcode tools orientation point arrow":
+						if node.get('gcode_tools') == "Gcode tools orientation point arrow":
 							point[0] = self.apply_transforms(node,cubicsuperpath.parsePath(node.get("d")))[0][0][1]
-						if node.get('comment') == "Gcode tools orientation point text":
-							r = re.match(r'(?i)\s*\(\s*(\d*(,|\.)*\d*)\s*;\s*(\d*(,|\.)*\d*)\)\s*',node.text)
-							point[1] = [float(r.group(1)),float(r.group(3))]
+						if node.get('gcode_tools') == "Gcode tools orientation point text":
+							r = re.match(r'(?i)\s*\(\s*(-?\s*\d*(,|\.)*\d*)\s*;\s*(-?\s*\d*(,|\.)*\d*)\s*;\s*(-?\s*\d*(,|\.)*\d*)\s*\)\s*',node.text)
+							if r!=None:
+								point[1] = [float(r.group(1)),float(r.group(3)),float(r.group(5))]
 					if point[0]!=[] and point[1]!=[]:	points += [point]
+				if len(points)==len(p)==2:
+					points += [ [ [(points[1][0][1]-points[0][0][1])+points[0][0][0], -(points[1][0][0]-points[0][0][0])+points[0][0][1]], [-(points[1][1][1]-points[0][1][1])+points[0][1][0], points[1][1][0]-points[0][1][0]+points[0][1][1]] ] ]
+					print_("Orientation points: ")
+					for point in points:
+						print_(point)
 				if len(points)==3:
+					#	Zcoordinates definition 
+					self.options.Zsurface = max(points[0][1][2],points[1][1][2])
+					self.options.Zdepth = min(points[0][1][2],points[1][1][2])
 					matrix = numpy.array([
 								[points[0][0][0], points[0][0][1], 1, 0, 0, 0, 0, 0, 0],
 								[0, 0, 0, points[0][0][0], points[0][0][1], 1, 0, 0, 0],
@@ -848,6 +854,7 @@ class Gcode_tools(inkex.Effect):
 								[0, 0, 0, points[2][0][0], points[2][0][1], 1, 0, 0, 0],
 								[0, 0, 0, 0, 0, 0, points[2][0][0], points[2][0][1], 1]
 							])
+								
 					if numpy.linalg.det(matrix)!=0 :
 						m = numpy.linalg.solve(matrix,
 							numpy.array(
@@ -855,15 +862,25 @@ class Gcode_tools(inkex.Effect):
 										)
 							).tolist()
 						self.transform_matrix = [[m[j*3+i][0] for i in range(3)] for j in range(3)]
-					else : self.transform_matrix = [[1,0,0],[0,1,0],[0,0,1]]
-				else : self.transform_matrix = [[1,0,0],[0,1,0],[0,0,1]]
-			else : self.transform_matrix = [[1,0,0],[0,1,0],[0,0,1]]
+					
+					else :
+						inkex.errormsg(_("Can not find orientation points or they are wrong. Add a new set of orientation points using Orientation tab."))
+						sys.exit()
+				else :
+					inkex.errormsg(_("Can not find orientation points or they are wrong. Add a new set of orientation points using Orientation tab."))
+					sys.exit()
+			else : 						
+				inkex.errormsg(_("Can not find orientation points or they are wrong. Add a new set of orientation points using Orientation tab."))
+				sys.exit()
+
 			self.transform_matrix_reverse = numpy.linalg.inv(self.transform_matrix).tolist()		
 			print_("\n Transformation matrixes:")
 			print_(self.transform_matrix)
 			print_(self.transform_matrix_reverse)
+
 			self.options.Zauto_scale  = math.sqrt( (self.transform_matrix[0][0]**2 + self.transform_matrix[1][1]**2)/2 )
 			print_("Z automatic scale = %s (computed according orientation points)" % self.options.Zauto_scale)
+
 		x,y = source_point[0],	source_point[1]
 		if not reverse :
 			t = self.transform_matrix
@@ -913,9 +930,10 @@ class Gcode_tools(inkex.Effect):
 		
 		self.transform_matrix = None	
 		
-		if self.options.active_tab !=  '"tools_library"':	
+		if self.options.active_tab !=  '"tools_library"' :
 			self.get_tool()	
-		self.transform([0,0]) # Calculate transform matrixes and Zscale 
+		if self.options.active_tab != '"orientation"' :
+			self.transform([0,0]) # Calculate transform matrixes and Zscale 
 	
 ################################################################################
 ###
@@ -1372,32 +1390,34 @@ class Gcode_tools(inkex.Effect):
 ################################################################################
 
 		elif self.options.active_tab == '"orientation"' :
-			points = [[self.options.orientation_point1x, self.options.orientation_point1y], [self.options.orientation_point2x, self.options.orientation_point2y], [self.options.orientation_point3x, self.options.orientation_point3y]]
 			orientation_group = inkex.etree.SubElement(self.current_layer if self.current_layer is not None else self.document.getroot(), inkex.addNS('g','svg'))
-			if (self.options.orientation_scale < 0):
-				if self.options.unit == "G21 (All units in mm)" : 
-					self.options.orientation_scale = 3.5433070660
-					print_("orientation_scale < 0 ===> switching to mm units=%0.10f"%self.options.orientation_scale )
-				elif self.options.																								unit == "G20 (All units in inches)" : 
-					self.options.orientation_scale = 90
-					print_("orientation_scale < 0 ===> switching to inches units=%0.10f"%self.options.orientation_scale )
+			if self.options.unit == "G21 (All units in mm)" : 
+				points = [[0.,0.,self.options.Zsurface],[100.,0.,self.options.Zdepth],[0.,100.,0.]]
+				orientation_scale = 3.5433070660
+				print_("orientation_scale < 0 ===> switching to mm units=%0.10f"%orientation_scale )
+			elif self.options.unit == "G20 (All units in inches)" :
+				points = [[0.,0.,self.options.Zsurface],[5.,0.,self.options.Zdepth],[0.,5.,0.]]
+				orientation_scale = 90
+				print_("orientation_scale < 0 ===> switching to inches units=%0.10f"%orientation_scale )
+			if self.options.orientation_points_count == 2 :
+				points = points[:2]
 			for i in points :
-				si = [i[0]*self.options.orientation_scale, i[1]*self.options.orientation_scale]
-				g = inkex.etree.SubElement(orientation_group, inkex.addNS('g','svg'), {'comment': "Gcode tools orientation point"})
+				si = [i[0]*orientation_scale, i[1]*orientation_scale]
+				g = inkex.etree.SubElement(orientation_group, inkex.addNS('g','svg'), {'gcode_tools': "Gcode tools orientation point (%s points)" % self.options.orientation_points_count})
 				inkex.etree.SubElement(	g, inkex.addNS('path','svg'), 
 					{
 						'style':	"stroke:none;fill:#000000;", 	
 						'd':'m %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z z' % (si[0], -si[1]),
-						'comment': "Gcode tools orientation point arrow"
+						'gcode_tools': "Gcode tools orientation point arrow"
 					})
 				t = inkex.etree.SubElement(	g, inkex.addNS('text','svg'), 
 					{
 						'style':	"font-size:10px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
 						'x':	str(si[0]+10),
 						'y':	str(-si[1]-10),
-						'comment': "Gcode tools orientation point text"
+						'gcode_tools': "Gcode tools orientation point text"
 					})
-				t.text = "(%s; %s)" % (i[0],i[1])
+				t.text = "(%s; %s; %s)" % (i[0],i[1],i[2])
 				
 		
 ################################################################################
