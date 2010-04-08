@@ -1057,11 +1057,11 @@ class Gcode_tools(inkex.Effect):
 					d = re.sub(r'(?i)(m[^mz]+)',r'\1 Z ',d)
 					d = re.sub(r'(?i)\s*z\s*z\s*',r' Z ',d)
 					d = re.sub(r'(?i)\s*([A-Za-z])\s*',r' \1 ',d)
-					sign=1 if r>0 else -1
 					# scale = sqrt(Xscale**2 + Yscale**2) / sqrt(1**2 + 1**2)
 					scale = math.sqrt( (self.transform_matrix_reverse[0][0]**2 + self.transform_matrix_reverse[1][1]**2)/2 )
 					tool_d = self.tool['diameter']*scale
 					r = self.options.area_inkscape_radius * scale
+					sign=1 if r>0 else -1
 					print_("Tool diameter = %s, r = %s" % (tool_d, r))
 
 					for i in range(self.options.max_area_curves):
