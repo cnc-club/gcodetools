@@ -38,6 +38,7 @@ import time
 import cmath
 import numpy
 
+
 _ = inkex._
 
 
@@ -581,9 +582,11 @@ class Gcode_tools(inkex.Effect):
 		self.OptionParser.add_option("",   "--create-log",					action="store", type="inkbool", 	dest="log_create_log", default=False,	help="Create log files")
 		self.OptionParser.add_option("",   "--log-filename",				action="store", type="string", 		dest="log_filename", default='',		help="Create log files")
 
-		self.OptionParser.add_option("",   "--orientation-points-count",			action="store", type="int", 	dest="orientation_points_count", default='2',		help="Orientation points count")
+		self.OptionParser.add_option("",   "--orientation-points-count",	action="store", type="int", 		dest="orientation_points_count", default='2',		help="Orientation points count")
 
 		self.OptionParser.add_option("",   "--tools-library-type",			action="store", type="string", 		dest="tools_library_type", default='cylinder cutter',	help="Create tools defention")
+
+		self.OptionParser.add_option("",   "--help-language",				action="store", type="string", 		dest="help_language", default='http://www.cnc-club.ru/forum/viewtopic.php?f=33&t=35',	help="Open help page in webbrowser.")
 
 		self.default_tool = {
 					"name": "Default tool",
@@ -917,6 +920,18 @@ class Gcode_tools(inkex.Effect):
 		
 		global options
 		options = self.options
+
+################################################################################
+###		Launch browser on help tab
+################################################################################
+
+		if self.options.active_tab == '"help"' :
+			import webbrowser
+			webbrowser.open(self.options.help_language)		
+			return
+
+
+
 			
 		# define print_ function 
 		global print_
@@ -933,11 +948,9 @@ class Gcode_tools(inkex.Effect):
 		
 		self.transform_matrix = None	
 		
-		if self.options.active_tab !=  '"tools_library"' :
-			self.get_tool()	
-		if self.options.active_tab != '"orientation"' :
+		if self.options.active_tab not in ['"orientation"','"tools_library"']  :
 			self.transform([0,0]) # Calculate transform matrixes and Zscale 
-	
+			self.get_tool()		
 ################################################################################
 ###
 ###		Curve to Gcode
@@ -962,6 +975,8 @@ class Gcode_tools(inkex.Effect):
 			p = []	
 			
 			for id, node in self.selected.iteritems():
+#				print_(self.selected.iteritems())
+#				print_((node,node.get('id')))
 				if node.tag == inkex.addNS('path','svg'):
 					csp = cubicsuperpath.parsePath(node.get("d"))
 					if 'transform' in node.keys():
@@ -1522,7 +1537,6 @@ G01 Z1 (going to cutting z)\n""",
 			bg.set('d',"m %f,%f l %f,%f %f,%f %f,%f z " % (self.view_center[0]-170, self.view_center[1]-20, 400,0, 0,y+50, -400, 0) )	
 			tool = []
 
-
 	def get_tool(self):
 		def search_in_group(g):
 			items = g.getchildren()
@@ -1542,8 +1556,8 @@ G01 Z1 (going to cutting z)\n""",
 		self.tool = self.default_tool
 
 		if p==[]: 
-			print_("Have not found any tool. Using default tool: %s" % self.tool)			
-			return 
+			inkex.errormsg(_("Have not found any tool. Add a new one using Tools library tab."))
+			sys.exit()
 		
 		for i in p:
 			#	Get parameters
@@ -1570,7 +1584,9 @@ G01 Z1 (going to cutting z)\n""",
 					print_("Warning! Tool has parameter that default tool has not ( '%s': '%s' )." % (key, value) )
 		print_("Using tool: %s" % self.tool)			
 					
-					
+
+
+
 e = Gcode_tools()
 e.affect()					
 

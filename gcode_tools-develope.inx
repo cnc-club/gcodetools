@@ -20,7 +20,12 @@ English support forum:
 	http://www.cnc-club.ru/forum/viewtopic.php?t=35
 
 Gcode tools ver. 1.5 develope
-			</_param>	
+</_param>	
+			<param type='optiongroup' name='help-language' _gui-text="Help language">
+		<option value='http://www.cnc-club.ru/forum/viewtopic.php?t=35'>English			</option>
+		<option value='http://www.cnc-club.ru/forum/viewtopic.php?t=34'>Russian			</option>
+			</param>
+
 		</page>
 		<page name='options' _gui-text='Options'>
 			<param name="Zscale" type="float" precision="5" min="-100000" max="100000" _gui-text="Scale along Z axis">1</param>			
