@@ -196,6 +196,9 @@ class P:
 ###		Functions to operate with CubicSuperPath
 ###
 
+def vectors_are_cw(a,b):
+	return a[0]*b[1]-a[1]*b[0] < 0
+
 def point_to_csp_simple_bound_dist(p, csp):
 	minx,miny,maxx,maxy = None,None,None,None
 	for subpath in csp:
@@ -1000,55 +1003,68 @@ class Gcode_tools(inkex.Effect):
 				if node.tag == inkex.addNS('path','svg'):
 					d = node.get('d')
 					csp = cubicsuperpath.parsePath(d)
-					# Finding top most point in path (min y value)
-					my = (None, 0, 0, 0)
-					for i in range(len(csp)):
-						for j in range(1,len(csp[i])):
-							ax,ay,bx,by,cx,cy,x0,y0 = bezmisc.bezierparameterize((csp[i][j-1][1],csp[i][j-1][2],csp[i][j][0],csp[i][j][1]))
-							if ay == 0 :
-								roots = [ -cy/(2*by) ] if by !=0 else []
-							else:
-								det = (2.0*by)**2 - 4.0*(3*ay*cy)
-								roots = [ (-2*by+math.sqrt(det))/(6*ay), (-2*by+math.sqrt(det))/(6*ay) ] if det>=0 else []
-							roots += [1,0]	
-							for t in roots :
-								if 0<=t<=1:
-									y = ay*(t**3)+by*(t**2)+cy*t+y0  
-									x = ax*(t**3)+bx*(t**2)+cx*t+x0  
-									if my[0]>y or my[0] == None : 
-										my = (y,i,j,t,x)
-									elif my[0]==y and x>my[4] : 
-										my = (y,i,j,t,x)
-										
-					if my[0]!=None :
- 					 	subp = csp[my[1]]
- 					 	del csp[my[1]]
- 					 	j = my[2]
- 					 	if my[3] in [0,1]:
- 					 		if my[3] == 0: j=j-1
-	 					 	subp[-1][2], subp[0][0] = subp[-1][1], subp[0][1]
- 					 		subp = [ [subp[j][1], subp[j][1], subp[j][2]] ] + subp[j+1:] + subp[:j] + [ [subp[j][0], subp[j][1], subp[j][1]] ]
-						else: 					 		
-	 						sp1,sp2,sp3 = cspbezsplit(subp[j-1],subp[j],my[3])
-	 						subp[-1][2], subp[0][0] = subp[-1][1], subp[0][1]
-							subp = [ [ sp2[1], sp2[1],sp2[2] ] ] + [sp3] + subp[j+1:] + subp[:j-1] + [sp1] + [[ sp2[0], sp2[1],sp2[1] ]] 					 	  
- 					 	csp = [subp] + csp
-						# Reverce path if needed
-						st,end = [],[]
-						for i in range(1,len(subp)):
-							pst = P( csp_at_t(subp[i-1],subp[i],.1) )
-							pend = P( csp_at_t(subp[-i-1],subp[-i],.9) )
-							if st==[] and (pst-P(subp[0][1])).mag()>straight_tolerance:
-								st = pst - P(subp[0][1])
-							if end==[] and (pend-P(subp[0][1])).mag()>straight_tolerance:
-								end = pend - P(subp[0][1])
-							if st!=[] and end!=[]: break
-						if math.atan2(st.x,st.y) % math.pi2 < math.atan2(end.x,end.y) % math.pi2 :
-							for i in range(len(csp)):
-							 	n = []
-							 	for j in csp[i]:
-							 		n = [  [j[2][:],j[1][:],j[0][:]]  ] + n
-							 	csp[i] = n[:]
+					
+					if node.get(inkex.addNS('type','sodipodi'))!="inkscape:offset":
+						print_("Path %s is not an offset. Preparation started." % node.get("id"))
+						# Path is not offset. Preparation will be needed.
+						# Finding top most point in path (min y value)
+						my = (None, 0, 0, 0)
+						for i in range(len(csp)):
+							for j in range(1,len(csp[i])):
+								ax,ay,bx,by,cx,cy,x0,y0 = bezmisc.bezierparameterize((csp[i][j-1][1],csp[i][j-1][2],csp[i][j][0],csp[i][j][1]))
+								if ay == 0 :
+									roots = [ -cy/(2*by) ] if by !=0 else []
+								else:
+									det = (2.0*by)**2 - 4.0*(3*ay*cy)
+									roots = [ (-2*by+math.sqrt(det))/(6*ay), (-2*by+math.sqrt(det))/(6*ay) ] if det>=0 else []
+								roots += [1,0]	
+								for t in roots :
+									if 0<=t<=1:
+										y = ay*(t**3)+by*(t**2)+cy*t+y0  
+										x = ax*(t**3)+bx*(t**2)+cx*t+x0  
+										if my[0]>y or my[0] == None : 
+											my = (y,i,j,t,x)
+										elif my[0]==y and x<my[4] : 
+											my = (y,i,j,t,x)
+						
+						
+						# Reverse path if needed.
+						if my[0]!=None :
+							# Move outline subpath to the begining of csp
+	 					 	subp = csp[my[1]]
+	 					 	del csp[my[1]]
+	 					 	j = my[2]
+	 					 	# Split by topmos point and join again
+	 					 	if my[3] in [0,1]:
+	 					 		if my[3] == 0: j=j-1
+		 					 	subp[-1][2], subp[0][0] = subp[-1][1], subp[0][1]
+	 					 		subp = [ [subp[j][1], subp[j][1], subp[j][2]] ] + subp[j+1:] + subp[:j] + [ [subp[j][0], subp[j][1], subp[j][1]] ]
+							else: 					 		
+		 						sp1,sp2,sp3 = cspbezsplit(subp[j-1],subp[j],my[3])
+		 						subp[-1][2], subp[0][0] = subp[-1][1], subp[0][1]
+								subp = [ [ sp2[1], sp2[1],sp2[2] ] ] + [sp3] + subp[j+1:] + subp[:j-1] + [sp1] + [[ sp2[0], sp2[1],sp2[1] ]] 					 	  
+	 					 	csp = [subp] + csp
+							# Reverce path if needed
+							st,end = [],[]
+							i=1
+							while i<len(csp[0]):
+								if csp[0][i-1][1][0]==csp[0][i][1][0] and csp[0][i-1][1][1]==csp[0][i][1][1] :
+									csp[0][i-1][2] = csp[0][i][2]
+									del csp[0][i]
+								else:
+									i += 1
+
+							bez = (csp[0][0][1][:],csp[0][0][2][:],csp[0][1][0][:],csp[0][1][1][:])
+							dx, dy = bezmisc.bezierslopeatt(bez,0)
+							bez = (csp[0][-2][1][:],csp[0][-2][2][:],csp[0][-1][0][:],csp[0][-1][1][:])
+							dx1, dy1 = bezmisc.bezierslopeatt(bez,0)
+
+							if vectors_are_cw([dx,dy],[dx1,dy1]) :
+								for i in range(len(csp)):
+								 	n = []
+								 	for j in csp[i]:
+								 		n = [  [j[2][:],j[1][:],j[0][:]]  ] + n
+								 	csp[i] = n[:]
 
 								
  					 	
