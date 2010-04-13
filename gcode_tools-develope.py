@@ -38,7 +38,6 @@ import time
 import cmath
 import numpy
 
-
 _ = inkex._
 
 
@@ -196,9 +195,6 @@ class P:
 ###
 ###		Functions to operate with CubicSuperPath
 ###
-
-def vectors_are_cw(a,b):
-	return a[0]*b[1]-a[1]*b[0] < 0
 
 def point_to_csp_simple_bound_dist(p, csp):
 	minx,miny,maxx,maxy = None,None,None,None
@@ -582,11 +578,9 @@ class Gcode_tools(inkex.Effect):
 		self.OptionParser.add_option("",   "--create-log",					action="store", type="inkbool", 	dest="log_create_log", default=False,	help="Create log files")
 		self.OptionParser.add_option("",   "--log-filename",				action="store", type="string", 		dest="log_filename", default='',		help="Create log files")
 
-		self.OptionParser.add_option("",   "--orientation-points-count",	action="store", type="int", 		dest="orientation_points_count", default='2',		help="Orientation points count")
+		self.OptionParser.add_option("",   "--orientation-point-count",			action="store", type="int", 	dest="orientation_point_count", default='2',			help="Orientation points count")
 
 		self.OptionParser.add_option("",   "--tools-library-type",			action="store", type="string", 		dest="tools_library_type", default='cylinder cutter',	help="Create tools defention")
-
-		self.OptionParser.add_option("",   "--help-language",				action="store", type="string", 		dest="help_language", default='http://www.cnc-club.ru/forum/viewtopic.php?f=33&t=35',	help="Open help page in webbrowser.")
 
 		self.default_tool = {
 					"name": "Default tool",
@@ -807,78 +801,31 @@ class Gcode_tools(inkex.Effect):
 
 
 	def transform(self,source_point, reverse=False):
-		def search_in_group(g):
-			items = g.getchildren()
-			items.reverse()
-			p2, p3 = [], []
-			for i in items:
-				if i.tag == inkex.addNS("g",'svg') and i.get("gcode_tools") == "Gcode tools orientation point (2 points)":
-					p2 += [i]
-				if i.tag == inkex.addNS("g",'svg') and i.get("gcode_tools") == "Gcode tools orientation point (3 points)":
-					p3 += [i]
-				elif i.tag == inkex.addNS("g",'svg'):
-					p1 = search_in_group(i)
-					if len(p1) in [2,3]: return p1
-				if len(p2)==2 : return p2 
-				if len(p3)==3 : return p3 
-			return []
-				 
+	
 		if self.transform_matrix==None:
-			# Search orientation points in current Layer firs then in whole painting 
-			for g in [self.current_layer, self.document.getroot()] if self.current_layer is not None else [self.document.getroot()]:
-				p = search_in_group(g)
-				if len(p)==3 : break
-			if len(p) in [2,3]:
-				points = []
-				for g in p:
-					point = [[],[]]	
-					for node in g:
-						if node.get('gcode_tools') == "Gcode tools orientation point arrow":
-							point[0] = self.apply_transforms(node,cubicsuperpath.parsePath(node.get("d")))[0][0][1]
-						if node.get('gcode_tools') == "Gcode tools orientation point text":
-							r = re.match(r'(?i)\s*\(\s*(-?\s*\d*(,|\.)*\d*)\s*;\s*(-?\s*\d*(,|\.)*\d*)\s*;\s*(-?\s*\d*(,|\.)*\d*)\s*\)\s*',node.text)
-							if r!=None:
-								point[1] = [float(r.group(1)),float(r.group(3)),float(r.group(5))]
-					if point[0]!=[] and point[1]!=[]:	points += [point]
-				if len(points)==len(p)==2:
-					points += [ [ [(points[1][0][1]-points[0][0][1])+points[0][0][0], -(points[1][0][0]-points[0][0][0])+points[0][0][1]], [-(points[1][1][1]-points[0][1][1])+points[0][1][0], points[1][1][0]-points[0][1][0]+points[0][1][1]] ] ]
-					print_("Orientation points: ")
-					for point in points:
-						print_(point)
-				if len(points)==3:
-					#	Zcoordinates definition 
-					self.options.Zsurface = max(points[0][1][2],points[1][1][2])
-					self.options.Zdepth = min(points[0][1][2],points[1][1][2])
-					matrix = numpy.array([
-								[points[0][0][0], points[0][0][1], 1, 0, 0, 0, 0, 0, 0],
-								[0, 0, 0, points[0][0][0], points[0][0][1], 1, 0, 0, 0],
-								[0, 0, 0, 0, 0, 0, points[0][0][0], points[0][0][1], 1],
-								[points[1][0][0], points[1][0][1], 1, 0, 0, 0, 0, 0, 0],
-								[0, 0, 0, points[1][0][0], points[1][0][1], 1, 0, 0, 0],
-								[0, 0, 0, 0, 0, 0, points[1][0][0], points[1][0][1], 1],
-								[points[2][0][0], points[2][0][1], 1, 0, 0, 0, 0, 0, 0],
-								[0, 0, 0, points[2][0][0], points[2][0][1], 1, 0, 0, 0],
-								[0, 0, 0, 0, 0, 0, points[2][0][0], points[2][0][1], 1]
-							])
-								
-					if numpy.linalg.det(matrix)!=0 :
-						m = numpy.linalg.solve(matrix,
-							numpy.array(
-								[[points[0][1][0]], [points[0][1][1]], [1], [points[1][1][0]], [points[1][1][1]], [1], [points[2][1][0]], [points[2][1][1]], [1]]	
-										)
-							).tolist()
-						self.transform_matrix = [[m[j*3+i][0] for i in range(3)] for j in range(3)]
-					
-					else :
-						inkex.errormsg(_("Can not find orientation points or they are wrong. Add a new set of orientation points using Orientation tab."))
-						sys.exit()
-				else :
-					inkex.errormsg(_("Can not find orientation points or they are wrong. Add a new set of orientation points using Orientation tab."))
-					sys.exit()
-			else : 						
-				inkex.errormsg(_("Can not find orientation points or they are wrong. Add a new set of orientation points using Orientation tab."))
-				sys.exit()
-
+		# Search orientation points in current Layer firs then in whole painting 
+		
+			if len(points)==3:
+				matrix = numpy.array([
+							[points[0][0][0], points[0][0][1], 1, 0, 0, 0, 0, 0, 0],
+							[0, 0, 0, points[0][0][0], points[0][0][1], 1, 0, 0, 0],
+							[0, 0, 0, 0, 0, 0, points[0][0][0], points[0][0][1], 1],
+							[points[1][0][0], points[1][0][1], 1, 0, 0, 0, 0, 0, 0],
+							[0, 0, 0, points[1][0][0], points[1][0][1], 1, 0, 0, 0],
+							[0, 0, 0, 0, 0, 0, points[1][0][0], points[1][0][1], 1],
+							[points[2][0][0], points[2][0][1], 1, 0, 0, 0, 0, 0, 0],
+							[0, 0, 0, points[2][0][0], points[2][0][1], 1, 0, 0, 0],
+							[0, 0, 0, 0, 0, 0, points[2][0][0], points[2][0][1], 1]
+						])
+				if numpy.linalg.det(matrix)!=0 :
+					m = numpy.linalg.solve(matrix,
+						numpy.array(
+							[[points[0][1][0]], [points[0][1][1]], [1], [points[1][1][0]], [points[1][1][1]], [1], [points[2][1][0]], [points[2][1][1]], [1]]	
+									)
+						).tolist()
+					self.transform_matrix = [[m[j*3+i][0] for i in range(3)] for j in range(3)]
+				else : self.transform_matrix = [[1,0,0],[0,1,0],[0,0,1]]
+			else : self.transform_matrix = [[1,0,0],[0,1,0],[0,0,1]]
 			self.transform_matrix_reverse = numpy.linalg.inv(self.transform_matrix).tolist()		
 			print_("\n Transformation matrixes:")
 			print_(self.transform_matrix)
@@ -906,6 +853,94 @@ class Gcode_tools(inkex.Effect):
 		return csp
 		
 
+
+
+################################################################################
+###
+###		Get Gcode tools info from the svg
+###
+################################################################################
+
+	def get_info(self):
+	
+		def recursive_search(g, layer):
+			print_(self.selected)
+			items = g.getchildren()
+			items.reverse()
+			for i in items:
+				if i.get(inkex.addNS('inkscape','groupmode')) == 'layer':
+					recursive_search(i,i)
+				elif i.get('gcode_tools') == "Gcode tools orientation group" :
+					points = self.get_orientation_points(g)
+					if points != None :
+						self.orientation_points[layer] = self.orientation_points[layer]+[points] if layer in self.orientation_points else [points]
+						print_("Found orientation points in '%s' layer: %s" % (layer.get(inkex.addNS('inkscape','label')), points))
+				elif i.get("gcode_tools") == "Gcode tools tool defenition" :
+					tool = self.get_tool(g)
+					print_("Found tool in '%s' layer: %s" % (layer.get(inkex.addNS('inkscape','label')),tool))
+				elif i.tag == inkex.addNS('path','svg') and i in self.selected:
+				
+					pass
+	
+
+
+	def get_orientation_points(self,g):
+		items = g.getchildren()
+		items.reverse()
+		p2, p3 = [], []
+		p = None
+		for i in items:
+			if i.tag == inkex.addNS("g",'svg') and i.get("gcode_tools") == "Gcode tools orientation point (2 points)":
+				p2 += [i]
+			if i.tag == inkex.addNS("g",'svg') and i.get("gcode_tools") == "Gcode tools orientation point (3 points)":
+				p3 += [i]
+			elif i.tag == inkex.addNS("g",'svg'):
+				p1 = search_in_group(i)
+				if len(p1) in [2,3]: return p1
+		if len(p2)==2 : p=p2 
+		elif len(p3)==3 : p=p3 
+		if p==None : return None
+		for i in p :	
+			point = [[],[]]	
+			for  node in i :
+				if node.get('gcode_tools') == "Gcode tools orientation point arrow":
+					point[0] = self.apply_transforms(node,cubicsuperpath.parsePath(node.get("d")))[0][0][1]
+				if node.get('gcode_tools') == "Gcode tools orientation point text":
+					r = re.match(r'(?i)\s*\(\s*(\d*(,|\.)*\d*)\s*;\s*(\d*(,|\.)*\d*)\)\s*',node.text)
+					point[1] = [float(r.group(1)),float(r.group(3))]
+			if point[0]!=[] and point[1]!=[]:	points += [point]
+		if len(points) in [2,3] : return points
+		else : return None
+
+	def get_tool(self, g):
+		tool = self.default_tool
+		for i in g:
+			#	Get parameters
+			if i.get("gcode_tools") == "Gcode tools tool parameter" :
+				key = None
+				value = None
+				for j in i:
+					if j.get("gcode_tools") == "Gcode tools tool defention field name":
+						key = j.text
+					if j.get("gcode_tools") == "Gcode tools tool defention field value":
+						for k in j :
+							if k.tag == inkex.addNS('tspan','svg') and k.get("gcode_tools") == "Gcode tools tool defention field value":
+								if k.text!=None : value = value +"\n" + k.text if value != None else k.text
+				if value == None or key == None: continue
+				#print_("Found tool parameter '%s':'%s'" % (key,value))
+				if key in self.default_tool.keys() :
+					 try :
+						tool[key] = type(self.default_tool[key])(value)
+					 except :
+						tool[key] = self.default_tool[key]
+						print_("Warning! Tool's and default tool's parameter's (%s) types are not the same ( type('%s') != type('%s') )." % (key, value, self.default_tool[key]))
+				else :
+					tool[key] = value
+					print_("Warning! Tool has parameter that default tool has not ( '%s': '%s' )." % (key, value) )
+		return tool
+
+
+
 		
 ################################################################################
 ###
@@ -917,21 +952,8 @@ class Gcode_tools(inkex.Effect):
 
 	
 	def effect(self):
-		
 		global options
 		options = self.options
-
-################################################################################
-###		Launch browser on help tab
-################################################################################
-
-		if self.options.active_tab == '"help"' :
-			import webbrowser
-			webbrowser.open(self.options.help_language)		
-			return
-
-
-
 			
 		# define print_ function 
 		global print_
@@ -947,20 +969,25 @@ class Gcode_tools(inkex.Effect):
 		else : print_  = lambda x : None 
 		
 		self.transform_matrix = None	
+
+		self.get_info()
+
 		
-		if self.options.active_tab not in ['"orientation"','"tools_library"']  :
-			self.transform([0,0]) # Calculate transform matrixes and Zscale 
-			self.get_tool()		
-################################################################################
-###
-###		Curve to Gcode
-###
-################################################################################
+		if self.options.active_tab !=  '"tools_library"':	
+			self.get_tool()	
+		self.transform([0,0]) # Calculate transform matrixes and Zscale 
+
+
 		if self.options.active_tab not in ['"path-to-gcode"', '"area"', '"engraving"', '"orientation"', '"tools_library"']:
 			inkex.errormsg(_("Select one of the active tabs - Path to Gcode, Area, Engraving, Orientation ot Tools library."))
-			return
+			return	
+		
+################################################################################
+###
+###		Path to Gcode
+###
+################################################################################
 		elif self.options.active_tab == '"path-to-gcode"':
-
 			if len(self.options.ids)<=0:
 				inkex.errormsg(_("This extension requires at least one selected path."))
 				return
@@ -975,8 +1002,6 @@ class Gcode_tools(inkex.Effect):
 			p = []	
 			
 			for id, node in self.selected.iteritems():
-#				print_(self.selected.iteritems())
-#				print_((node,node.get('id')))
 				if node.tag == inkex.addNS('path','svg'):
 					csp = cubicsuperpath.parsePath(node.get("d"))
 					if 'transform' in node.keys():
@@ -1018,68 +1043,55 @@ class Gcode_tools(inkex.Effect):
 				if node.tag == inkex.addNS('path','svg'):
 					d = node.get('d')
 					csp = cubicsuperpath.parsePath(d)
-					
-					if node.get(inkex.addNS('type','sodipodi'))!="inkscape:offset":
-						print_("Path %s is not an offset. Preparation started." % node.get("id"))
-						# Path is not offset. Preparation will be needed.
-						# Finding top most point in path (min y value)
-						my = (None, 0, 0, 0)
-						for i in range(len(csp)):
-							for j in range(1,len(csp[i])):
-								ax,ay,bx,by,cx,cy,x0,y0 = bezmisc.bezierparameterize((csp[i][j-1][1],csp[i][j-1][2],csp[i][j][0],csp[i][j][1]))
-								if ay == 0 :
-									roots = [ -cy/(2*by) ] if by !=0 else []
-								else:
-									det = (2.0*by)**2 - 4.0*(3*ay*cy)
-									roots = [ (-2*by+math.sqrt(det))/(6*ay), (-2*by+math.sqrt(det))/(6*ay) ] if det>=0 else []
-								roots += [1,0]	
-								for t in roots :
-									if 0<=t<=1:
-										y = ay*(t**3)+by*(t**2)+cy*t+y0  
-										x = ax*(t**3)+bx*(t**2)+cx*t+x0  
-										if my[0]>y or my[0] == None : 
-											my = (y,i,j,t,x)
-										elif my[0]==y and x<my[4] : 
-											my = (y,i,j,t,x)
-						
-						
-						# Reverse path if needed.
-						if my[0]!=None :
-							# Move outline subpath to the begining of csp
-	 					 	subp = csp[my[1]]
-	 					 	del csp[my[1]]
-	 					 	j = my[2]
-	 					 	# Split by topmos point and join again
-	 					 	if my[3] in [0,1]:
-	 					 		if my[3] == 0: j=j-1
-		 					 	subp[-1][2], subp[0][0] = subp[-1][1], subp[0][1]
-	 					 		subp = [ [subp[j][1], subp[j][1], subp[j][2]] ] + subp[j+1:] + subp[:j] + [ [subp[j][0], subp[j][1], subp[j][1]] ]
-							else: 					 		
-		 						sp1,sp2,sp3 = cspbezsplit(subp[j-1],subp[j],my[3])
-		 						subp[-1][2], subp[0][0] = subp[-1][1], subp[0][1]
-								subp = [ [ sp2[1], sp2[1],sp2[2] ] ] + [sp3] + subp[j+1:] + subp[:j-1] + [sp1] + [[ sp2[0], sp2[1],sp2[1] ]] 					 	  
-	 					 	csp = [subp] + csp
-							# Reverce path if needed
-							st,end = [],[]
-							i=1
-							while i<len(csp[0]):
-								if csp[0][i-1][1][0]==csp[0][i][1][0] and csp[0][i-1][1][1]==csp[0][i][1][1] :
-									csp[0][i-1][2] = csp[0][i][2]
-									del csp[0][i]
-								else:
-									i += 1
-
-							bez = (csp[0][0][1][:],csp[0][0][2][:],csp[0][1][0][:],csp[0][1][1][:])
-							dx, dy = bezmisc.bezierslopeatt(bez,0)
-							bez = (csp[0][-2][1][:],csp[0][-2][2][:],csp[0][-1][0][:],csp[0][-1][1][:])
-							dx1, dy1 = bezmisc.bezierslopeatt(bez,0)
-
-							if vectors_are_cw([dx,dy],[dx1,dy1]) :
-								for i in range(len(csp)):
-								 	n = []
-								 	for j in csp[i]:
-								 		n = [  [j[2][:],j[1][:],j[0][:]]  ] + n
-								 	csp[i] = n[:]
+					# Finding top most point in path (min y value)
+					my = (None, 0, 0, 0)
+					for i in range(len(csp)):
+						for j in range(1,len(csp[i])):
+							ax,ay,bx,by,cx,cy,x0,y0 = bezmisc.bezierparameterize((csp[i][j-1][1],csp[i][j-1][2],csp[i][j][0],csp[i][j][1]))
+							if ay == 0 :
+								roots = [ -cy/(2*by) ] if by !=0 else []
+							else:
+								det = (2.0*by)**2 - 4.0*(3*ay*cy)
+								roots = [ (-2*by+math.sqrt(det))/(6*ay), (-2*by+math.sqrt(det))/(6*ay) ] if det>=0 else []
+							roots += [1,0]	
+							for t in roots :
+								if 0<=t<=1:
+									y = ay*(t**3)+by*(t**2)+cy*t+y0  
+									x = ax*(t**3)+bx*(t**2)+cx*t+x0  
+									if my[0]>y or my[0] == None : 
+										my = (y,i,j,t,x)
+									elif my[0]==y and x>my[4] : 
+										my = (y,i,j,t,x)
+										
+					if my[0]!=None :
+ 					 	subp = csp[my[1]]
+ 					 	del csp[my[1]]
+ 					 	j = my[2]
+ 					 	if my[3] in [0,1]:
+ 					 		if my[3] == 0: j=j-1
+	 					 	subp[-1][2], subp[0][0] = subp[-1][1], subp[0][1]
+ 					 		subp = [ [subp[j][1], subp[j][1], subp[j][2]] ] + subp[j+1:] + subp[:j] + [ [subp[j][0], subp[j][1], subp[j][1]] ]
+						else: 					 		
+	 						sp1,sp2,sp3 = cspbezsplit(subp[j-1],subp[j],my[3])
+	 						subp[-1][2], subp[0][0] = subp[-1][1], subp[0][1]
+							subp = [ [ sp2[1], sp2[1],sp2[2] ] ] + [sp3] + subp[j+1:] + subp[:j-1] + [sp1] + [[ sp2[0], sp2[1],sp2[1] ]] 					 	  
+ 					 	csp = [subp] + csp
+						# Reverce path if needed
+						st,end = [],[]
+						for i in range(1,len(subp)):
+							pst = P( csp_at_t(subp[i-1],subp[i],.1) )
+							pend = P( csp_at_t(subp[-i-1],subp[-i],.9) )
+							if st==[] and (pst-P(subp[0][1])).mag()>straight_tolerance:
+								st = pst - P(subp[0][1])
+							if end==[] and (pend-P(subp[0][1])).mag()>straight_tolerance:
+								end = pend - P(subp[0][1])
+							if st!=[] and end!=[]: break
+						if math.atan2(st.x,st.y) % math.pi2 < math.atan2(end.x,end.y) % math.pi2 :
+							for i in range(len(csp)):
+							 	n = []
+							 	for j in csp[i]:
+							 		n = [  [j[2][:],j[1][:],j[0][:]]  ] + n
+							 	csp[i] = n[:]
 
 								
  					 	
@@ -1088,11 +1100,11 @@ class Gcode_tools(inkex.Effect):
 					d = re.sub(r'(?i)(m[^mz]+)',r'\1 Z ',d)
 					d = re.sub(r'(?i)\s*z\s*z\s*',r' Z ',d)
 					d = re.sub(r'(?i)\s*([A-Za-z])\s*',r' \1 ',d)
+					sign=1 if r>0 else -1
 					# scale = sqrt(Xscale**2 + Yscale**2) / sqrt(1**2 + 1**2)
 					scale = math.sqrt( (self.transform_matrix_reverse[0][0]**2 + self.transform_matrix_reverse[1][1]**2)/2 )
 					tool_d = self.tool['diameter']*scale
 					r = self.options.area_inkscape_radius * scale
-					sign=1 if r>0 else -1
 					print_("Tool diameter = %s, r = %s" % (tool_d, r))
 
 					for i in range(self.options.max_area_curves):
@@ -1449,7 +1461,6 @@ class Gcode_tools(inkex.Effect):
 						'gcode_tools': "Gcode tools orientation point text"
 					})
 				t.text = "(%s; %s; %s)" % (i[0],i[1],i[2])
-				
 		
 ################################################################################
 ###
@@ -1537,56 +1548,8 @@ G01 Z1 (going to cutting z)\n""",
 			bg.set('d',"m %f,%f l %f,%f %f,%f %f,%f z " % (self.view_center[0]-170, self.view_center[1]-20, 400,0, 0,y+50, -400, 0) )	
 			tool = []
 
-	def get_tool(self):
-		def search_in_group(g):
-			items = g.getchildren()
-			items.reverse()
-			for i in items :
-				if i.tag == inkex.addNS("g",'svg') and i.get("gcode_tools") == "Gcode tools tool defenition":
-					return i	
-				elif i.tag == inkex.addNS("g",'svg'): 
-					k = search_in_group(i)
-					if k!=[] : return k
-			return []
-	
-		for g in [self.current_layer, self.document.getroot()] if self.current_layer is not None else [self.document.getroot()]:
-			p = search_in_group(g)
-			if p!=[] : break
-		
-		self.tool = self.default_tool
-
-		if p==[]: 
-			inkex.errormsg(_("Have not found any tool. Add a new one using Tools library tab."))
-			sys.exit()
-		
-		for i in p:
-			#	Get parameters
-			if i.get("gcode_tools") == "Gcode tools tool parameter" :
-				key = None
-				value = None
-				for j in i:
-					if j.get("gcode_tools") == "Gcode tools tool defention field name":
-						key = j.text
-					if j.get("gcode_tools") == "Gcode tools tool defention field value":
-						for k in j :
-							if k.tag == inkex.addNS('tspan','svg') and k.get("gcode_tools") == "Gcode tools tool defention field value":
-								if k.text!=None : value = value +"\n" + k.text if value != None else k.text
-				if value == None or key == None: continue
-#				print_("Found tool parameter '%s':'%s'" % (key,value))
-				if key in self.default_tool.keys() :
-					 try :
-						self.tool[key] = type(self.default_tool[key])(value)
-					 except :
-						self.tool[key] = self.default_tool[key]
-						print_("Warning! Tool's and default tool's parameter's (%s) types are not the same ( type('%s') != type('%s') )." % (key, value, self.default_tool[key]))
-				else :
-					self.tool[key] = value
-					print_("Warning! Tool has parameter that default tool has not ( '%s': '%s' )." % (key, value) )
-		print_("Using tool: %s" % self.tool)			
+				
 					
-
-
-
 e = Gcode_tools()
 e.affect()					
 
