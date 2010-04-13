@@ -628,7 +628,6 @@ class Gcode_tools(inkex.Effect):
 	def parse_curve(self, p, layer, w = None, f = None):
 			c = []
 			if len(p)==0 : 
-				inkex.errormsg(_("Nothing to do. Check that all paths are actually paths."))
 				return []
 			p = self.transform_csp(p, layer)
 			
@@ -739,7 +738,7 @@ class Gcode_tools(inkex.Effect):
 			if not self.options.generate_not_parametric_code else "" )
 			return True
 		else: 
-			inkex.errormsg(_("Directory does not exist!"))
+			error(_("Directory does not exist! Please specify existing directory at Preferences tab!"),"error")
 			return False
 	
 	def generate_gcode(self, curve, layer, depth):
@@ -814,13 +813,13 @@ class Gcode_tools(inkex.Effect):
 				if self.layers[i] in self.orientation_points : 
 					break
 			if self.layers[i] not in self.orientation_points :
-				self.error("Orientation points for '%s' layer have not been found! Please add orientation points using Orientation tab!" % layer.get(inkex.addNS('label','inkscape')),"no_orientation_points")
+				self.error(_("Orientation points for '%s' layer have not been found! Please add orientation points using Orientation tab!") % layer.get(inkex.addNS('label','inkscape')),"no_orientation_points")
 			elif self.layers[i] in self.transform_matrix :
 				self.transform_matrix[layer] = self.transform_matrix[self.layers[i]]
 			else :
 				orientation_layer = self.layers[i]
 				if len(self.orientation_points[orientation_layer])>1 : 
-					self.error("There are more than 1 orientation point groups in '%s' layer" % orientation_layer.get(inkex.addNS('label','inkscape')),"more_than_1_orientation_point_groups")
+					self.error(_("There are more than one orientation point groups in '%s' layer") % orientation_layer.get(inkex.addNS('label','inkscape')),"more_than_one_orientation_point_groups")
 				points = self.orientation_points[orientation_layer][0]
 				if len(points)==2:
 					points += [ [ [(points[1][0][1]-points[0][0][1])+points[0][0][0], -(points[1][0][0]-points[0][0][0])+points[0][0][1]], [-(points[1][1][1]-points[0][1][1])+points[0][1][0], points[1][1][0]-points[0][1][0]+points[0][1][1]] ] ]
@@ -895,7 +894,7 @@ class Gcode_tools(inkex.Effect):
 		warnings = """
 						Warning tools_warning
 						bad_orientation_points_in_some_layers
-						more_than_1_orientation_point_groups
+						more_than_one_orientation_point_groups
 						more_than_one_tool
 						"""
 		errors = """
@@ -947,7 +946,7 @@ class Gcode_tools(inkex.Effect):
 						self.orientation_points[layer] = self.orientation_points[layer]+[points[:]] if layer in self.orientation_points else [points[:]]
 						print_("Found orientation points in '%s' layer: %s" % (layer.get(inkex.addNS('label','inkscape')), points))
 					else :
-						self.error("Warning! Found bad orientation points in '%s' layer result Gcode could be broken!" % layer.get(inkex.addNS('label','inkscape')), "bad_orientation_points_in_some_layers") 
+						self.error(_("Warning! Found bad orientation points in '%s' layer result Gcode could be broken!") % layer.get(inkex.addNS('label','inkscape')), "bad_orientation_points_in_some_layers") 
 				elif i.get("gcode_tools") == "Gcode tools tool defenition" :
 					tool = self.get_tool(i)
 					self.tools[layer] = self.tools[layer] + [tool.copy()] if layer in self.tools else [tool.copy()]
@@ -1006,10 +1005,10 @@ class Gcode_tools(inkex.Effect):
 						tool[key] = type(self.default_tool[key])(value)
 					 except :
 						tool[key] = self.default_tool[key]
-						self.error("Warning! Tool's and default tool's parameter's (%s) types are not the same ( type('%s') != type('%s') )." % (key, value, self.default_tool[key]), "tools_warning")
+						self.error(_("Warning! Tool's and default tool's parameter's (%s) types are not the same ( type('%s') != type('%s') ).") % (key, value, self.default_tool[key]), "tools_warning")
 				else :
 					tool[key] = value
-					self.error("Warning! Tool has parameter that default tool has not ( '%s': '%s' )." % (key, value), "tools_warning" )
+					self.error(_("Warning! Tool has parameter that default tool has not ( '%s': '%s' ).") % (key, value), "tools_warning" )
 		return tool
 	def set_tool(self,layer):
 		for i in range(self.layers.index(layer),-1,-1):
@@ -1017,10 +1016,10 @@ class Gcode_tools(inkex.Effect):
 				break
 		if self.layers[i] in self.tools :
 			if self.layers[i] != layer : self.tools[layer] = self.tools[self.layers[i]]
-			if len(self.tools[layer])>1 : self.error("Layer '%s' contains more than one tool!" % self.layers[i].get(inkex.addNS('label','inkscape')), "more_than_one_tool")
+			if len(self.tools[layer])>1 : self.error(_("Layer '%s' contains more than one tool!") % self.layers[i].get(inkex.addNS('label','inkscape')), "more_than_one_tool")
 			return self.tools[layer]
 		else :
-			self.error("Can not find tool for '%s' layer! Please add one with Tools library tab!" % layer.get(inkex.addNS('label','inkscape')), "no_tool_error")
+			self.error(_("Can not find tool for '%s' layer! Please add one with Tools library tab!") % layer.get(inkex.addNS('label','inkscape')), "no_tool_error")
 		
 ################################################################################
 ###
@@ -1065,8 +1064,7 @@ class Gcode_tools(inkex.Effect):
 
 
 		if self.options.active_tab not in ['"path-to-gcode"', '"area"', '"engraving"', '"orientation"', '"tools_library"']:
-			inkex.errormsg(_("Select one of the active tabs - Path to Gcode, Area, Engraving, Orientation ot Tools library."))
-			return	
+			self.error(_("Select one of the active tabs - Path to Gcode, Area, Engraving, Orientation ot Tools library."),"error")
 
 
 		
@@ -1079,8 +1077,7 @@ class Gcode_tools(inkex.Effect):
 			if len(self.selected_paths)<=0:
 				self.error(_("This extension requires at least one selected path."),"error")
 
-			if not self.check_dir() : 
-				return
+			self.check_dir() 
 			gcode = self.header
 
 			#	Set group
@@ -1108,8 +1105,8 @@ class Gcode_tools(inkex.Effect):
 				f.write(gcode)
 				f.close()							
 			except:
-				inkex.errormsg(_("Can not write to specified file!"))
-				return
+				self.error(_("Can not write to specified file!"),"error")
+
 
 ################################################################################
 ###
@@ -1124,7 +1121,7 @@ class Gcode_tools(inkex.Effect):
 				if layer in self.selected_paths :
 					self.set_tool(layer)
 					if self.tools[layer][0]['diameter']<=0 : 
-						self.error("Tool diameter must be > 0 but tool's diameter on '%s' layer is not!" % layer.get(inkex.addNS('label','inkscape')),"area_tools_diameter_error")
+						self.error(_("Tool diameter must be > 0 but tool's diameter on '%s' layer is not!") % layer.get(inkex.addNS('label','inkscape')),"area_tools_diameter_error")
 		
 					for path in self.selected_paths[layer]:
 						area_group = inkex.etree.SubElement( path.getparent(), inkex.addNS('g','svg') )
@@ -1520,7 +1517,7 @@ class Gcode_tools(inkex.Effect):
 					if self.tools[layer][0]['shape'] != "":
 						f = eval('lambda w: ' + self.tools[layer][0]['shape'].strip('"'))
 					else: 
-						self.error("Tool '%s' has no shape!" % self.tools[layer][0]['name'],"engraving_tools_shape_error")
+						self.error(_("Tool '%s' has no shape!") % self.tools[layer][0]['name'],"engraving_tools_shape_error")
 						f = lambda w: w
 			
 					if cspe!=[]:
@@ -1535,8 +1532,7 @@ class Gcode_tools(inkex.Effect):
 					f.write(gcode)
 					f.close()							
 				except:
-					self.error(_("Can not write to specified file!"))
-					return
+					self.error(_("Can not write to specified file!"),"error")
 			else : 	self.error(_("No need to engrave sharp angles."),"warning")
 	
 
