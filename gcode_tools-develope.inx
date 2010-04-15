@@ -7,9 +7,8 @@
 	<param name='active-tab' type="notebook">
 		<page name='help' _gui-text='Help'>
 			<_param name="fullhelp" type="description">
-Gcode tools plug-in converts paths to Gcode. 
+Gcode tools plug-in: converts paths to Gcode (using circular interpolation), makes offset paths and engraves sharp corners using cone cutters. 
 This plug-in calculates Gcode for paths using circular interpolation or linear motion when needed.
-Default header and footer are used if there are no 'header' and 'footer' files in given directory. 
 
 Manuals, tutorials and exampels can be found here:
 
@@ -39,31 +38,35 @@ Gcode tools ver. 1.5 develope
 			<param name="directory" type="string" _gui-text="Directory">/home</param>
 
 		
-			<param name="Zsafe" type="float" precision="5" min="-1000" max="1000" _gui-text="Z safe">5</param>
-			<param name="unit" type="enum" _gui-text="Unit: ">
+			<param name="Zsafe" type="float" precision="5" min="-1000" max="1000" _gui-text="Z safe distance for G00 move over blank">5</param>
+			<param name="unit" type="enum" _gui-text="Units (mm or in): ">
 				<item value="G21 (All units in mm)">mm</item>
 				<item value="G20 (All units in inches)">in</item>
 			</param>
 
-			<param name="create-log" type="boolean" _gui-text="Create log file">false</param>			
-			<param name="log-filename" type="string" _gui-text="Log file"></param>			
+			<param name="create-log" type="boolean" _gui-text="Generate log file">false</param>			
+			<param name="log-filename" type="string" _gui-text="Full path to log file:"></param>			
 			
 		</page>	
 		<page name='path-to-gcode' _gui-text='Path to Gcode'>	
 				<param name="biarc-tolerance" type='float' precision="5" _gui-text='Biarc interpolation tolerance'>1</param>
 				<param name="biarc-max-split-depth" type="int" _gui-text="Maximum splitting depth">4</param>
 				<_param name="help" type="description">
-Biarc interpolation tolerance is maximum distance between path and it approximation. 
-If distance between path's segment and it's approximation is greater than biarc interpolation tolerance the segment will be split into two segments.
+Biarc interpolation tolerance is the maximum distance between path and its approximation. 
+The segment will be splitted in two segments if the distance between path's segment and it's approximation exceeds biarc interpolation tolerance.
 				</_param>
 		</page>
 		<page name='area' _gui-text='Area'>	
 			<param name="max-area-curves" type="int" min="0" max="1000" _gui-text="Maximum area cutting curves">100</param>
-			<param name="area-inkscape-radius" type="float" min="-1000" max="1000" _gui-text="Area radius">-10</param>
+			<param name="area-inkscape-radius" type="float" min="-1000" max="1000" _gui-text="Area width">-10</param>
 			<_param name="help" type="description">
 This function creates several Inkscape path offsets to fill original path's area up to "Area radius" value. 
-Outlines start from tool_diameter/2 to "Area radius" with tool_diameter steps.
-Fill in "Area radius" and press apply.
+
+Outlines start from "1/2 D" up to "Area width" total width with "D" steps where D is taken from the nearest tool definition ("Tool diameter" value).
+
+Only one offset will be created if the "Area width" is equal to "1/2 D".
+
+Fill in "Area width" and press Apply.
 			</_param>
 
 		</page>			
@@ -74,57 +77,57 @@ Fill in "Area radius" and press apply.
 			<param name="engraving-draw-calculation-paths" type="boolean" _gui-text="Draw additional graphics to debug engraving path">false</param>
 			
 			<_param name="help" type="description">
-This function creates path to engrave sharp angles.
-Cutter shape function is a function which defines shape of the cutter. Some simple shapes:
+This function creates paths to engrave sharp angles.
+Some simple shapes:
 
-45 degree cone: w
-cone having 10 unit height and 3 unit diameter: 10/3 w
-sphere having r unit diameter: math.sqrt(max(0,r**2-w**2))
-ellips having r and r*4 unit diameter: math.sqrt(max(0,r**2-w**2))*4</_param>
+cone    (45 degrees)           : w
+cone    (height/diameter=10/3) : 10/3 w
+sphere  ("r" diameter)         : math.sqrt(max(0,r**2-w**2))
+ellipse (R1=r and R2=r*4r)     : math.sqrt(max(0,r**2-w**2))*4</_param>
 		</page>			
 		
 		<page name='orientation' _gui-text='Orientation'>	
 
 			<param name="orientation-points-count" type="optiongroup" _gui-text="Orientation type: ">
-<option value="2">2 Orientation points 
-(allows movement, rotation,
-scale along both X and Y axis)</option>
-<option value="3">3 Orientation points 
-(allows movement, rotation, scale along
-both X and Y axis separate and mirroring)</option>
+<option value="2">2-points mode
+(move and rotate,
+maintained aspect ratio X/Y)</option>
+<option value="3">3-points mode
+(move, rotate and mirror, 
+different X/Y scale)</option>
 			</param>
 			<param name="Zsurface" type="float" precision="5" min="-1000" max="1000" _gui-text="Z surface">0</param>
 			<param name="Zdepth" type="float" precision="5" min="-1000" max="1000" _gui-text="Z depth">-1</param>
 
 			<_param name="help" type="description">
-Press apply to create three control points. The transformation (offset,scale,rotation in XY plane) of the path will be automaticaly calculated depending on this points.
+If there is no orientation points inside current layer they are taken from the upper layer otherwise from the lower one. [If there is no orientation points at all the defaul 2-points set will be added automatically to the topmost layer].
 
-You can apply transormations to this points, move them. Just make sure that they are not on one line.
+The transformation (offset,scale,mirror,rotation in XY plane) of the path will be automaticaly calculated depending on these points.
+3-points mode only: do not put all three into one line (use 2-points mode instead).
 
-You can modify coordinates that are in the brackets right in the image using text tool.
+You can modify Z surface, Z depth values later using text tool (3rd coordinates).
 
+Now press apply to create control points (independent set for each layer).</_param>
 
-Initial scale is helpfull if you want to use mm or inches. 
-
-For mm set Initial scale to 3.543307087 or use any negative value ("-1" for example).
-For inches set Initial scale to 90</_param>
 		</page>
 
 		<page name='tools_library' _gui-text='Tools library'>	
 			
 			<param type='optiongroup' name='tools-library-type' _gui-text="Tools type:">
-<option value='cylinder cutter'>Cylinder cutter</option>
-<option value='cone cutter'>Cone cutter</option>
-<option value='plasma cutter'>Plasma cutter</option>
-<option value='default tool'>Default tool (all parameters)</option>
+<option value='default tool'>default</option>
+<option value='cylinder cutter'>cylinder</option>
+<option value='cone cutter'>cone</option>
+<option value='plasma cutter'>plasma</option>
+
 			</param>
 			
 			<_param name="help" type="description">
-Press apply to create new tool. Selecting tools type just changes default values for the tool.
+Selected tool type fills appropriate default values. You can change these values using the text tool later on.
 
-All parameters (field names and values) can be changed using the text tool.
+The topmost (z order) tool in the active layer is used. If there is no tool inside current layer it is taken from the upper layer otherwise from the lower one. [If there is no tool at all the defaul tool will be added automatically to the topmost layer].
 
-You can create a number of tools, Gcode tools will use topmost (in z order) tool in the active layer. Or if there's no tools in the active layer plug-in will search for tools in whole image.</_param>
+Press apply to create new tool.
+      </_param>
 		</page>
 			
 			
