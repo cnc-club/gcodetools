@@ -1207,7 +1207,7 @@ class Gcode_tools(inkex.Effect):
 							d = re.sub(r'(?i)\s*([A-Za-z])\s*',r' \1 ',d)
 						# scale = sqrt(Xscale**2 + Yscale**2) / sqrt(1**2 + 1**2)
 						self.transform([0,0],layer)
-						scale = self.Zauto_scale[layer]
+						scale = 1/self.Zauto_scale[layer]
 						tool_d = self.tools[layer][0]['diameter']*scale
 						r = self.options.area_inkscape_radius * scale
 						sign=1 if r>0 else -1
