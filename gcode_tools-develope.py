@@ -1588,7 +1588,7 @@ class Gcode_tools(inkex.Effect):
 ################################################################################
 		elif self.options.active_tab == '"tools_library"' :
 			self.current_layer = self.current_layer if self.current_layer is not None else self.document.getroot()
-			if self.current_layer in self.orientation_points:
+			if self.current_layer in self.tools:
 				self.error(_("Active layer already has a tool! Remove it or select another layer!"),"active_layer_already_has_tool")
 	
 			if self.options.tools_library_type == "cylinder cutter" :
