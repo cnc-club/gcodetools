@@ -10,11 +10,10 @@
 Gcode tools plug-in: converts paths to Gcode (using circular interpolation), makes offset paths and engraves sharp corners using cone cutters. 
 This plug-in calculates Gcode for paths using circular interpolation or linear motion when needed.
 
-Manuals, tutorials and exampels can be found here:
+Chouse a lnguage and press apply to see Gcode tools home page, where you can find help, tutorials and other info.
 
-Russian support forum:
-	http://www.cnc-club.ru/forum/viewtopic.php?t=34
-	
+After you press Apply a webbroser will be started. Unfortunately you wont be able to use inkscape until you close the webbrowser but you always can open Gcode tools home page in other browser.
+
 English support forum:
 	http://www.cnc-club.ru/forum/viewtopic.php?t=35
 
@@ -77,8 +76,8 @@ Fill in "Area width" and press Apply.
 			<param name="engraving-draw-calculation-paths" type="boolean" _gui-text="Draw additional graphics to debug engraving path">false</param>
 			
 			<_param name="help" type="description">
-This function creates paths to engrave sharp angles.
-Some simple shapes:
+This function creates path to engrave sharp angles.
+Cutter's shape function is defined by the tool. Some simple shapes:
 
 cone    (45 degrees)           : w
 cone    (height/diameter=10/3) : 10/3 w
@@ -89,50 +88,47 @@ ellipse (R1=r and R2=r*4r)     : math.sqrt(max(0,r**2-w**2))*4</_param>
 		<page name='orientation' _gui-text='Orientation'>	
 
 			<param name="orientation-points-count" type="optiongroup" _gui-text="Orientation type: ">
-<option value="2">2-points mode
+<_option value="2">2-points mode
 (move and rotate,
-maintained aspect ratio X/Y)</option>
-<option value="3">3-points mode
+maintained aspect ratio X/Y)</_option>
+<_option value="3">3-points mode
 (move, rotate and mirror, 
-different X/Y scale)</option>
+different X/Y scale)</_option>
 			</param>
 			<param name="Zsurface" type="float" precision="5" min="-1000" max="1000" _gui-text="Z surface">0</param>
 			<param name="Zdepth" type="float" precision="5" min="-1000" max="1000" _gui-text="Z depth">-1</param>
 
 			<_param name="help" type="description">
-If there is no orientation points inside current layer they are taken from the upper layer otherwise from the lower one. [If there is no orientation points at all the defaul 2-points set will be added automatically to the topmost layer].
+If there is no orientation points inside current layer they are taken from the upper layer.
 
 The transformation (offset,scale,mirror,rotation in XY plane) of the path will be automaticaly calculated depending on these points.
 3-points mode only: do not put all three into one line (use 2-points mode instead).
 
 You can modify Z surface, Z depth values later using text tool (3rd coordinates).
 
-Now press apply to create control points (independent set for each layer).</_param>
+Do not ungroup orientation points! You can select them using double click to enter the group or by Ctrl+Click
 
+
+Now press apply to create control points (independent set for each layer).</_param>
 		</page>
 
 		<page name='tools_library' _gui-text='Tools library'>	
 			
 			<param type='optiongroup' name='tools-library-type' _gui-text="Tools type:">
-<option value='default tool'>default</option>
-<option value='cylinder cutter'>cylinder</option>
-<option value='cone cutter'>cone</option>
-<option value='plasma cutter'>plasma</option>
-
+<_option value='default tool'>default</_option>
+<_option value='cylinder cutter'>cylinder</_option>
+<_option value='cone cutter'>cone</_option>
+<_option value='plasma cutter'>plasma</_option>
 			</param>
 			
 			<_param name="help" type="description">
-Selected tool type fills appropriate default values. You can change these values using the text tool later on.
+Selected tool type fills appropriate default values. You can change these values using the Text tool later on.
 
-The topmost (z order) tool in the active layer is used. If there is no tool inside current layer it is taken from the upper layer otherwise from the lower one. [If there is no tool at all the defaul tool will be added automatically to the topmost layer].
+The topmost (z order) tool in the active layer is used. If there is no tool inside current layer it is taken from the upper layer.
 
 Press apply to create new tool.
       </_param>
-		</page>
-			
-			
-
-			
+	</page>
 	</param>	
     <effect>
 		<object-type>path</object-type>
@@ -141,17 +137,3 @@ Press apply to create new tool.
         <command reldir="extensions" interpreter="python">gcode_tools-develope.py</command>
     </script>
 </inkscape-extension>
-
-
-
-
-
-
-
-
-
-
-
-
-
-

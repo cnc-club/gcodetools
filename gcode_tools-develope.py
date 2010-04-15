@@ -74,7 +74,7 @@ def bezierparameterize(((bx0,by0),(bx1,by1),(bx2,by2),(bx3,by3))):
 		by=3*(by2-by1)-cy
 		ay=by3-y0-cy-by
 	return ax,ay,bx,by,cx,cy,x0,y0
-bezmisc.bezierparameterize = bezierparameterize
+# bezmisc.bezierparameterize = bezierparameterize
 
 ################################################################################
 ###
@@ -854,13 +854,13 @@ class Gcode_tools(inkex.Effect):
 				else :
 					self.error(_("Orientation points are wrong! (if there are two orientation points they sould not be the same. If there are three orientaion points the sould not lay on straight line.)"),"wrong_orientation_points")
 
-				self.transform_matrix_reverse[layer] = numpy.linalg.inv(self.transform_matrix[layer]).tolist()		
-				print_("\n Layer '%s' transformation matrixes:" % layer.get(inkex.addNS('label','inkscape')) )
-				print_(self.transform_matrix)
-				print_(self.transform_matrix_reverse)
+			self.transform_matrix_reverse[layer] = numpy.linalg.inv(self.transform_matrix[layer]).tolist()		
+			print_("\n Layer '%s' transformation matrixes:" % layer.get(inkex.addNS('label','inkscape')) )
+			print_(self.transform_matrix)
+			print_(self.transform_matrix_reverse)
 
-				self.Zauto_scale[layer]  = math.sqrt( (self.transform_matrix[layer][0][0]**2 + self.transform_matrix[layer][1][1]**2)/2 )
-				print_("Z automatic scale = %s (computed according orientation points)" % self.Zauto_scale[layer])
+			self.Zauto_scale[layer]  = math.sqrt( (self.transform_matrix[layer][0][0]**2 + self.transform_matrix[layer][1][1]**2)/2 )
+			print_("Z automatic scale = %s (computed according orientation points)" % self.Zauto_scale[layer])
 
 		x,y = source_point[0],	source_point[1]
 		if not reverse :
@@ -1010,6 +1010,7 @@ class Gcode_tools(inkex.Effect):
 					tool[key] = value
 					self.error(_("Warning! Tool has parameter that default tool has not ( '%s': '%s' ).") % (key, value), "tools_warning" )
 		return tool
+		
 	def set_tool(self,layer):
 		for i in range(self.layers.index(layer),-1,-1):
 			if self.layers[i] in self.tools : 
@@ -1020,6 +1021,8 @@ class Gcode_tools(inkex.Effect):
 			return self.tools[layer]
 		else :
 			self.error(_("Can not find tool for '%s' layer! Please add one with Tools library tab!") % layer.get(inkex.addNS('label','inkscape')), "no_tool_error")
+
+
 		
 ################################################################################
 ###
@@ -1033,6 +1036,7 @@ class Gcode_tools(inkex.Effect):
 	def effect(self):
 		global options
 		options = self.options
+
 
 ################################################################################
 ###		Launch browser on help tab
