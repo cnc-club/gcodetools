@@ -902,6 +902,8 @@ class Gcode_tools(inkex.Effect):
 						wrong_orientation_points	
 						area_tools_diameter_error
 						no_tool_error
+						active_layer_already_has_tool
+						active_layer_already_has_orientation_points
 					"""
 		if type_.lower() in re.split("[\s\n,\.]+", errors.lower()) :
 			print_(s)
@@ -1061,10 +1063,8 @@ class Gcode_tools(inkex.Effect):
 				print_  = lambda x : None 
 		else : print_  = lambda x : None 
 		
-
-
-		if self.options.active_tab not in ['"tools_library"', '"orientation"'] :	
-			self.get_info()
+		# Get all Gcode tools data from the scene.
+		self.get_info()
 
 
 		if self.options.active_tab not in ['"path-to-gcode"', '"area"', '"engraving"', '"orientation"', '"tools_library"']:
@@ -1547,7 +1547,11 @@ class Gcode_tools(inkex.Effect):
 ################################################################################
 
 		elif self.options.active_tab == '"orientation"' :
-			orientation_group = inkex.etree.SubElement(self.current_layer if self.current_layer is not None else self.document.getroot(), inkex.addNS('g','svg'), {"gcode_tools":"Gcode tools orientation group"})
+			self.current_layer = self.current_layer if self.current_layer is not None else self.document.getroot()
+			if self.current_layer in self.orientation_points:
+				self.error(_("Active layer already has orientation points! Remove them or select another layer!"),"active_layer_already_has_orientation_points")
+			
+			orientation_group = inkex.etree.SubElement(self.current_layer, inkex.addNS('g','svg'), {"gcode_tools":"Gcode tools orientation group"})
 			doc_height = inkex.unittouu(self.document.getroot().get('height'))
 			if self.options.unit == "G21 (All units in mm)" : 
 				points = [[0.,0.,self.options.Zsurface],[100.,0.,self.options.Zdepth],[0.,100.,0.]]
@@ -1583,6 +1587,10 @@ class Gcode_tools(inkex.Effect):
 ###
 ################################################################################
 		elif self.options.active_tab == '"tools_library"' :
+			self.current_layer = self.current_layer if self.current_layer is not None else self.document.getroot()
+			if self.current_layer in self.orientation_points:
+				self.error(_("Active layer already has a tool! Remove it or select another layer!"),"active_layer_already_has_tool")
+	
 			if self.options.tools_library_type == "cylinder cutter" :
 				tool = {
 						"name": "Cylindrical cutter",
@@ -1622,7 +1630,7 @@ G01 Z1 (going to cutting z)\n""",
 				tool = self.default_tool
 				
 					
-			tools_group = inkex.etree.SubElement(self.current_layer if self.current_layer is not None else self.document.getroot(), inkex.addNS('g','svg'), {'gcode_tools': "Gcode tools tool defenition"})
+			tools_group = inkex.etree.SubElement(self.current_layer, inkex.addNS('g','svg'), {'gcode_tools': "Gcode tools tool defenition"})
 			bg = inkex.etree.SubElement(	tools_group, inkex.addNS('path','svg'), 
 						{'style':	"fill:#eeeeee;stroke:#444444; stroke-width:1px;"})
 
