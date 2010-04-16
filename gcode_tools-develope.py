@@ -74,7 +74,7 @@ def bezierparameterize(((bx0,by0),(bx1,by1),(bx2,by2),(bx3,by3))):
 		by=3*(by2-by1)-cy
 		ay=by3-y0-cy-by
 	return ax,ay,bx,by,cx,cy,x0,y0
-# bezmisc.bezierparameterize = bezierparameterize
+bezmisc.bezierparameterize = bezierparameterize
 
 ################################################################################
 ###
@@ -1079,7 +1079,7 @@ class Gcode_tools(inkex.Effect):
 ################################################################################
 		elif self.options.active_tab == '"path-to-gcode"':
 			if len(self.selected_paths)<=0:
-				self.error(_("This extension requires at least one selected path."),"error")
+				self.error(_("Works on Paths and Dynamic Offsets only.\nSolution 1: press Path->Object to path or Shift+Ctrl+C.\nSolution 2: Path->Dynamic offset or Ctrl+J.\nSolution 3: export all contours to PostScript level 2 (File->Save As->.ps) and File->Import this file."),"error")
 
 			self.check_dir() 
 			gcode = self.header
@@ -1120,7 +1120,7 @@ class Gcode_tools(inkex.Effect):
 
 		elif self.options.active_tab == '"area"' :
 			if len(self.selected_paths)<=0:
-				self.error(_("This extension requires at least one selected path."),"error")
+				self.error(_("Works on Paths and Dynamic Offsets only.\nSolution 1: press Path->Object to path or Shift+Ctrl+C.\nSolution 2: Path->Dynamic offset or Ctrl+J.\nSolution 3: export all contours to PostScript level 2 (File->Save As->.ps) and File->Import this file."),"error")
 			for layer in self.layers :
 				if layer in self.selected_paths :
 					self.set_tool(layer)
@@ -1185,21 +1185,29 @@ class Gcode_tools(inkex.Effect):
 										del csp[0][i]
 									else:
 										i += 1
-
+								while len(csp[0])>2 and cspseglength(csp[0][0],csp[0][1]) < straight_tolerance :
+									del csp[0][0]
 								bez = (csp[0][0][1][:],csp[0][0][2][:],csp[0][1][0][:],csp[0][1][1][:])
 								dx, dy = bezmisc.bezierslopeatt(bez,0)
+								while len(csp[0])>2 and cspseglength(csp[0][-2],csp[0][-1]) < straight_tolerance :
+									del csp[0][-1]
+								print_(cspseglength(csp[0][-2],csp[0][-1]))
 								bez = (csp[0][-2][1][:],csp[0][-2][2][:],csp[0][-1][0][:],csp[0][-1][1][:])
-								dx1, dy1 = bezmisc.bezierslopeatt(bez,0)
+								dx1, dy1 = bezmisc.bezierslopeatt(bez,1)
+								#ax,ay,bx,by,cx,cy,dx,dy=bezmisc.bezierparameterize(bez)
+								#print_("x = %s*t^3 + %s*t^2 + %s*t + %s." % (ax,bx,cx,dx))
+								#print_("y = %s*t^3 + %s*t^2 + %s*t + %s." % (ay,by,cy,dy))
+								#print_("x' = %s*t^2 + %s*t + %s." % (3*ax,2*bx,cx))
+								#print_("y' = %s*t^2 + %s*t + %s." % (3*ay,2*by,cy))
+								print_("Start (%s,%s) end (%s,%s) vecrors are cw: %s."% (dx,dy,dx1,dy1,vectors_are_cw([dx,dy],[dx1,dy1])) ) 
 
-								if vectors_are_cw([dx,dy],[dx1,dy1]) :
+								if dx*dy1-dx1*dy<0 or (dx*dy1-dx1*dy==0 and dx>0) :
 									for i in range(len(csp)):
 									 	n = []
 									 	for j in csp[i]:
 									 		n = [  [j[2][:],j[1][:],j[0][:]]  ] + n
 									 	csp[i] = n[:]
 
-								
-	 					 	
 		 					 	
 							d = cubicsuperpath.formatPath(csp)
 							d = re.sub(r'(?i)(m[^mz]+)',r'\1 Z ',d)
