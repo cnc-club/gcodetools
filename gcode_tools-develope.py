@@ -604,6 +604,7 @@ class Gcode_tools(inkex.Effect):
 					"sog":"",
 					"spinlde rpm":"",
 					"CW or CCW":"",
+					"tool change gcode":" ",
 				}			
 		self.tools_field_order = [
 					'name',
@@ -620,7 +621,8 @@ class Gcode_tools(inkex.Effect):
 					"gcode after path",
 					"sog",
 					"spinlde rpm",
-					"CW or CCW"
+					"CW or CCW",
+					"tool change gcode",
 				]
 
 
@@ -659,7 +661,7 @@ class Gcode_tools(inkex.Effect):
 
 	def draw_curve(self, curve, layer, group=None, style=biarc_style):
 		if group==None:
-			group = inkex.etree.SubElement( self.biarcGroup, inkex.addNS('g','svg') )
+			group = inkex.etree.SubElement( self.layers[min(1,len(self.layers))], inkex.addNS('g','svg') )
 		s, arcn = '', 0
 		
 		
@@ -740,7 +742,11 @@ class Gcode_tools(inkex.Effect):
 		else: 
 			error(_("Directory does not exist! Please specify existing directory at Preferences tab!"),"error")
 			return False
-	
+
+################################################################################
+###		Generate Gcode
+################################################################################
+
 	def generate_gcode(self, curve, layer, depth):
 		Zauto_scale = self.Zauto_scale[layer]
 		tool = self.tools[layer][0]
@@ -759,7 +765,15 @@ class Gcode_tools(inkex.Effect):
 					r += s[i] + ("%f" % (c[i]*m[i]+a[i])) + s1[i]
 			return r
 		if len(curve)==0 : return ""	
-		g, lg, zs, f = '', 'G00', self.options.Zsafe, " F%f"%tool['feed'] 
+		
+		try :
+			self.last_used_tool == None
+		except :
+			self.last_used_tool = None
+		g = tool['tool change gcode'] +"\n" if tool != self.last_used_tool else "\n"
+		
+		
+		lg, zs, f =  'G00', self.options.Zsafe, " F%f"%tool['feed'] 
 		go_to_safe_distance = "G00" + c([None,None,zs]) + "\n" if self.options.generate_not_parametric_code else 'G00 Z[#11*#7+#10]\n' 
 		penetration_feed = " F%s"%tool['penetration feed'] 
 		for i in range(1,len(curve)):
@@ -881,7 +895,6 @@ class Gcode_tools(inkex.Effect):
 		return csp
 		
 ################################################################################
-###
 ###		Errors handling function, notes are just printed into Logfile, 
 ###		warnings are printed into log file and warning message is displayed but
 ###		extension continues working, errors causes log and execution is halted
@@ -896,6 +909,12 @@ class Gcode_tools(inkex.Effect):
 						bad_orientation_points_in_some_layers
 						more_than_one_orientation_point_groups
 						more_than_one_tool
+						orientation_have_not_been_defined
+						tool_have_not_been_defined
+						selection_does_not_contain_paths
+						selection_does_not_contain_paths_will_take_all
+						selection_is_empty_will_comupe_drawing
+						selection_contains_objects_that_are_not_paths
 						"""
 		errors = """
 						Error 	
@@ -907,11 +926,11 @@ class Gcode_tools(inkex.Effect):
 					"""
 		if type_.lower() in re.split("[\s\n,\.]+", errors.lower()) :
 			print_(s)
-			inkex.errormsg(s)		
+			inkex.errormsg(s+"\n")		
 			sys.exit()
 		elif type_.lower() in re.split("[\s\n,\.]+", warnings.lower()) :
 			print_(s)
-			inkex.errormsg(s)		
+			inkex.errormsg(s+"\n")		
 		elif type_.lower() in re.split("[\s\n,\.]+", notes.lower()) :
 			print_(s)
 		else :
@@ -928,6 +947,7 @@ class Gcode_tools(inkex.Effect):
 
 	def get_info(self):
 		self.selected_paths = {}
+		self.paths = {}		
 		self.tools = {}
 		self.orientation_points = {}
 		self.layers = [self.document.getroot()]
@@ -935,10 +955,12 @@ class Gcode_tools(inkex.Effect):
 		self.transform_matrix = {}
 		self.transform_matrix_reverse = {}
 		self.Zauto_scale = {}
-		def recursive_search(g, layer):
+		def recursive_search(g, layer, selected=False):
 			items = g.getchildren()
 			items.reverse()
 			for i in items:
+				if selected:
+					self.selected[i.get("id")] = i
 				if i.tag == inkex.addNS("g",'svg') and i.get(inkex.addNS('groupmode','inkscape')) == 'layer':
 					self.layers += [i]
 					recursive_search(i,i)
@@ -953,10 +975,15 @@ class Gcode_tools(inkex.Effect):
 					tool = self.get_tool(i)
 					self.tools[layer] = self.tools[layer] + [tool.copy()] if layer in self.tools else [tool.copy()]
 					print_("Found tool in '%s' layer: %s" % (layer.get(inkex.addNS('label','inkscape')), tool))
-				elif i.tag == inkex.addNS('path','svg') and i in self.selected.values():
-					self.selected_paths[layer] = self.selected_paths[layer] + [i] if layer in self.selected_paths else [i]  
+				elif i.tag == inkex.addNS('path','svg'):
+					self.paths[layer] = self.paths[layer] + [i] if layer in self.paths else [i]  
+					if i.get("id") in self.selected :
+						self.selected_paths[layer] = self.selected_paths[layer] + [i] if layer in self.selected_paths else [i]  
 				elif i.tag == inkex.addNS("g",'svg'):
-					recursive_search(i,layer)
+					recursive_search(i,layer, (i.get("id") in self.selected) )
+				elif i.get("id") in self.selected :
+					self.error(_("Selection contains objects that are not Paths!"),"selection_contains_objects_that_are_not_paths")
+				
 					
 		recursive_search(self.document.getroot(),self.document.getroot())
 
@@ -1026,6 +1053,638 @@ class Gcode_tools(inkex.Effect):
 
 
 		
+
+
+
+
+		
+################################################################################
+###
+###		Path to Gcode
+###
+################################################################################
+
+	def path_to_gcode(self) :
+
+
+		if len(self.selected)<=0 :
+			self.error(_("Selection is empty! Will compute whole drawing."),"selection_is_empty_will_comupe_drawing")
+			paths = self.paths
+		else :
+			paths = self.selected_paths
+		self.check_dir() 
+		gcode = self.header
+
+		#	Set group
+		biarc_group = inkex.etree.SubElement( self.selected[self.options.ids[0]].getparent(), inkex.addNS('g','svg') )
+		for layer in self.layers :
+			if layer in paths :
+				self.set_tool(layer)
+				p = []	
+				for path in paths[layer] :
+					csp = cubicsuperpath.parsePath(path.get("d"))
+					if 'transform' in path.keys():
+						trans = path.get('transform')
+						trans = simpletransform.parseTransform(trans)
+						simpletransform.applyTransformToPath(trans, csp)
+					p += csp
+				curve = self.parse_curve(p, layer)
+				self.draw_curve(curve, layer, biarc_group)
+				if self.tools[layer][0]["depth step"] == 0 : self.tools[layer][0]["depth step"] = 1
+				for step in range( 0,  int(math.ceil( abs( (self.Zcoordinates[layer][1]-self.Zcoordinates[layer][0])/self.tools[layer][0]["depth step"] )) ) ):
+					Zpos = max(		self.Zcoordinates[layer][1],		 self.Zcoordinates[layer][0] - abs(self.tools[layer][0]["depth step"]*(step+1))	)
+					gcode += self.generate_gcode(curve, layer, Zpos)
+		gcode += self.footer
+		try: 	
+			f = open(self.options.directory+'/'+self.options.file, "w")	
+			f.write(gcode)
+			f.close()							
+		except:
+			self.error(_("Can not write to specified file!"),"error")
+
+
+################################################################################
+###
+###		Calculate area curves
+###
+################################################################################
+
+	def area(self) :
+	
+		if len(self.selected_paths)<=0:
+			self.error(_("This extension requires at least one selected path."),"error")
+			return
+		for layer in self.layers :
+			if layer in self.selected_paths :
+				self.set_tool(layer)
+				if self.tools[layer][0]['diameter']<=0 : 
+					self.error(_("Tool diameter must be > 0 but tool's diameter on '%s' layer is not!") % layer.get(inkex.addNS('label','inkscape')),"area_tools_diameter_error")
+	
+				for path in self.selected_paths[layer]:
+					area_group = inkex.etree.SubElement( path.getparent(), inkex.addNS('g','svg') )
+				
+					d = path.get('d')
+					csp = cubicsuperpath.parsePath(d)
+				
+					if path.get(inkex.addNS('type','sodipodi'))!="inkscape:offset":
+						print_("Path %s is not an offset. Preparation started." % path.get("id"))
+						# Path is not offset. Preparation will be needed.
+						# Finding top most point in path (min y value)
+						my = (None, 0, 0, 0)
+						for i in range(len(csp)):
+							for j in range(1,len(csp[i])):
+								ax,ay,bx,by,cx,cy,x0,y0 = bezmisc.bezierparameterize((csp[i][j-1][1],csp[i][j-1][2],csp[i][j][0],csp[i][j][1]))
+								if ay == 0 :
+									roots = [ -cy/(2*by) ] if by !=0 else []
+								else:
+									det = (2.0*by)**2 - 4.0*(3*ay*cy)
+									roots = [ (-2*by+math.sqrt(det))/(6*ay), (-2*by+math.sqrt(det))/(6*ay) ] if det>=0 else []
+								roots += [1,0]	
+								for t in roots :
+									if 0<=t<=1:
+										y = ay*(t**3)+by*(t**2)+cy*t+y0  
+										x = ax*(t**3)+bx*(t**2)+cx*t+x0  
+										if my[0]>y or my[0] == None : 
+											my = (y,i,j,t,x)
+										elif my[0]==y and x<my[4] : 
+											my = (y,i,j,t,x)
+					
+					
+						# Reverse path if needed.
+						if my[0]!=None :
+							# Move outline subpath to the begining of csp
+	 					 	subp = csp[my[1]]
+	 					 	del csp[my[1]]
+	 					 	j = my[2]
+	 					 	# Split by the topmost point and join again
+	 					 	if my[3] in [0,1]:
+	 					 		if my[3] == 0: j=j-1
+		 					 	subp[-1][2], subp[0][0] = subp[-1][1], subp[0][1]
+	 					 		subp = [ [subp[j][1], subp[j][1], subp[j][2]] ] + subp[j+1:] + subp[:j] + [ [subp[j][0], subp[j][1], subp[j][1]] ]
+							else: 					 		
+		 						sp1,sp2,sp3 = cspbezsplit(subp[j-1],subp[j],my[3])
+		 						subp[-1][2], subp[0][0] = subp[-1][1], subp[0][1]
+								subp = [ [ sp2[1], sp2[1],sp2[2] ] ] + [sp3] + subp[j+1:] + subp[:j-1] + [sp1] + [[ sp2[0], sp2[1],sp2[1] ]] 					 	  
+	 					 	csp = [subp] + csp
+							# Reverce path if needed
+							st,end = [],[]
+							i=1
+							while i<len(csp[0]):
+								if csp[0][i-1][1][0]==csp[0][i][1][0] and csp[0][i-1][1][1]==csp[0][i][1][1] :
+									csp[0][i-1][2] = csp[0][i][2]
+									del csp[0][i]
+								else:
+									i += 1
+							while len(csp[0])>2 and cspseglength(csp[0][0],csp[0][1]) < straight_tolerance :
+								del csp[0][0]
+							bez = (csp[0][0][1][:],csp[0][0][2][:],csp[0][1][0][:],csp[0][1][1][:])
+							dx, dy = bezmisc.bezierslopeatt(bez,0)
+							while len(csp[0])>2 and cspseglength(csp[0][-2],csp[0][-1]) < straight_tolerance :
+								del csp[0][-1]
+							bez = (csp[0][-2][1][:],csp[0][-2][2][:],csp[0][-1][0][:],csp[0][-1][1][:])
+							dx1, dy1 = bezmisc.bezierslopeatt(bez,1)
+							#ax,ay,bx,by,cx,cy,dx,dy=bezmisc.bezierparameterize(bez)
+							#print_("x = %s*t^3 + %s*t^2 + %s*t + %s." % (ax,bx,cx,dx))
+							#print_("y = %s*t^3 + %s*t^2 + %s*t + %s." % (ay,by,cy,dy))
+							#print_("x' = %s*t^2 + %s*t + %s." % (3*ax,2*bx,cx))
+							#print_("y' = %s*t^2 + %s*t + %s." % (3*ay,2*by,cy))
+							print_("Starting segment's tangent's (%s,%s) endind segment's tangent's (%s,%s) vecrors are cw: %s."% (dx,dy,dx1,dy1,vectors_are_cw([dx,dy],[dx1,dy1])) ) 
+
+							if dx*dy1-dx1*dy<0 or (dx*dy1-dx1*dy==0 and dx>0) :
+								for i in range(len(csp)):
+								 	n = []
+								 	for j in csp[i]:
+								 		n = [  [j[2][:],j[1][:],j[0][:]]  ] + n
+								 	csp[i] = n[:]
+
+	 					 	
+						d = cubicsuperpath.formatPath(csp)
+						d = re.sub(r'(?i)(m[^mz]+)',r'\1 Z ',d)
+						d = re.sub(r'(?i)\s*z\s*z\s*',r' Z ',d)
+						d = re.sub(r'(?i)\s*([A-Za-z])\s*',r' \1 ',d)
+					# scale = sqrt(Xscale**2 + Yscale**2) / sqrt(1**2 + 1**2)
+					self.transform([0,0],layer)
+					scale = 1/self.Zauto_scale[layer]
+					tool_d = self.tools[layer][0]['diameter']*scale
+					r = self.options.area_inkscape_radius * scale
+					sign=1 if r>0 else -1
+					print_("Tool diameter = %s, r = %s" % (tool_d, r))
+
+					for i in range(self.options.max_area_curves):
+						radius = - tool_d * (i+0.5) * sign
+						if abs(radius)>abs(r): 
+							radius = -r
+						
+						inkex.etree.SubElement(	area_group, inkex.addNS('path','svg'), 
+										{
+											 inkex.addNS('type','sodipodi'):	'inkscape:offset',
+											 inkex.addNS('radius','inkscape'):	str(radius),
+											 inkex.addNS('original','inkscape'):	d,
+											'style':				biarc_style_i['area']
+										})
+						if radius == -r : break 
+
+
+################################################################################
+###
+###		Engraving
+###
+################################################################################
+
+	def engraving(self) :
+	
+		if len(self.selected_paths)<=0:
+			self.error(_("This extension requires at least one selected path."),"error")
+		if not self.check_dir() : return
+		gcode = ''
+
+		def inv(a): # invert matrix 3x3
+			det = float(a[0][0]*a[1][1]*a[2][2] + a[0][1]*a[1][2]*a[2][0] + a[1][0]*a[2][1]*a[0][2] - a[0][2]*a[1][1]*a[2][0] - a[0][0]*a[2][1]*a[1][2] - a[0][1]*a[2][2]*a[1][0])
+			if det==0: return None
+			return	[  
+				[  (a[1][1]*a[2][2] - a[2][1]*a[1][2])/det,  -(a[0][1]*a[2][2] - a[2][1]*a[0][2])/det,  (a[0][1]*a[1][2] - a[1][1]*a[0][2])/det ], 
+				[ -(a[1][0]*a[2][2] - a[2][0]*a[1][2])/det,   (a[0][0]*a[2][2] - a[2][0]*a[0][2])/det, -(a[0][0]*a[1][2] - a[1][0]*a[0][2])/det ], 
+				[  (a[1][0]*a[2][1] - a[2][0]*a[1][1])/det,  -(a[0][0]*a[2][1] - a[2][0]*a[0][1])/det,  (a[0][0]*a[1][1] - a[1][0]*a[0][1])/det ]
+			]
+
+		def find_cutter_center((x1,y1),(nx1,ny1), sp1,sp2, tool, t3 = .5):
+
+			####################################################################
+			###		To find center of cutter a system of non linear equations 
+			###		will be solved using Newton's method 
+			####################################################################
+			bez = (sp1[1][:],sp1[2][:],sp2[0][:],sp2[1][:])
+			ax,ay,bx,by,cx,cy,dx,dy=bezmisc.bezierparameterize(bez)
+			fx=ax*(t3*t3*t3)+bx*(t3*t3)+cx*t3+dx
+			fy=ay*(t3*t3*t3)+by*(t3*t3)+cy*t3+dy
+		
+			f1x = -(3*ay*(t3*t3)+2*by*t3+cy)
+			f1y = 3*ax*(t3*t3)+2*bx*t3+cx
+			
+			if (ny*f1x-nx*f1y) != 0 :
+				t1 = ((fy-y1)*f1x - (fx-x1)*f1y)/(ny*f1x-nx*f1y)
+				t2 = (x1-fx-t1*nx)/f1x if f1x != 0 else (y1-fy-t1*ny)/f1y
+			if (ny*f1x-nx*f1y)==0 or t1<0 or t2<0 : 	
+				t1 = tool['diameter']
+				t2 = tool['diameter']/math.sqrt(f1x*f1x+f1y*f1y)
+				
+			t = [ t1, t2, t3 ]					
+			i = 0
+			F = [0.,0.,0.]
+			F1 = [[0.,0.,0.],[0.,0.,0.],[0.,0.,0.]]
+			while i==0 or abs(F[0])+abs(F[1])+math.sqrt(abs(F[2])) >engraving_tolerance and i<10:
+				t1,t2,t3 = t[0],t[1],t[2]
+				fx=ax*(t3*t3*t3)+bx*(t3*t3)+cx*t3+dx
+				fy=ay*(t3*t3*t3)+by*(t3*t3)+cy*t3+dy
+				f1x=3*ax*(t3*t3)+2*bx*t3+cx
+				f1y=3*ay*(t3*t3)+2*by*t3+cy
+				i+=1
+				
+				tx = fx-x1-nx1*t1
+				ty = fy-y1-ny1*t1
+				
+				F[0] = x1+nx1*t1-fx+t2*f1y
+				F[1] = y1+ny1*t1-fy-t2*f1x
+				F[2] = t1*t1 - tx*tx -ty*ty					
+				
+				F1[0][0] = nx1
+				F1[0][1] = f1y
+				F1[0][2] = -f1x+t2*(6*ay*t3+2*by)
+				
+				F1[1][0] = ny1
+				F1[1][1] = -f1x
+				F1[1][2] = -f1y-t2*(6*ax*t3+2*bx)
+				
+				F1[2][0] = 2*t1+2*nx1*tx +2*ny1*ty
+				F1[2][1] = 0
+				F1[2][2] = -2*f1x*tx -2*f1y*ty
+
+				F1 = inv(F1)
+			
+				if (	 isnan(F[0]) or isnan(F[1]) or isnan(F[2]) or 
+						 isinf(F[0]) or isinf(F[1]) or  isinf(F[2]) ):
+					return t+[1e100,i]	
+			
+				if F1!= None :
+					t[0] -=  F1[0][0]*F[0] + F1[0][1]*F[1] + F1[0][2]*F[2]
+					t[1] -=  F1[1][0]*F[0] + F1[1][1]*F[1] + F1[1][2]*F[2]
+					t[2] -=  F1[2][0]*F[0] + F1[2][1]*F[1] + F1[2][2]*F[2]
+				else: break	
+				
+			return t+[abs(F[0])+abs(F[1])+math.sqrt(abs(F[2])),i]	
+
+		def csp_simpe_bound(csp):
+			minx,miny,maxx,maxy = None,None,None
+			for subpath in csp:
+				for sp in subpath : 
+					for p in sp:
+						minx = min(minx,p[0]) if minx!=None else p[0]
+						miny = min(miny,p[1]) if miny!=None else p[1]
+						maxx = max(maxx,p[0]) if maxx!=None else p[0]
+						maxy = max(maxy,p[1]) if maxy!=None else p[1]
+			return minx,miny,maxx,maxy		
+					
+					
+		cspe =[]
+		we = []
+		for layer in self.layers :
+			if layer in self.selected_paths : 
+				self.set_tool(layer)
+				engraving_group = inkex.etree.SubElement( self.selected_paths[layer][0].getparent(), inkex.addNS('g','svg') )
+				for node in self.selected_paths[layer] :	
+					if node.tag == inkex.addNS('path','svg'):
+						cspi = cubicsuperpath.parsePath(node.get('d'))
+
+						for j in xrange(len(cspi)):
+							# Remove zerro length segments
+							i = 1
+							while i<len(cspi[j]):
+								if abs(cspi[j][i-1][1][0]-cspi[j][i][1][0])<engraving_tolerance and abs(cspi[j][i-1][1][1]-cspi[j][i][1][1])<engraving_tolerance:
+									cspi[j][i-1][2] = cspi[j][i][2]
+									del cspi[j][i]
+								else:
+									i += 1
+						for csp in cspi:
+							#	Create list containing normlas and points
+							nl = []
+							for i in range(1,len(csp)):
+								n, n1 = [], []
+								sp1, sp2 = csp[i-1], csp[i]
+								bez = (sp1[1][:],sp1[2][:],sp2[0][:],sp2[1][:])
+								for ti in [.0,.25,.75,1.]:
+									#	Is following string is nedded or not??? (It makes t depend on form of the curve) 
+									#ti = bezmisc.beziertatlength(bez,ti)	
+									x1,y1 = bezmisc.bezierpointatt(bez,ti)
+									nx,ny = bezmisc.bezierslopeatt(bez,ti)
+									nx,ny = -ny/math.sqrt(nx**2+ny**2),nx/math.sqrt(nx**2+ny**2) 
+									n+=[ [ [x1,y1], [nx,ny], False, False, i] ] # [point coordinates, normal, is an inner corner, is an outer corner, csp's index]
+									if ti==1 and i<len(csp)-1:
+										bez1 = (csp[i][1][:],csp[i][2][:],csp[i+1][0][:],csp[i+1][1][:])
+										nx2, ny2 = bezmisc.bezierslopeatt(bez1,0)
+										nx2,ny2 = -ny2/math.sqrt(nx2**2+ny2**2),nx2/math.sqrt(nx2**2+ny2**2) 
+										ang = ny2*nx-ny*nx2
+										ang1 = 180-math.acos(max(-1,min(1,nx*nx2+ny*ny2)))*180/math.pi
+			 							if ang > 0  and ang1 < self.options.engraving_sharp_angle_tollerance :	# inner angle
+											n[-1][2] = True
+			 							elif ang < 0 and ang1 < self.options.engraving_sharp_angle_tollerance :					# outer angle
+			 								a = -math.acos(nx*nx2+ny*ny2)
+			 								for t in [.0,.25,.75,1.]:
+			 									n1 += [ [ [x1,y1], [nx*math.cos(a*t)-ny*math.sin(a*t),nx*math.sin(a*t)+ny*math.cos(a*t)], False, True, i ]  ]
+				 				nl += [ n ] + ([ n1 ] if n1!=[] else [])
+				 			# Modify first/last points if curve is closed
+							if abs(csp[-1][1][0]-csp[0][1][0])<engraving_tolerance and abs(csp[-1][1][1]-csp[0][1][1])<engraving_tolerance :
+								bez1 = (csp[-2][1][:],csp[-2][2][:],csp[-1][0][:],csp[-1][1][:])
+								x1,y1 = bezmisc.bezierpointatt(bez1,1)
+								nx,ny = bezmisc.bezierslopeatt(bez1,1)
+								nx,ny = -ny/math.sqrt(nx**2+ny**2),nx/math.sqrt(nx**2+ny**2) 
+								bez = (csp[0][1][:],csp[0][2][:],csp[1][0][:],csp[1][1][:])
+								nx2,ny2 = bezmisc.bezierslopeatt(bez,0)
+								nx2,ny2 = -ny2/math.sqrt(nx2**2+ny2**2),nx2/math.sqrt(nx2**2+ny2**2)
+								ang = ny2*nx-ny*nx2
+								if ang > 0  and 180-math.acos(nx*nx2+ny*ny2)*180/math.pi < self.options.engraving_sharp_angle_tollerance :	# inner angle
+									nl[-1][-1][2] = True
+	 							elif ang < 0 and 180-math.acos(nx*nx2+ny*ny2)*180/math.pi < self.options.engraving_sharp_angle_tollerance :					# outer angle
+	 								a = -math.acos(nx*nx2+ny*ny2)
+						 			n1 = []
+	 								for t in [.0,.25,.75,1.]:
+	 									n1 += [ [ [x1,y1], [nx*math.cos(a*t)-ny*math.sin(a*t),nx*math.sin(a*t)+ny*math.cos(a*t)], False, True, i ]  ]
+					 				nl += [ n1 ] 
+
+
+
+							if self.options.engraving_draw_calculation_paths==True:
+								for i in nl:
+									for p in i:
+										inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
+											{
+												 "d":	"M %f,%f L %f,%f" %(p[0][0],p[0][1],p[0][0]+p[1][0]*10,p[0][1]+p[1][1]*10),
+												'style':	"stroke:#0000ff; stroke-opacity:0.46; stroke-width:0.1; fill:none",
+											})				
+
+
+						
+				 			# 	Calculate offset points	
+				 			csp_points = [] 
+							for ki in xrange(len(nl)):
+								p = []
+								for ti in xrange(3) if ki!=len(nl)-1 else xrange(4):
+									n = nl[ki][ti]
+									x1,y1 = n[0]
+									nx,ny = n[1]
+									d, r = 0, None
+									if ti==0 and nl[ki-1][-1][2] == True 	or 		ti==3 and nl[ki][ti][2] == True:
+										# Point is a sharp angle r=0p
+										r = 0
+									else :
+										for j in xrange(0,len(cspi)):
+											for i in xrange(1,len(cspi[j])):
+												d = point_to_csp_bound_dist([x1,y1], cspi[j][i-1], cspi[j][i], self.options.engraving_max_dist*2)
+												if d>=self.options.engraving_max_dist*2 :
+													r = min(d/2,r) if r!=None else d/2	
+													continue
+												for n1 in xrange(self.options.engraving_newton_iterations):
+							 						t = find_cutter_center((x1,y1),(nx,ny), cspi[j][i-1], cspi[j][i], self.tools[layer][0], float(n1)/(self.options.engraving_newton_iterations-1))
+													if t[0] > engraving_tolerance and 0<=t[2]<=1 and abs(t[3])<engraving_tolerance:
+														t3 = t[2]
+														ax,ay,bx,by,cx,cy,dx,dy=bezmisc.bezierparameterize((cspi[j][i-1][1],cspi[j][i-1][2],cspi[j][i][0],cspi[j][i][1]))
+														x2=ax*(t3*t3*t3)+bx*(t3*t3)+cx*t3+dx
+														y2=ay*(t3*t3*t3)+by*(t3*t3)+cy*t3+dy
+											
+														if abs(x2-x1)<engraving_tolerance and abs(y2-y1)<engraving_tolerance:
+															f1x = 3*ax*(t3*t3)+2*bx*t3+cx
+															f1y = 3*ay*(t3*t3)+2*by*t3+cy
+															f2x = 6*ax*t3+2*bx
+															f2y = 6*ay*t3+2*by
+															d = f1x*f2y-f1y*f2x
+															if d!=0 :
+																d = math.sqrt((f1x*f1x+f1y*f1y)**3)/d
+																if d>0:
+																	r = min( d,r) if r!=None else d
+																else :
+																	r = min(r,self.options.engraving_max_dist) if r!=None else self.options.engraving_max_dist
+														else:						
+								 							r = min(t[0],r) if r!=None else t[0]	
+										for j in xrange(0,len(cspi)):
+											for i in xrange(0,len(cspi[j])):
+												x2,y2 = cspi[j][i][1]
+												if (abs(x1-x2)>engraving_tolerance or abs(y1-y2)>engraving_tolerance ) and (x2*nx - x1*nx + y2*ny - y1*ny) != 0:
+													t1 = .5 * ( (x1-x2)**2+(y1-y2)**2 ) /  (x2*nx - x1*nx + y2*ny - y1*ny)
+													if t1>0 : r = min(t1,r) if r!=None else t1
+									if self.options.engraving_draw_calculation_paths==True:
+										inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
+												{'style':	"fill:#ff00ff; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x1+nx*r), inkex.addNS('cy','sodipodi'):		str(y1+ny*r), inkex.addNS('rx','sodipodi'):	str(1), inkex.addNS('ry','sodipodi'): str(1), inkex.addNS('type','sodipodi'):	'arc'})	
+										inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
+												{'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x1+nx*r),  inkex.addNS('cy','sodipodi'):		str(y1+ny*r),inkex.addNS('rx','sodipodi'):		str(r), inkex.addNS('ry','sodipodi'):		str(r), inkex.addNS('type','sodipodi'):	'arc'})
+
+									r = min(r, self.options.engraving_max_dist)
+									w = min(r, self.tools[layer][0]['diameter'])
+									p += [ [x1+nx*w,y1+ny*w,r,w] ]
+							
+						
+							
+								if len(csp_points)>0 : csp_points[-1] += [p[0]]						 			
+								csp_points += [ p ]
+							#	Splitting path to pieces each of them not further from path more than engraving_max_dist
+							engraving_path = [ [] ]
+							for p_ in csp_points :
+								for p in p_:
+									if p[2]<self.options.engraving_max_dist : break
+								if p[2]<self.options.engraving_max_dist: engraving_path[-1] += [p_]
+								else : 
+									if engraving_path[-1] != [] : engraving_path += [ [] ]
+							if engraving_path[-1] == [] : del engraving_path[-1] 
+					
+					
+							for csp_points in engraving_path :
+								#	Create Path that goes through this points 
+								cspm = []
+								w = []
+								m = [[0.0, 0.0, 0.0, 1.0], [0.015625, 0.140625, 0.421875, 0.421875], [0.421875, 0.421875, 0.140625, 0.015625], [1.0, 0.0, 0.0, 0.0]]
+								for p in csp_points:
+									m = numpy.array(m)
+									xi = numpy.array( [p[i][:2] for i in range(4)])
+									sp1,sp2 = [[0.,0.],[0.,0.],[0.,0.]], [[0.,0.],[0.,0.],[0.,0.]]
+									a,b,c,d = numpy.linalg.solve(m, xi).tolist()
+									sp1[1], sp1[0] = d, d
+									sp1[2] = c
+									sp2[0] = b
+									sp2[1], sp2[2] = a, a
+									sp3,sp4,sp5 = cspbezsplit(sp1, sp2, .25)
+									l = cspseglength(sp3,sp4)
+									sp1,sp2,sp4 = cspbezsplit(sp1, sp2, .75)
+									l1 = cspseglength(sp1,sp2)
+									if l1!=0:
+										sp1,sp2,sp3 = cspbezsplitatlength(sp1, sp2, l/l1)
+										if len(cspm)>0 :
+											cspm[-1][2] = sp1[2]
+											cspm += [sp2[:], sp3[:], sp4[:]]
+											w +=  [p[i][3] for i in range(1,4)] 
+										else :
+											cspm += [sp1[:], sp2[:], sp3[:], sp4[:]]	
+											w += [p[i][3] for i in range(4)]
+
+								node =  inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 										{
+															 "d":	 cubicsuperpath.formatPath([cspm]),
+															'style':				biarc_style_i['biarc1']
+														})
+								for i in xrange(len(cspm)):
+									inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
+												{'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(cspm[i][1][0]),  inkex.addNS('cy','sodipodi'):		str(cspm[i][1][1]),inkex.addNS('rx','sodipodi'):		str(w[i]), inkex.addNS('ry','sodipodi'):		str(w[i]), inkex.addNS('type','sodipodi'):	'arc'})
+
+								cspe += [cspm]
+								we   +=	[w]				
+
+				if self.tools[layer][0]['shape'] != "":
+					f = eval('lambda w: ' + self.tools[layer][0]['shape'].strip('"'))
+				else: 
+					self.error(_("Tool '%s' has no shape!") % self.tools[layer][0]['name'],"engraving_tools_shape_error")
+					f = lambda w: w
+		
+				if cspe!=[]:
+					curve = self.parse_curve(cspe, layer, we, f)
+					self.draw_curve(curve, layer, engraving_group)
+					gcode += self.generate_gcode(curve, layer, self.options.Zsurface)
+
+		if gcode!='' :
+			gcode = self.header + gcode + self.footer
+			try: 	
+				f = open(self.options.directory+'/'+self.options.file, "w")	
+				f.write(gcode)
+				f.close()							
+			except:
+				self.error(_("Can not write to specified file!"),"error")
+		else : 	self.error(_("No need to engrave sharp angles."),"warning")
+
+
+################################################################################
+###
+###		Orientation
+###
+################################################################################
+
+	def orientation(self, layer=None) :
+		if layer == None :
+			layer = self.current_layer if self.current_layer is not None else self.document.getroot()
+		if layer in self.orientation_points:
+			self.error(_("Active layer already has orientation points! Remove them or select another layer!"),"active_layer_already_has_orientation_points")
+		
+		orientation_group = inkex.etree.SubElement(layer, inkex.addNS('g','svg'), {"gcode_tools":"Gcode tools orientation group"})
+		doc_height = inkex.unittouu(self.document.getroot().get('height'))
+		if self.options.unit == "G21 (All units in mm)" : 
+			points = [[0.,0.,self.options.Zsurface],[100.,0.,self.options.Zdepth],[0.,100.,0.]]
+			orientation_scale = 3.5433070660
+			print_("orientation_scale < 0 ===> switching to mm units=%0.10f"%orientation_scale )
+		elif self.options.unit == "G20 (All units in inches)" :
+			points = [[0.,0.,self.options.Zsurface],[5.,0.,self.options.Zdepth],[0.,5.,0.]]
+			orientation_scale = 90
+			print_("orientation_scale < 0 ===> switching to inches units=%0.10f"%orientation_scale )
+		if self.options.orientation_points_count == 2 :
+			points = points[:2]
+		for i in points :
+			si = [i[0]*orientation_scale, i[1]*orientation_scale]
+			g = inkex.etree.SubElement(orientation_group, inkex.addNS('g','svg'), {'gcode_tools': "Gcode tools orientation point (%s points)" % self.options.orientation_points_count})
+			inkex.etree.SubElement(	g, inkex.addNS('path','svg'), 
+				{
+					'style':	"stroke:none;fill:#000000;", 	
+					'd':'m %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z z' % (si[0], -si[1]+doc_height),
+					'gcode_tools': "Gcode tools orientation point arrow"
+				})
+			t = inkex.etree.SubElement(	g, inkex.addNS('text','svg'), 
+				{
+					'style':	"font-size:10px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
+					inkex.addNS("space","xml"):"preserve",
+					'x':	str(si[0]+10),
+					'y':	str(-si[1]-10+doc_height),
+					'gcode_tools': "Gcode tools orientation point text"
+				})
+			t.text = "(%s; %s; %s)" % (i[0],i[1],i[2])
+		
+################################################################################
+###
+###		Tools library
+###
+################################################################################
+	def tools_library(self, layer=None) :
+		if layer == None :
+			layer = self.current_layer if self.current_layer is not None else self.document.getroot()
+		if layer in self.tools:
+			self.error(_("Active layer already has a tool! Remove it or select another layer!"),"active_layer_already_has_tool")
+
+		if self.options.tools_library_type == "cylinder cutter" :
+			tool = {
+					"name": "Cylindrical cutter",
+					"id": "Cylindrical cutter 0001",
+					"diameter":10,
+					"penetration angle":90,
+					"feed":"400",
+					"penetration feed":"100",
+					"depth step":"1",
+					"tool change gcode":" "
+			}
+		elif self.options.tools_library_type == "cone cutter":	
+			tool = {
+					"name": "Cone cutter",
+					"id": "Cone cutter 0001",
+					"diameter":10,
+					"shape":"w",
+					"feed":"400",
+					"penetration feed":"100",
+					"depth step":"1",
+					"tool change gcode":" "
+			}
+		elif self.options.tools_library_type == "plasma cutter":	
+			tool = {
+				"name": "Plasma cutter",
+				"id": "Plasma cutter 0001",
+				"diameter":10,
+				"penetration feed":100,
+				"feed":400,
+				"gcode before path":"""G31 Z-100 F500 (find metal)
+G92 Z0 (zerro z)
+G00 Z10 F500 (going up)
+M03 (turn on plasma)
+G04 P0.2 (pause)
+G01 Z1 (going to cutting z)\n""",
+				"gcode after path":"M05 (turn off plasma)\n",
+			}
+		else :
+			tool = self.default_tool
+			
+				
+		tools_group = inkex.etree.SubElement(layer, inkex.addNS('g','svg'), {'gcode_tools': "Gcode tools tool defenition"})
+		bg = inkex.etree.SubElement(	tools_group, inkex.addNS('path','svg'), 
+					{'style':	"fill:#eeeeee;stroke:#444444; stroke-width:1px;"})
+
+		y = 0
+		keys = []
+		for key in self.tools_field_order:
+			if key in tool: keys += [key]
+		for key in tool:
+			if key not in self.tools_field_order: keys += [key]
+		for key in keys :
+			g = inkex.etree.SubElement(tools_group, inkex.addNS('g','svg'), {'gcode_tools': "Gcode tools tool parameter"})
+		
+			t = inkex.etree.SubElement(	g, inkex.addNS('text','svg'), 
+					{
+						'style':	("font-size:10px;" if key!="name" else "font-size:20px;") +	"font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
+						inkex.addNS("space","xml"):"preserve",							
+						'x':	str(self.view_center[0]-150),
+						'y':	str(self.view_center[1]+y),
+						'gcode_tools': "Gcode tools tool defention field name"
+					})
+			t.text = str(key)
+			v = str(tool[key]).split("\n")
+			t = inkex.etree.SubElement(	g, inkex.addNS('text','svg'), 
+					{
+						'style':	("font-size:10px;" if key!="name" else "font-size:20px;") + "font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
+						'x':	str(self.view_center[0]),
+						inkex.addNS("space","xml"):"preserve",
+						'y':	str(self.view_center[1]+y),
+						'gcode_tools': "Gcode tools tool defention field value"
+					})
+			for s in v :
+				span = inkex.etree.SubElement( t, inkex.addNS('tspan','svg'), 
+					{
+						'x':	str(self.view_center[0]),
+						'y':	str(self.view_center[1]+y),
+						inkex.addNS("role","sodipodi"):"line",
+						'gcode_tools': "Gcode tools tool defention field value"
+					})					
+				y += 15 if key!='name' else 20
+				span.text = s
+		bg.set('d',"m %f,%f l %f,%f %f,%f %f,%f z " % (self.view_center[0]-170, self.view_center[1]-20, 400,0, 0,y+50, -400, 0) )	
+		tool = []
+
+
+################################################################################
+###		Launch browser on help tab
+################################################################################
+	def help(self):
+		import webbrowser
+		webbrowser.open(self.options.help_language)		
+		return
+
+
 ################################################################################
 ###
 ###		Effect
@@ -1039,17 +1698,6 @@ class Gcode_tools(inkex.Effect):
 		global options
 		options = self.options
 
-
-################################################################################
-###		Launch browser on help tab
-################################################################################
-
-		if self.options.active_tab == '"help"' :
-			import webbrowser
-			webbrowser.open(self.options.help_language)		
-			return
-
-			
 		# define print_ function 
 		global print_
 		if self.options.log_create_log :
@@ -1062,627 +1710,35 @@ class Gcode_tools(inkex.Effect):
 			except :
 				print_  = lambda x : None 
 		else : print_  = lambda x : None 
+	
 		
-		# Get all Gcode tools data from the scene.
-		self.get_info()
-
-
-		if self.options.active_tab not in ['"path-to-gcode"', '"area"', '"engraving"', '"orientation"', '"tools_library"']:
+		if self.options.active_tab == '"help"' :
+			self.help()
+		elif self.options.active_tab not in ['"path-to-gcode"', '"area"', '"engraving"', '"orientation"', '"tools_library"']:
 			self.error(_("Select one of the active tabs - Path to Gcode, Area, Engraving, Orientation ot Tools library."),"error")
-
-
-		
-################################################################################
-###
-###		Path to Gcode
-###
-################################################################################
-		elif self.options.active_tab == '"path-to-gcode"':
-			if len(self.selected_paths)<=0:
-				self.error(_("This extension requires at least one selected path."),"error")
-
-			self.check_dir() 
-			gcode = self.header
-
-			#	Set group
-			biarc_group = inkex.etree.SubElement( self.selected[self.options.ids[0]].getparent(), inkex.addNS('g','svg') )
-			for layer in self.layers :
-				if layer in self.selected_paths :
-					self.set_tool(layer)
-					p = []	
-					for path in self.selected_paths[layer] :
-						csp = cubicsuperpath.parsePath(path.get("d"))
-						if 'transform' in path.keys():
-							trans = path.get('transform')
-							trans = simpletransform.parseTransform(trans)
-							simpletransform.applyTransformToPath(trans, csp)
-						p += csp
-					curve = self.parse_curve(p, layer)
-					self.draw_curve(curve, layer, biarc_group)
-					if self.tools[layer][0]["depth step"] == 0 : self.tools[layer][0]["depth step"] = 1
-					for step in range( 0,  int(math.ceil( abs( (self.Zcoordinates[layer][1]-self.Zcoordinates[layer][0])/self.tools[layer][0]["depth step"] )) ) ):
-						Zpos = max(		self.Zcoordinates[layer][1],		 self.Zcoordinates[layer][0] - abs(self.tools[layer][0]["depth step"]*(step+1))	)
-						gcode += self.generate_gcode(curve, layer, Zpos)
-			gcode += self.footer
-			try: 	
-				f = open(self.options.directory+'/'+self.options.file, "w")	
-				f.write(gcode)
-				f.close()							
-			except:
-				self.error(_("Can not write to specified file!"),"error")
-
-
-################################################################################
-###
-###		Calculate area curves
-###
-################################################################################
-
-		elif self.options.active_tab == '"area"' :
-			if len(self.selected_paths)<=0:
-				self.error(_("This extension requires at least one selected path."),"error")
-			for layer in self.layers :
-				if layer in self.selected_paths :
-					self.set_tool(layer)
-					if self.tools[layer][0]['diameter']<=0 : 
-						self.error(_("Tool diameter must be > 0 but tool's diameter on '%s' layer is not!") % layer.get(inkex.addNS('label','inkscape')),"area_tools_diameter_error")
-		
-					for path in self.selected_paths[layer]:
-						area_group = inkex.etree.SubElement( path.getparent(), inkex.addNS('g','svg') )
-						
-									
-				
-					
-						d = path.get('d')
-						csp = cubicsuperpath.parsePath(d)
-					
-						if path.get(inkex.addNS('type','sodipodi'))!="inkscape:offset":
-							print_("Path %s is not an offset. Preparation started." % path.get("id"))
-							# Path is not offset. Preparation will be needed.
-							# Finding top most point in path (min y value)
-							my = (None, 0, 0, 0)
-							for i in range(len(csp)):
-								for j in range(1,len(csp[i])):
-									ax,ay,bx,by,cx,cy,x0,y0 = bezmisc.bezierparameterize((csp[i][j-1][1],csp[i][j-1][2],csp[i][j][0],csp[i][j][1]))
-									if ay == 0 :
-										roots = [ -cy/(2*by) ] if by !=0 else []
-									else:
-										det = (2.0*by)**2 - 4.0*(3*ay*cy)
-										roots = [ (-2*by+math.sqrt(det))/(6*ay), (-2*by+math.sqrt(det))/(6*ay) ] if det>=0 else []
-									roots += [1,0]	
-									for t in roots :
-										if 0<=t<=1:
-											y = ay*(t**3)+by*(t**2)+cy*t+y0  
-											x = ax*(t**3)+bx*(t**2)+cx*t+x0  
-											if my[0]>y or my[0] == None : 
-												my = (y,i,j,t,x)
-											elif my[0]==y and x<my[4] : 
-												my = (y,i,j,t,x)
-						
-						
-							# Reverse path if needed.
-							if my[0]!=None :
-								# Move outline subpath to the begining of csp
-		 					 	subp = csp[my[1]]
-		 					 	del csp[my[1]]
-		 					 	j = my[2]
-		 					 	# Split by the topmost point and join again
-		 					 	if my[3] in [0,1]:
-		 					 		if my[3] == 0: j=j-1
-			 					 	subp[-1][2], subp[0][0] = subp[-1][1], subp[0][1]
-		 					 		subp = [ [subp[j][1], subp[j][1], subp[j][2]] ] + subp[j+1:] + subp[:j] + [ [subp[j][0], subp[j][1], subp[j][1]] ]
-								else: 					 		
-			 						sp1,sp2,sp3 = cspbezsplit(subp[j-1],subp[j],my[3])
-			 						subp[-1][2], subp[0][0] = subp[-1][1], subp[0][1]
-									subp = [ [ sp2[1], sp2[1],sp2[2] ] ] + [sp3] + subp[j+1:] + subp[:j-1] + [sp1] + [[ sp2[0], sp2[1],sp2[1] ]] 					 	  
-		 					 	csp = [subp] + csp
-								# Reverce path if needed
-								st,end = [],[]
-								i=1
-								while i<len(csp[0]):
-									if csp[0][i-1][1][0]==csp[0][i][1][0] and csp[0][i-1][1][1]==csp[0][i][1][1] :
-										csp[0][i-1][2] = csp[0][i][2]
-										del csp[0][i]
-									else:
-										i += 1
-								while len(csp[0])>2 and cspseglength(csp[0][0],csp[0][1]) < straight_tolerance :
-									del csp[0][0]
-								bez = (csp[0][0][1][:],csp[0][0][2][:],csp[0][1][0][:],csp[0][1][1][:])
-								dx, dy = bezmisc.bezierslopeatt(bez,0)
-								while len(csp[0])>2 and cspseglength(csp[0][-2],csp[0][-1]) < straight_tolerance :
-									del csp[0][-1]
-								print_(cspseglength(csp[0][-2],csp[0][-1]))
-								bez = (csp[0][-2][1][:],csp[0][-2][2][:],csp[0][-1][0][:],csp[0][-1][1][:])
-								dx1, dy1 = bezmisc.bezierslopeatt(bez,1)
-								#ax,ay,bx,by,cx,cy,dx,dy=bezmisc.bezierparameterize(bez)
-								#print_("x = %s*t^3 + %s*t^2 + %s*t + %s." % (ax,bx,cx,dx))
-								#print_("y = %s*t^3 + %s*t^2 + %s*t + %s." % (ay,by,cy,dy))
-								#print_("x' = %s*t^2 + %s*t + %s." % (3*ax,2*bx,cx))
-								#print_("y' = %s*t^2 + %s*t + %s." % (3*ay,2*by,cy))
-								print_("Start (%s,%s) end (%s,%s) vecrors are cw: %s."% (dx,dy,dx1,dy1,vectors_are_cw([dx,dy],[dx1,dy1])) ) 
-
-								if dx*dy1-dx1*dy<0 or (dx*dy1-dx1*dy==0 and dx>0) :
-									for i in range(len(csp)):
-									 	n = []
-									 	for j in csp[i]:
-									 		n = [  [j[2][:],j[1][:],j[0][:]]  ] + n
-									 	csp[i] = n[:]
-
-		 					 	
-							d = cubicsuperpath.formatPath(csp)
-							d = re.sub(r'(?i)(m[^mz]+)',r'\1 Z ',d)
-							d = re.sub(r'(?i)\s*z\s*z\s*',r' Z ',d)
-							d = re.sub(r'(?i)\s*([A-Za-z])\s*',r' \1 ',d)
-						# scale = sqrt(Xscale**2 + Yscale**2) / sqrt(1**2 + 1**2)
-						self.transform([0,0],layer)
-						scale = 1/self.Zauto_scale[layer]
-						tool_d = self.tools[layer][0]['diameter']*scale
-						r = self.options.area_inkscape_radius * scale
-						sign=1 if r>0 else -1
-						print_("Tool diameter = %s, r = %s" % (tool_d, r))
-
-						for i in range(self.options.max_area_curves):
-							radius = - tool_d * (i+0.5) * sign
-							if abs(radius)>abs(r): 
-								radius = -r
-							
-							inkex.etree.SubElement(	area_group, inkex.addNS('path','svg'), 
-											{
-												 inkex.addNS('type','sodipodi'):	'inkscape:offset',
-												 inkex.addNS('radius','inkscape'):	str(radius),
-												 inkex.addNS('original','inkscape'):	d,
-												'style':				biarc_style_i['area']
-											})
-							if radius == -r : break 
-	
-
-################################################################################
-###
-###		Engraving
-###
-################################################################################
-
-		elif self.options.active_tab == '"engraving"' :
-		
-################################################################################			
-###			
-###		To find center of cutter a system of non linear equations will be solved
-###		using Newton's method 
-###			
-################################################################################
-			if len(self.selected_paths)<=0:
-				self.error(_("This extension requires at least one selected path."),"error")
-			if not self.check_dir() : return
-			gcode = ''
-
-			def inv(a): # invert matrix 3x3
-				det = float(a[0][0]*a[1][1]*a[2][2] + a[0][1]*a[1][2]*a[2][0] + a[1][0]*a[2][1]*a[0][2] - a[0][2]*a[1][1]*a[2][0] - a[0][0]*a[2][1]*a[1][2] - a[0][1]*a[2][2]*a[1][0])
-				if det==0: return None
-				return	[  
-					[  (a[1][1]*a[2][2] - a[2][1]*a[1][2])/det,  -(a[0][1]*a[2][2] - a[2][1]*a[0][2])/det,  (a[0][1]*a[1][2] - a[1][1]*a[0][2])/det ], 
-					[ -(a[1][0]*a[2][2] - a[2][0]*a[1][2])/det,   (a[0][0]*a[2][2] - a[2][0]*a[0][2])/det, -(a[0][0]*a[1][2] - a[1][0]*a[0][2])/det ], 
-					[  (a[1][0]*a[2][1] - a[2][0]*a[1][1])/det,  -(a[0][0]*a[2][1] - a[2][0]*a[0][1])/det,  (a[0][0]*a[1][1] - a[1][0]*a[0][1])/det ]
-				]
-
-			def find_cutter_center((x1,y1),(nx1,ny1), sp1,sp2, tool, t3 = .5):
-				bez = (sp1[1][:],sp1[2][:],sp2[0][:],sp2[1][:])
-				ax,ay,bx,by,cx,cy,dx,dy=bezmisc.bezierparameterize(bez)
-				fx=ax*(t3*t3*t3)+bx*(t3*t3)+cx*t3+dx
-				fy=ay*(t3*t3*t3)+by*(t3*t3)+cy*t3+dy
-			
-				f1x = -(3*ay*(t3*t3)+2*by*t3+cy)
-				f1y = 3*ax*(t3*t3)+2*bx*t3+cx
-				
-				if (ny*f1x-nx*f1y) != 0 :
-					t1 = ((fy-y1)*f1x - (fx-x1)*f1y)/(ny*f1x-nx*f1y)
-					t2 = (x1-fx-t1*nx)/f1x if f1x != 0 else (y1-fy-t1*ny)/f1y
-				if (ny*f1x-nx*f1y)==0 or t1<0 or t2<0 : 	
-					t1 = tool['diameter']
-					t2 = tool['diameter']/math.sqrt(f1x*f1x+f1y*f1y)
-					
-				t = [ t1, t2, t3 ]					
-				i = 0
-				F = [0.,0.,0.]
-				F1 = [[0.,0.,0.],[0.,0.,0.],[0.,0.,0.]]
-				while i==0 or abs(F[0])+abs(F[1])+math.sqrt(abs(F[2])) >engraving_tolerance and i<10:
-					t1,t2,t3 = t[0],t[1],t[2]
-					fx=ax*(t3*t3*t3)+bx*(t3*t3)+cx*t3+dx
-					fy=ay*(t3*t3*t3)+by*(t3*t3)+cy*t3+dy
-					f1x=3*ax*(t3*t3)+2*bx*t3+cx
-					f1y=3*ay*(t3*t3)+2*by*t3+cy
-					i+=1
-					
-					tx = fx-x1-nx1*t1
-					ty = fy-y1-ny1*t1
-					
-					F[0] = x1+nx1*t1-fx+t2*f1y
-					F[1] = y1+ny1*t1-fy-t2*f1x
-					F[2] = t1*t1 - tx*tx -ty*ty					
-					
-					F1[0][0] = nx1
-					F1[0][1] = f1y
-					F1[0][2] = -f1x+t2*(6*ay*t3+2*by)
-					
-					F1[1][0] = ny1
-					F1[1][1] = -f1x
-					F1[1][2] = -f1y-t2*(6*ax*t3+2*bx)
-					
-					F1[2][0] = 2*t1+2*nx1*tx +2*ny1*ty
-					F1[2][1] = 0
-					F1[2][2] = -2*f1x*tx -2*f1y*ty
-
-					F1 = inv(F1)
-				
-					if (	 isnan(F[0]) or isnan(F[1]) or isnan(F[2]) or 
-							 isinf(F[0]) or isinf(F[1]) or  isinf(F[2]) ):
-						return t+[1e100,i]	
-				
-					if F1!= None :
-						t[0] -=  F1[0][0]*F[0] + F1[0][1]*F[1] + F1[0][2]*F[2]
-						t[1] -=  F1[1][0]*F[0] + F1[1][1]*F[1] + F1[1][2]*F[2]
-						t[2] -=  F1[2][0]*F[0] + F1[2][1]*F[1] + F1[2][2]*F[2]
-					else: break	
-					
-				return t+[abs(F[0])+abs(F[1])+math.sqrt(abs(F[2])),i]	
-
-			def csp_simpe_bound(csp):
-				minx,miny,maxx,maxy = None,None,None
-				for subpath in csp:
-					for sp in subpath : 
-						for p in sp:
-							minx = min(minx,p[0]) if minx!=None else p[0]
-							miny = min(miny,p[1]) if miny!=None else p[1]
-							maxx = max(maxx,p[0]) if maxx!=None else p[0]
-							maxy = max(maxy,p[1]) if maxy!=None else p[1]
-				return minx,miny,maxx,maxy		
-						
-						
-			cspe =[]
-			we = []
-			for layer in self.layers :
-				if layer in self.selected_paths : 
-					self.set_tool(layer)
-					engraving_group = inkex.etree.SubElement( self.selected_paths[layer][0].getparent(), inkex.addNS('g','svg') )
-					for node in self.selected_paths[layer] :	
-						if node.tag == inkex.addNS('path','svg'):
-							cspi = cubicsuperpath.parsePath(node.get('d'))
-
-							for j in xrange(len(cspi)):
-								# Remove zerro length segments
-								i = 1
-								while i<len(cspi[j]):
-									if abs(cspi[j][i-1][1][0]-cspi[j][i][1][0])<engraving_tolerance and abs(cspi[j][i-1][1][1]-cspi[j][i][1][1])<engraving_tolerance:
-										cspi[j][i-1][2] = cspi[j][i][2]
-										del cspi[j][i]
-									else:
-										i += 1
-							for csp in cspi:
-								#	Create list containing normlas and points
-								nl = []
-								for i in range(1,len(csp)):
-									n, n1 = [], []
-									sp1, sp2 = csp[i-1], csp[i]
-									bez = (sp1[1][:],sp1[2][:],sp2[0][:],sp2[1][:])
-									for ti in [.0,.25,.75,1.]:
-										#	Is following string is nedded or not??? (It makes t depend on form of the curve) 
-										#ti = bezmisc.beziertatlength(bez,ti)	
-										x1,y1 = bezmisc.bezierpointatt(bez,ti)
-										nx,ny = bezmisc.bezierslopeatt(bez,ti)
-										nx,ny = -ny/math.sqrt(nx**2+ny**2),nx/math.sqrt(nx**2+ny**2) 
-										n+=[ [ [x1,y1], [nx,ny], False, False, i] ] # [point coordinates, normal, is an inner corner, is an outer corner, csp's index]
-										if ti==1 and i<len(csp)-1:
-											bez1 = (csp[i][1][:],csp[i][2][:],csp[i+1][0][:],csp[i+1][1][:])
-											nx2, ny2 = bezmisc.bezierslopeatt(bez1,0)
-											nx2,ny2 = -ny2/math.sqrt(nx2**2+ny2**2),nx2/math.sqrt(nx2**2+ny2**2) 
-											ang = ny2*nx-ny*nx2
-											ang1 = 180-math.acos(max(-1,min(1,nx*nx2+ny*ny2)))*180/math.pi
-				 							if ang > 0  and ang1 < self.options.engraving_sharp_angle_tollerance :	# inner angle
-												n[-1][2] = True
-				 							elif ang < 0 and ang1 < self.options.engraving_sharp_angle_tollerance :					# outer angle
-				 								a = -math.acos(nx*nx2+ny*ny2)
-				 								for t in [.0,.25,.75,1.]:
-				 									n1 += [ [ [x1,y1], [nx*math.cos(a*t)-ny*math.sin(a*t),nx*math.sin(a*t)+ny*math.cos(a*t)], False, True, i ]  ]
-					 				nl += [ n ] + ([ n1 ] if n1!=[] else [])
-					 			# Modify first/last points if curve is closed
-								if abs(csp[-1][1][0]-csp[0][1][0])<engraving_tolerance and abs(csp[-1][1][1]-csp[0][1][1])<engraving_tolerance :
-									bez1 = (csp[-2][1][:],csp[-2][2][:],csp[-1][0][:],csp[-1][1][:])
-									x1,y1 = bezmisc.bezierpointatt(bez1,1)
-									nx,ny = bezmisc.bezierslopeatt(bez1,1)
-									nx,ny = -ny/math.sqrt(nx**2+ny**2),nx/math.sqrt(nx**2+ny**2) 
-									bez = (csp[0][1][:],csp[0][2][:],csp[1][0][:],csp[1][1][:])
-									nx2,ny2 = bezmisc.bezierslopeatt(bez,0)
-									nx2,ny2 = -ny2/math.sqrt(nx2**2+ny2**2),nx2/math.sqrt(nx2**2+ny2**2)
-									ang = ny2*nx-ny*nx2
-									if ang > 0  and 180-math.acos(nx*nx2+ny*ny2)*180/math.pi < self.options.engraving_sharp_angle_tollerance :	# inner angle
-										nl[-1][-1][2] = True
-		 							elif ang < 0 and 180-math.acos(nx*nx2+ny*ny2)*180/math.pi < self.options.engraving_sharp_angle_tollerance :					# outer angle
-		 								a = -math.acos(nx*nx2+ny*ny2)
-							 			n1 = []
-		 								for t in [.0,.25,.75,1.]:
-		 									n1 += [ [ [x1,y1], [nx*math.cos(a*t)-ny*math.sin(a*t),nx*math.sin(a*t)+ny*math.cos(a*t)], False, True, i ]  ]
-						 				nl += [ n1 ] 
-
-
-
-								if self.options.engraving_draw_calculation_paths==True:
-									for i in nl:
-										for p in i:
-											inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
-												{
-													 "d":	"M %f,%f L %f,%f" %(p[0][0],p[0][1],p[0][0]+p[1][0]*10,p[0][1]+p[1][1]*10),
-													'style':	"stroke:#0000ff; stroke-opacity:0.46; stroke-width:0.1; fill:none",
-												})				
-
-
-							
-					 			# 	Calculate offset points	
-					 			csp_points = [] 
-								for ki in xrange(len(nl)):
-									p = []
-									for ti in xrange(3) if ki!=len(nl)-1 else xrange(4):
-										n = nl[ki][ti]
-										x1,y1 = n[0]
-										nx,ny = n[1]
-										d, r = 0, None
-										if ti==0 and nl[ki-1][-1][2] == True 	or 		ti==3 and nl[ki][ti][2] == True:
-											# Point is a sharp angle r=0p
-											r = 0
-										else :
-											for j in xrange(0,len(cspi)):
-												for i in xrange(1,len(cspi[j])):
-													d = point_to_csp_bound_dist([x1,y1], cspi[j][i-1], cspi[j][i], self.options.engraving_max_dist*2)
-													if d>=self.options.engraving_max_dist*2 :
-														r = min(d/2,r) if r!=None else d/2	
-														continue
-													for n1 in xrange(self.options.engraving_newton_iterations):
-								 						t = find_cutter_center((x1,y1),(nx,ny), cspi[j][i-1], cspi[j][i], self.tools[layer][0], float(n1)/(self.options.engraving_newton_iterations-1))
-														if t[0] > engraving_tolerance and 0<=t[2]<=1 and abs(t[3])<engraving_tolerance:
-															t3 = t[2]
-															ax,ay,bx,by,cx,cy,dx,dy=bezmisc.bezierparameterize((cspi[j][i-1][1],cspi[j][i-1][2],cspi[j][i][0],cspi[j][i][1]))
-															x2=ax*(t3*t3*t3)+bx*(t3*t3)+cx*t3+dx
-															y2=ay*(t3*t3*t3)+by*(t3*t3)+cy*t3+dy
-												
-															if abs(x2-x1)<engraving_tolerance and abs(y2-y1)<engraving_tolerance:
-																f1x = 3*ax*(t3*t3)+2*bx*t3+cx
-																f1y = 3*ay*(t3*t3)+2*by*t3+cy
-																f2x = 6*ax*t3+2*bx
-																f2y = 6*ay*t3+2*by
-																d = f1x*f2y-f1y*f2x
-																if d!=0 :
-																	d = math.sqrt((f1x*f1x+f1y*f1y)**3)/d
-																	if d>0:
-																		r = min( d,r) if r!=None else d
-																	else :
-																		r = min(r,self.options.engraving_max_dist) if r!=None else self.options.engraving_max_dist
-															else:						
-									 							r = min(t[0],r) if r!=None else t[0]	
-											for j in xrange(0,len(cspi)):
-												for i in xrange(0,len(cspi[j])):
-													x2,y2 = cspi[j][i][1]
-													if (abs(x1-x2)>engraving_tolerance or abs(y1-y2)>engraving_tolerance ) and (x2*nx - x1*nx + y2*ny - y1*ny) != 0:
-														t1 = .5 * ( (x1-x2)**2+(y1-y2)**2 ) /  (x2*nx - x1*nx + y2*ny - y1*ny)
-														if t1>0 : r = min(t1,r) if r!=None else t1
-										if self.options.engraving_draw_calculation_paths==True:
-											inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
-													{'style':	"fill:#ff00ff; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x1+nx*r), inkex.addNS('cy','sodipodi'):		str(y1+ny*r), inkex.addNS('rx','sodipodi'):	str(1), inkex.addNS('ry','sodipodi'): str(1), inkex.addNS('type','sodipodi'):	'arc'})	
-											inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
-													{'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x1+nx*r),  inkex.addNS('cy','sodipodi'):		str(y1+ny*r),inkex.addNS('rx','sodipodi'):		str(r), inkex.addNS('ry','sodipodi'):		str(r), inkex.addNS('type','sodipodi'):	'arc'})
-
-										r = min(r, self.options.engraving_max_dist)
-										w = min(r, self.tools[layer][0]['diameter'])
-										p += [ [x1+nx*w,y1+ny*w,r,w] ]
-								
-							
-								
-									if len(csp_points)>0 : csp_points[-1] += [p[0]]						 			
-									csp_points += [ p ]
-								#	Splitting path to pieces each of them not further from path more than engraving_max_dist
-								engraving_path = [ [] ]
-								for p_ in csp_points :
-									for p in p_:
-										if p[2]<self.options.engraving_max_dist : break
-									if p[2]<self.options.engraving_max_dist: engraving_path[-1] += [p_]
-									else : 
-										if engraving_path[-1] != [] : engraving_path += [ [] ]
-								if engraving_path[-1] == [] : del engraving_path[-1] 
-						
-						
-								for csp_points in engraving_path :
-									#	Create Path that goes through this points 
-									cspm = []
-									w = []
-									m = [[0.0, 0.0, 0.0, 1.0], [0.015625, 0.140625, 0.421875, 0.421875], [0.421875, 0.421875, 0.140625, 0.015625], [1.0, 0.0, 0.0, 0.0]]
-									for p in csp_points:
-										m = numpy.array(m)
-										xi = numpy.array( [p[i][:2] for i in range(4)])
-										sp1,sp2 = [[0.,0.],[0.,0.],[0.,0.]], [[0.,0.],[0.,0.],[0.,0.]]
-										a,b,c,d = numpy.linalg.solve(m, xi).tolist()
-										sp1[1], sp1[0] = d, d
-										sp1[2] = c
-										sp2[0] = b
-										sp2[1], sp2[2] = a, a
-										sp3,sp4,sp5 = cspbezsplit(sp1, sp2, .25)
-										l = cspseglength(sp3,sp4)
-										sp1,sp2,sp4 = cspbezsplit(sp1, sp2, .75)
-										l1 = cspseglength(sp1,sp2)
-										if l1!=0:
-											sp1,sp2,sp3 = cspbezsplitatlength(sp1, sp2, l/l1)
-											if len(cspm)>0 :
-												cspm[-1][2] = sp1[2]
-												cspm += [sp2[:], sp3[:], sp4[:]]
-												w +=  [p[i][3] for i in range(1,4)] 
-											else :
-												cspm += [sp1[:], sp2[:], sp3[:], sp4[:]]	
-												w += [p[i][3] for i in range(4)]
-
-									node =  inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 										{
-																 "d":	 cubicsuperpath.formatPath([cspm]),
-																'style':				biarc_style_i['biarc1']
-															})
-									for i in xrange(len(cspm)):
-										inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
-													{'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(cspm[i][1][0]),  inkex.addNS('cy','sodipodi'):		str(cspm[i][1][1]),inkex.addNS('rx','sodipodi'):		str(w[i]), inkex.addNS('ry','sodipodi'):		str(w[i]), inkex.addNS('type','sodipodi'):	'arc'})
-
-									cspe += [cspm]
-									we   +=	[w]				
-
-					if self.tools[layer][0]['shape'] != "":
-						f = eval('lambda w: ' + self.tools[layer][0]['shape'].strip('"'))
-					else: 
-						self.error(_("Tool '%s' has no shape!") % self.tools[layer][0]['name'],"engraving_tools_shape_error")
-						f = lambda w: w
-			
-					if cspe!=[]:
-						curve = self.parse_curve(cspe, layer, we, f)
-						self.draw_curve(curve, layer, engraving_group)
-						gcode += self.generate_gcode(curve, layer, self.options.Zsurface)
-	
-			if gcode!='' :
-				gcode = self.header + gcode + self.footer
-				try: 	
-					f = open(self.options.directory+'/'+self.options.file, "w")	
-					f.write(gcode)
-					f.close()							
-				except:
-					self.error(_("Can not write to specified file!"),"error")
-			else : 	self.error(_("No need to engrave sharp angles."),"warning")
-	
-
-################################################################################
-###
-###		Orientation
-###
-################################################################################
-
-		elif self.options.active_tab == '"orientation"' :
-			self.current_layer = self.current_layer if self.current_layer is not None else self.document.getroot()
-			if self.current_layer in self.orientation_points:
-				self.error(_("Active layer already has orientation points! Remove them or select another layer!"),"active_layer_already_has_orientation_points")
-			
-			orientation_group = inkex.etree.SubElement(self.current_layer, inkex.addNS('g','svg'), {"gcode_tools":"Gcode tools orientation group"})
-			doc_height = inkex.unittouu(self.document.getroot().get('height'))
-			if self.options.unit == "G21 (All units in mm)" : 
-				points = [[0.,0.,self.options.Zsurface],[100.,0.,self.options.Zdepth],[0.,100.,0.]]
-				orientation_scale = 3.5433070660
-				print_("orientation_scale < 0 ===> switching to mm units=%0.10f"%orientation_scale )
-			elif self.options.unit == "G20 (All units in inches)" :
-				points = [[0.,0.,self.options.Zsurface],[5.,0.,self.options.Zdepth],[0.,5.,0.]]
-				orientation_scale = 90
-				print_("orientation_scale < 0 ===> switching to inches units=%0.10f"%orientation_scale )
-			if self.options.orientation_points_count == 2 :
-				points = points[:2]
-			for i in points :
-				si = [i[0]*orientation_scale, i[1]*orientation_scale]
-				g = inkex.etree.SubElement(orientation_group, inkex.addNS('g','svg'), {'gcode_tools': "Gcode tools orientation point (%s points)" % self.options.orientation_points_count})
-				inkex.etree.SubElement(	g, inkex.addNS('path','svg'), 
-					{
-						'style':	"stroke:none;fill:#000000;", 	
-						'd':'m %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z z' % (si[0], -si[1]+doc_height),
-						'gcode_tools': "Gcode tools orientation point arrow"
-					})
-				t = inkex.etree.SubElement(	g, inkex.addNS('text','svg'), 
-					{
-						'style':	"font-size:10px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
-						inkex.addNS("space","xml"):"preserve",
-						'x':	str(si[0]+10),
-						'y':	str(-si[1]-10+doc_height),
-						'gcode_tools': "Gcode tools orientation point text"
-					})
-				t.text = "(%s; %s; %s)" % (i[0],i[1],i[2])
-		
-################################################################################
-###
-###		Tools library
-###
-################################################################################
-		elif self.options.active_tab == '"tools_library"' :
-			self.current_layer = self.current_layer if self.current_layer is not None else self.document.getroot()
-			if self.current_layer in self.tools:
-				self.error(_("Active layer already has a tool! Remove it or select another layer!"),"active_layer_already_has_tool")
-	
-			if self.options.tools_library_type == "cylinder cutter" :
-				tool = {
-						"name": "Cylindrical cutter",
-						"id": "Cylindrical cutter 0001",
-						"diameter":10,
-						"penetration angle":90,
-						"feed":"400",
-						"penetration feed":"100",
-						"depth step":"1",
-				}
-			elif self.options.tools_library_type == "cone cutter":	
-				tool = {
-						"name": "Cone cutter",
-						"id": "Cone cutter 0001",
-						"diameter":10,
-						"shape":"w",
-						"feed":"400",
-						"penetration feed":"100",
-						"depth step":"1",
-				}
-			elif self.options.tools_library_type == "plasma cutter":	
-				tool = {
-					"name": "Plasma cutter",
-					"id": "Plasma cutter 0001",
-					"diameter":10,
-					"penetration feed":100,
-					"feed":400,
-					"gcode before path":"""G31 Z-100 F500 (find metal)
-G92 Z0 (zerro z)
-G00 Z10 F500 (going up)
-M03 (turn on plasma)
-G04 P0.2 (pause)
-G01 Z1 (going to cutting z)\n""",
-					"gcode after path":"M05 (turn off plasma)\n",
-				}
-			else :
-				tool = self.default_tool
-				
-					
-			tools_group = inkex.etree.SubElement(self.current_layer, inkex.addNS('g','svg'), {'gcode_tools': "Gcode tools tool defenition"})
-			bg = inkex.etree.SubElement(	tools_group, inkex.addNS('path','svg'), 
-						{'style':	"fill:#eeeeee;stroke:#444444; stroke-width:1px;"})
-
-			y = 0
-			keys = []
-			for key in self.tools_field_order:
-				if key in tool: keys += [key]
-			for key in tool:
-				if key not in self.tools_field_order: keys += [key]
-			for key in keys :
-				g = inkex.etree.SubElement(tools_group, inkex.addNS('g','svg'), {'gcode_tools': "Gcode tools tool parameter"})
-			
-				t = inkex.etree.SubElement(	g, inkex.addNS('text','svg'), 
-						{
-							'style':	("font-size:10px;" if key!="name" else "font-size:20px;") +	"font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
-							inkex.addNS("space","xml"):"preserve",							
-							'x':	str(self.view_center[0]-150),
-							'y':	str(self.view_center[1]+y),
-							'gcode_tools': "Gcode tools tool defention field name"
-						})
-				t.text = str(key)
-				v = str(tool[key]).split("\n")
-				t = inkex.etree.SubElement(	g, inkex.addNS('text','svg'), 
-						{
-							'style':	("font-size:10px;" if key!="name" else "font-size:20px;") + "font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
-							'x':	str(self.view_center[0]),
-							inkex.addNS("space","xml"):"preserve",
-							'y':	str(self.view_center[1]+y),
-							'gcode_tools': "Gcode tools tool defention field value"
-						})
-				for s in v :
-					span = inkex.etree.SubElement( t, inkex.addNS('tspan','svg'), 
-						{
-							'x':	str(self.view_center[0]),
-							'y':	str(self.view_center[1]+y),
-							inkex.addNS("role","sodipodi"):"line",
-							'gcode_tools': "Gcode tools tool defention field value"
-						})					
-					y += 15 if key!='name' else 20
-					span.text = s
-			bg.set('d',"m %f,%f l %f,%f %f,%f %f,%f z " % (self.view_center[0]-170, self.view_center[1]-20, 400,0, 0,y+50, -400, 0) )	
-			tool = []
-
+		else:
+			# Get all Gcode tools data from the scene.
+			self.get_info()
+			if self.options.active_tab in ['"path-to-gcode"', '"area"', '"engraving"']:
+				if self.orientation_points == {} :
+					self.error(_("Orientation points have not been defined! A default set of orientation points have been automaticaly added."),"orientation_have_not_been_defined")
+					self.orientation( self.layers[min(1,len(self.layers))] )		
+					self.get_info()
+				if self.tools == {} :
+					self.error(_("Cutting tool have not been defined! A default tool have been automaticaly added."),"tool_have_not_been_defined")
+					self.options.tools_library_type = "default"
+					self.tools_library( self.layers[min(1,len(self.layers))] )		
+					self.get_info()
+			if self.options.active_tab == '"path-to-gcode"': 
+				self.path_to_gcode()		
+			elif self.options.active_tab == '"area"': 
+				self.area()		
+			elif self.options.active_tab == '"engraving"': 
+				self.engraving()		
+			elif self.options.active_tab == '"orientation"': 
+				self.orientation()		
+			elif self.options.active_tab == '"tools_library"': 
+				self.tools_library()		
 				
 					
 e = Gcode_tools()
