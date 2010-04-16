@@ -982,7 +982,7 @@ class Gcode_tools(inkex.Effect):
 				elif i.tag == inkex.addNS("g",'svg'):
 					recursive_search(i,layer, (i.get("id") in self.selected) )
 				elif i.get("id") in self.selected :
-					self.error(_("Selection contains objects that are not Paths!"),"selection_contains_objects_that_are_not_paths")
+					self.error(_("This extension works with Paths and Dynamic Offsets and groups of them only! All other objects will be ignored!\nSolution 1: press Path->Object to path or Shift+Ctrl+C.\nSolution 2: Path->Dynamic offset or Ctrl+J.\nSolution 3: export all contours to PostScript level 2 (File->Save As->.ps) and File->Import this file."),"selection_contains_objects_that_are_not_paths")
 				
 					
 		recursive_search(self.document.getroot(),self.document.getroot())
@@ -1739,7 +1739,6 @@ G01 Z1 (going to cutting z)\n""",
 				self.orientation()		
 			elif self.options.active_tab == '"tools_library"': 
 				self.tools_library()		
-				
 					
 e = Gcode_tools()
 e.affect()					
