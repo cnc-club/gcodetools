@@ -1583,6 +1583,7 @@ class Gcode_tools(inkex.Effect):
 				t = inkex.etree.SubElement(	g, inkex.addNS('text','svg'), 
 					{
 						'style':	"font-size:10px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
+						inkex.addNS("space","xml"):"preserve",
 						'x':	str(si[0]+10),
 						'y':	str(-si[1]-10+doc_height),
 						'gcode_tools': "Gcode tools orientation point text"
@@ -1654,6 +1655,7 @@ G01 Z1 (going to cutting z)\n""",
 				t = inkex.etree.SubElement(	g, inkex.addNS('text','svg'), 
 						{
 							'style':	("font-size:10px;" if key!="name" else "font-size:20px;") +	"font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
+							inkex.addNS("space","xml"):"preserve",							
 							'x':	str(self.view_center[0]-150),
 							'y':	str(self.view_center[1]+y),
 							'gcode_tools': "Gcode tools tool defention field name"
@@ -1664,6 +1666,7 @@ G01 Z1 (going to cutting z)\n""",
 						{
 							'style':	("font-size:10px;" if key!="name" else "font-size:20px;") + "font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
 							'x':	str(self.view_center[0]),
+							inkex.addNS("space","xml"):"preserve",
 							'y':	str(self.view_center[1]+y),
 							'gcode_tools': "Gcode tools tool defention field value"
 						})
@@ -1672,6 +1675,7 @@ G01 Z1 (going to cutting z)\n""",
 						{
 							'x':	str(self.view_center[0]),
 							'y':	str(self.view_center[1]+y),
+							inkex.addNS("role","sodipodi"):"line",
 							'gcode_tools': "Gcode tools tool defention field value"
 						})					
 					y += 15 if key!='name' else 20
