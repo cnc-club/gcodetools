@@ -986,7 +986,9 @@ class Gcode_tools(inkex.Effect):
 				
 					
 		recursive_search(self.document.getroot(),self.document.getroot())
-
+		if self.selected_paths == {}:
+			self.selected_paths=self.paths
+			self.error(_("No paths are selected! Trying to work on all available paths."),"warning")
 	def get_orientation_points(self,g):
 		items = g.getchildren()
 		items.reverse()
