@@ -1721,11 +1721,11 @@ G01 Z1 (going to cutting z)\n""",
 			self.get_info()
 			if self.options.active_tab in ['"path-to-gcode"', '"area"', '"engraving"']:
 				if self.orientation_points == {} :
-					self.error(_("Orientation points have not been defined! A default set of orientation points have been automaticaly added."),"orientation_have_not_been_defined")
+					self.error(_("Orientation points have not been defined! A default set of orientation points have been automaticaly added."),"warning")
 					self.orientation( self.layers[min(1,len(self.layers))] )		
 					self.get_info()
 				if self.tools == {} :
-					self.error(_("Cutting tool have not been defined! A default tool have been automaticaly added."),"tool_have_not_been_defined")
+					self.error(_("Cutting tool have not been defined! A default tool have been automaticaly added."),"warning")
 					self.options.tools_library_type = "default"
 					self.tools_library( self.layers[min(1,len(self.layers))] )		
 					self.get_info()
