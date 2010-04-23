@@ -564,6 +564,7 @@ class Gcode_tools(inkex.Effect):
 		self.OptionParser.add_option("",   "--active-tab",					action="store", type="string", 		dest="active_tab", default="",						help="Defines which tab is active")
 
 		self.OptionParser.add_option("",   "--generate_not_parametric_code",action="store", type="inkbool",		dest="generate_not_parametric_code", default=False,	help="Generated code will be not parametric.")		
+		self.OptionParser.add_option("",   "--auto_select_paths",action="store", type="inkbool",		dest="auto_select_paths", default=True,	help="Select all paths if nothing is selected.")		
 
 		self.OptionParser.add_option("",   "--loft-distances",				action="store", type="string", 		dest="loft_distances", default="10",				help="Distances between paths.")
 		self.OptionParser.add_option("",   "--loft-direction",				action="store", type="string", 		dest="loft_direction", default="crosswise",			help="Direction of loft's interpolation.")
@@ -986,7 +987,9 @@ class Gcode_tools(inkex.Effect):
 				
 					
 		recursive_search(self.document.getroot(),self.document.getroot())
-
+		if self.selected_paths == {} and self.options.auto_select_paths:
+			self.selected_paths=self.paths
+			self.error(_("No paths are selected! Trying to work on all available paths."),"warning")
 	def get_orientation_points(self,g):
 		items = g.getchildren()
 		items.reverse()
@@ -1723,11 +1726,11 @@ G01 Z1 (going to cutting z)\n""",
 			self.get_info()
 			if self.options.active_tab in ['"path-to-gcode"', '"area"', '"engraving"']:
 				if self.orientation_points == {} :
-					self.error(_("Orientation points have not been defined! A default set of orientation points have been automaticaly added."),"orientation_have_not_been_defined")
+					self.error(_("Orientation points have not been defined! A default set of orientation points have been automaticaly added."),"warning")
 					self.orientation( self.layers[min(1,len(self.layers))] )		
 					self.get_info()
 				if self.tools == {} :
-					self.error(_("Cutting tool have not been defined! A default tool have been automaticaly added."),"tool_have_not_been_defined")
+					self.error(_("Cutting tool have not been defined! A default tool have been automaticaly added."),"warning")
 					self.options.tools_library_type = "default"
 					self.tools_library( self.layers[min(1,len(self.layers))] )		
 					self.get_info()
