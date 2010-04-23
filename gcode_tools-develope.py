@@ -1112,7 +1112,7 @@ class Gcode_tools(inkex.Effect):
 	def area(self) :
 	
 		if len(self.selected_paths)<=0:
-			self.error(_("This extension requires at least one selected path."),"error")
+			self.error(_("This extension requires at least one selected path."),"warning")
 			return
 		for layer in self.layers :
 			if layer in self.selected_paths :
@@ -1183,6 +1183,7 @@ class Gcode_tools(inkex.Effect):
 								del csp[0][-1]
 							bez = (csp[0][-2][1][:],csp[0][-2][2][:],csp[0][-1][0][:],csp[0][-1][1][:])
 							dx1, dy1 = bezmisc.bezierslopeatt(bez,1)
+							dx1, dy1 = -dx1, -dy1
 							#ax,ay,bx,by,cx,cy,dx,dy=bezmisc.bezierparameterize(bez)
 							#print_("x = %s*t^3 + %s*t^2 + %s*t + %s." % (ax,bx,cx,dx))
 							#print_("y = %s*t^3 + %s*t^2 + %s*t + %s." % (ay,by,cy,dy))
@@ -1190,7 +1191,7 @@ class Gcode_tools(inkex.Effect):
 							#print_("y' = %s*t^2 + %s*t + %s." % (3*ay,2*by,cy))
 							print_("Starting segment's tangent's (%s,%s) endind segment's tangent's (%s,%s) vecrors are cw: %s."% (dx,dy,dx1,dy1,vectors_are_cw([dx,dy],[dx1,dy1])) ) 
 
-							if dx*dy1-dx1*dy<0 or (dx*dy1-dx1*dy==0 and dx>0) :
+							if dx*dy1-dx1*dy>0 or (dx*dy1-dx1*dy==0 and dx>0) :
 								for i in range(len(csp)):
 								 	n = []
 								 	for j in csp[i]:
@@ -1234,7 +1235,8 @@ class Gcode_tools(inkex.Effect):
 	def engraving(self) :
 	
 		if len(self.selected_paths)<=0:
-			self.error(_("This extension requires at least one selected path."),"error")
+			self.error(_("This extension requires at least one selected path."),"warning")
+			return
 		if not self.check_dir() : return
 		gcode = ''
 
