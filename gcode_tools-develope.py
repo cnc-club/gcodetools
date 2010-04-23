@@ -1184,7 +1184,7 @@ class Gcode_tools(inkex.Effect):
 							dx, dy = bezmisc.bezierslopeatt(bez,0)
 							while len(csp[0])>2 and cspseglength(csp[0][-2],csp[0][-1]) < straight_tolerance :
 								del csp[0][-1]
-							bez = (csp[0][-2][1][:],csp[0][-2][2][:],csp[0][-1][0][:],csp[0][-1][1][:])
+							bez = (csp[0][-1][1][:],csp[0][-1][2][:],csp[0][0][0][:],csp[0][0][1][:])
 							dx1, dy1 = bezmisc.bezierslopeatt(bez,1)
 							dx1, dy1 = -dx1, -dy1
 							#ax,ay,bx,by,cx,cy,dx,dy=bezmisc.bezierparameterize(bez)
@@ -1192,9 +1192,9 @@ class Gcode_tools(inkex.Effect):
 							#print_("y = %s*t^3 + %s*t^2 + %s*t + %s." % (ay,by,cy,dy))
 							#print_("x' = %s*t^2 + %s*t + %s." % (3*ax,2*bx,cx))
 							#print_("y' = %s*t^2 + %s*t + %s." % (3*ay,2*by,cy))
-							print_("Starting segment's tangent's (%s,%s) endind segment's tangent's (%s,%s) vecrors are cw: %s."% (dx,dy,dx1,dy1,vectors_are_cw([dx,dy],[dx1,dy1])) ) 
+							print_("Starting segment's tangent's (%s,%s) ending segment's tangent's (%s,%s) vecrors are cw: %s."% (dx,dy,dx1,dy1,vectors_are_cw([dx,dy],[dx1,dy1])) ) 
 
-							if dx*dy1-dx1*dy>0 or (dx*dy1-dx1*dy==0 and dx>0) :
+							if dx*dy1-dx1*dy<0 or (dx*dy1-dx1*dy==0 and dx>0) :
 								for i in range(len(csp)):
 								 	n = []
 								 	for j in csp[i]:
