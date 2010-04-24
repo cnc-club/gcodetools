@@ -1079,7 +1079,7 @@ class Gcode_tools(inkex.Effect):
 		gcode = self.header
 
 		#	Set group
-		biarc_group = inkex.etree.SubElement( self.selected[self.options.ids[0]].getparent(), inkex.addNS('g','svg') )
+		biarc_group = inkex.etree.SubElement( self.selected_paths.keys()[0] if len(self.selected_paths.keys())>0 else self.layers[0], inkex.addNS('g','svg') )
 		for layer in self.layers :
 			if layer in paths :
 				self.set_tool(layer)
