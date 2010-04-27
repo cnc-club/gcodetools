@@ -10,19 +10,15 @@
 Gcode tools plug-in: converts paths to Gcode (using circular interpolation), makes offset paths and engraves sharp corners using cone cutters. 
 This plug-in calculates Gcode for paths using circular interpolation or linear motion when needed.
 
-Chouse a lnguage and press apply to see Gcode tools home page, where you can find help, tutorials and other info.
-
-After you press Apply a webbroser will be started. Unfortunately you wont be able to use inkscape until you close the webbrowser but you always can open Gcode tools home page in other browser.
-
+Tutorials, manuals and support can be found at
 English support forum:
-	http://www.cnc-club.ru/forum/viewtopic.php?t=35
+	http://www.cnc-club.ru/gcodetools
+	
+and Russian support forum:
+	http://www.cnc-club.ru/gcodetoolsru
 
-Gcode tools ver. 1.5 develope
+Gcode tools ver. 1.5 
 </_param>	
-			<param type='optiongroup' name='help-language' _gui-text="Help language">
-		<option value='http://www.cnc-club.ru/forum/viewtopic.php?t=35'>English			</option>
-		<option value='http://www.cnc-club.ru/forum/viewtopic.php?t=34'>Russian			</option>
-			</param>
 
 		</page>
 		<page name='options' _gui-text='Options'>

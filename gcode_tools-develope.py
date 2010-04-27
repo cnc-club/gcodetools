@@ -1685,8 +1685,7 @@ G01 Z1 (going to cutting z)\n""",
 ###		Launch browser on help tab
 ################################################################################
 	def help(self):
-		import webbrowser
-		webbrowser.open(self.options.help_language)		
+		self.error(_("""Tutorials, manuals and support can be found at\nEnglish support forum:\n    http://www.cnc-club.ru/gcodetools\nand Russian support forum:\n    http://www.cnc-club.ru/gcodetoolsru"""),"warning")
 		return
 
 
@@ -1716,9 +1715,9 @@ G01 Z1 (going to cutting z)\n""",
 				print_  = lambda x : None 
 		else : print_  = lambda x : None 
 	
-		
 		if self.options.active_tab == '"help"' :
 			self.help()
+			return
 		elif self.options.active_tab not in ['"path-to-gcode"', '"area"', '"engraving"', '"orientation"', '"tools_library"']:
 			self.error(_("Select one of the active tabs - Path to Gcode, Area, Engraving, Orientation ot Tools library."),"error")
 		else:
