@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <inkscape-extension>
-    <name>gcodetools (dev)</name>
-    <id>ru.cnc-club.filter.gcode_tools_develope</id>
+    <name>Gcode tools dev</name>
+    <id>ru.cnc-club.filter.gcode_tools_dev</id>
 	<dependency type="executable" location="extensions">gcode_tools-develope.py</dependency>
 	<dependency type="executable" location="extensions">inkex.py</dependency>
 	<param name='active-tab' type="notebook">
@@ -16,6 +16,9 @@ English support forum:
 	
 and Russian support forum:
 	http://www.cnc-club.ru/gcodetoolsru
+
+Credits: Nick Drobchenko, Vladimir Kalayev, John Brooker.
+
 
 Gcode tools ver. 1.5 
 </_param>	
@@ -34,7 +37,7 @@ Gcode tools ver. 1.5
 			<param name="directory" type="string" _gui-text="Directory">/home</param>
 
 		
-			<param name="Zsafe" type="float" precision="5" min="-1000" max="1000" _gui-text="Z safe distance for G00 move over blank">5</param>
+			<param name="Zsafe" type="float" precision="5" min="-1000" max="1000" _gui-text="Z safe height for G00 move over blank">5</param>
 			<param name="unit" type="enum" _gui-text="Units (mm or in): ">
 				<item value="G21 (All units in mm)">mm</item>
 				<item value="G20 (All units in inches)">in</item>
@@ -48,9 +51,9 @@ Gcode tools ver. 1.5
 				<param name="biarc-tolerance" type='float' precision="5" _gui-text='Biarc interpolation tolerance'>1</param>
 				<param name="biarc-max-split-depth" type="int" _gui-text="Maximum splitting depth">4</param>
 				<_param name="help" type="description">
-Biarc interpolation tolerance is the maximum distance between path and its approximation. 
-The segment will be splitted in two segments if the distance between path's segment and it's approximation exceeds biarc interpolation tolerance.
-				</_param>
+Biarc interpolation tolerance is the maximum distance between path and its approximation.
+The segment will be split into two segments if the distance between path's segment and it's approximation exceeds biarc interpolation tolerance.
+</_param>
 		</page>
 		<page name='area' _gui-text='Area'>	
 			<param name="max-area-curves" type="int" min="0" max="1000" _gui-text="Maximum area cutting curves">100</param>
@@ -96,17 +99,17 @@ different X/Y scale)</_option>
 			<param name="Zdepth" type="float" precision="5" min="-1000" max="1000" _gui-text="Z depth">-1</param>
 
 			<_param name="help" type="description">
-If there is no orientation points inside current layer they are taken from the upper layer.
-
-The transformation (offset,scale,mirror,rotation in XY plane) of the path will be automaticaly calculated depending on these points.
+Orientation points are used to calculate transformation (offset,scale,mirror,rotation in XY plane) of the path.
 3-points mode only: do not put all three into one line (use 2-points mode instead).
 
 You can modify Z surface, Z depth values later using text tool (3rd coordinates).
 
-Do not ungroup orientation points! You can select them using double click to enter the group or by Ctrl+Click
+If there are no orientation points inside current layer they are taken from the upper layer.
 
+Do not ungroup orientation points! You can select them using double click to enter the group or by Ctrl+Click.
 
-Now press apply to create control points (independent set for each layer).</_param>
+Now press apply to create control points (independent set for each layer).
+			</_param>
 		</page>
 
 		<page name='tools_library' _gui-text='Tools library'>	
@@ -121,10 +124,10 @@ Now press apply to create control points (independent set for each layer).</_par
 			<_param name="help" type="description">
 Selected tool type fills appropriate default values. You can change these values using the Text tool later on.
 
-The topmost (z order) tool in the active layer is used. If there is no tool inside current layer it is taken from the upper layer.
+The topmost (z order) tool in the active layer is used. If there is no tool inside the current layer it is taken from the upper layer.
 
-Press apply to create new tool.
-      </_param>
+Press Apply to create new tool.
+			</_param>
 	</page>
 	</param>	
     <effect>

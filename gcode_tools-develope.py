@@ -22,7 +22,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 """
 
 ###
-###		Gcode tools v 1.5 develope
+###		Gcode tools v 1.5 
 ###
 
 import inkex, simplestyle, simplepath
@@ -865,9 +865,9 @@ class Gcode_tools(inkex.Effect):
 						self.transform_matrix[layer] = [[m[j*3+i][0] for i in range(3)] for j in range(3)]
 					
 					else :
-						self.error(_("Orientation points are wrong! (if there are two orientation points they sould not be the same. If there are three orientaion points the sould not lay on straight line.)"),"wrong_orientation_points")
+						self.error(_("Orientation points are wrong! (if there are two orientation points they sould not be the same. If there are three orientation points they should not be in a straight line.)"),"wrong_orientation_points")
 				else :
-					self.error(_("Orientation points are wrong! (if there are two orientation points they sould not be the same. If there are three orientaion points the sould not lay on straight line.)"),"wrong_orientation_points")
+					self.error(_("Orientation points are wrong! (if there are two orientation points they sould not be the same. If there are three orientation points they should not be in a straight line.)"),"wrong_orientation_points")
 
 			self.transform_matrix_reverse[layer] = numpy.linalg.inv(self.transform_matrix[layer]).tolist()		
 			print_("\n Layer '%s' transformation matrixes:" % layer.get(inkex.addNS('label','inkscape')) )
@@ -971,7 +971,7 @@ class Gcode_tools(inkex.Effect):
 						self.orientation_points[layer] = self.orientation_points[layer]+[points[:]] if layer in self.orientation_points else [points[:]]
 						print_("Found orientation points in '%s' layer: %s" % (layer.get(inkex.addNS('label','inkscape')), points))
 					else :
-						self.error(_("Warning! Found bad orientation points in '%s' layer result Gcode could be broken!") % layer.get(inkex.addNS('label','inkscape')), "bad_orientation_points_in_some_layers") 
+						self.error(_("Warning! Found bad orientation points in '%s' layer. Resulting Gcode could be corrupt!") % layer.get(inkex.addNS('label','inkscape')), "bad_orientation_points_in_some_layers") 
 				elif i.get("gcode_tools") == "Gcode tools tool defenition" :
 					tool = self.get_tool(i)
 					self.tools[layer] = self.tools[layer] + [tool.copy()] if layer in self.tools else [tool.copy()]
@@ -1725,11 +1725,11 @@ G01 Z1 (going to cutting z)\n""",
 			self.get_info()
 			if self.options.active_tab in ['"path-to-gcode"', '"area"', '"engraving"']:
 				if self.orientation_points == {} :
-					self.error(_("Orientation points have not been defined! A default set of orientation points have been automaticaly added."),"warning")
+					self.error(_("Orientation points have not been defined! A default set of orientation points has been automatically added."),"warning")
 					self.orientation( self.layers[min(1,len(self.layers))] )		
 					self.get_info()
 				if self.tools == {} :
-					self.error(_("Cutting tool have not been defined! A default tool have been automaticaly added."),"warning")
+					self.error(_("Cutting tool has not been defined! A default tool has been automatically added."),"warning")
 					self.options.tools_library_type = "default"
 					self.tools_library( self.layers[min(1,len(self.layers))] )		
 					self.get_info()
