@@ -745,7 +745,9 @@ class Gcode_tools(inkex.Effect):
 			return False
 
 ################################################################################
+###
 ###		Generate Gcode
+###		Generates Gcode on given curve.
 ################################################################################
 
 	def generate_gcode(self, curve, layer, depth):
@@ -808,16 +810,27 @@ class Gcode_tools(inkex.Effect):
 			g += go_to_safe_distance + tool['gcode after path'] + "\n"
 		return g
 	
-	def apply_transforms(self,g,csp):
-		root = self.document.getroot()
-		i=0
-		while (g.getparent()!=root) and i<10:
-			if 'transform' in g.keys():
-				trans = g.get('transform')
-				trans = simpletransform.parseTransform(trans)
-				simpletransform.applyTransformToPath(trans, csp)
-			g=g.getparent()
 
+
+	def get_transforms(self,g):
+		root = self.document.getroot()
+		trans = []
+		while (g!=root):
+			if 'transform' in g.keys():
+				t = g.get('transform')
+				t = simpletransform.parseTransform(t)
+				trans = simpletransform.composeTransform(t,trans) if trans != [] else t
+				print_(trans)
+			g=g.getparent()
+		return trans 
+		
+
+
+
+	def apply_transforms(self,g,csp):
+		trans = self.get_transforms(g)
+		if trans != []:
+			simpletransform.applyTransformToPath(trans, csp)
 		return csp
 
 
@@ -987,9 +1000,8 @@ class Gcode_tools(inkex.Effect):
 				
 					
 		recursive_search(self.document.getroot(),self.document.getroot())
-		if self.selected_paths == {} and self.options.auto_select_paths:
-			self.selected_paths=self.paths
-			self.error(_("No paths are selected! Trying to work on all available paths."),"warning")
+
+
 	def get_orientation_points(self,g):
 		items = g.getchildren()
 		items.reverse()
@@ -1068,11 +1080,9 @@ class Gcode_tools(inkex.Effect):
 ################################################################################
 
 	def path_to_gcode(self) :
-
-
-		if len(self.selected)<=0 :
-			self.error(_("Selection is empty! Will compute whole drawing."),"selection_is_empty_will_comupe_drawing")
-			paths = self.paths
+		if self.selected_paths == {} and self.options.auto_select_paths:
+			paths=self.paths
+			self.error(_("No paths are selected! Trying to work on all available paths."),"warning")
 		else :
 			paths = self.selected_paths
 		self.check_dir() 
@@ -1086,10 +1096,7 @@ class Gcode_tools(inkex.Effect):
 				p = []	
 				for path in paths[layer] :
 					csp = cubicsuperpath.parsePath(path.get("d"))
-					if 'transform' in path.keys():
-						trans = path.get('transform')
-						trans = simpletransform.parseTransform(trans)
-						simpletransform.applyTransformToPath(trans, csp)
+					cap = self.apply_transforms(path, csp)
 					p += csp
 				curve = self.parse_curve(p, layer)
 				self.draw_curve(curve, layer, biarc_group)
@@ -1113,7 +1120,6 @@ class Gcode_tools(inkex.Effect):
 ################################################################################
 
 	def area(self) :
-	
 		if len(self.selected_paths)<=0:
 			self.error(_("This extension requires at least one selected path."),"warning")
 			return
@@ -1635,10 +1641,15 @@ G01 Z1 (going to cutting z)\n""",
 		else :
 			tool = self.default_tool
 			
-				
+		
+		tool_num = 0
+		for i in self.tools:
+			tool_num += len(self.tools[i])
+		colors = ["00ff00","0000ff","ff0000","fefe00","00fefe", "fe00fe", "fe7e00", "7efe00", "00fe7e", "007efe", "7e00fe", "fe007e"]
+		
 		tools_group = inkex.etree.SubElement(layer, inkex.addNS('g','svg'), {'gcode_tools': "Gcode tools tool defenition"})
 		bg = inkex.etree.SubElement(	tools_group, inkex.addNS('path','svg'), 
-					{'style':	"fill:#eeeeee;stroke:#444444; stroke-width:1px;"})
+					{'style':	"fill:#%s;fill-opacity:0.5;stroke:#444444; stroke-width:1px;"%colors[tool_num%len(colors)]})
 
 		y = 0
 		keys = []
@@ -1681,12 +1692,37 @@ G01 Z1 (going to cutting z)\n""",
 		tool = []
 
 
+
+
+################################################################################
+###
+###		Check tools and OP asignment
+###
+################################################################################
+
+	def check_tools_and_op(self):
+		if len(self.selected)<=0 :
+			self.error(_("Selection is empty! Will compute whole drawing."),"selection_is_empty_will_comupe_drawing")
+			paths = self.paths
+		else :
+			paths = self.selected_paths
+
+		#	Set group
+		group = inkex.etree.SubElement( self.selected_paths.keys()[0] if len(self.selected_paths.keys())>0 else self.layers[0], inkex.addNS('g','svg') )
+		for layer in self.layers :
+			if layer in paths :
+				self.set_tool(layer)
+				trans = [[1,0.5,0],[0,0.8660254,0]]	
+				pass
+
 ################################################################################
 ###		Launch browser on help tab
 ################################################################################
 	def help(self):
 		self.error(_("""Tutorials, manuals and support can be found at\nEnglish support forum:\n    http://www.cnc-club.ru/gcodetools\nand Russian support forum:\n    http://www.cnc-club.ru/gcodetoolsru"""),"warning")
 		return
+
+
 
 
 ################################################################################

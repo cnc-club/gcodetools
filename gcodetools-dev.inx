@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <inkscape-extension>
-    <name>Gcode tools dev</name>
-    <id>ru.cnc-club.filter.gcode_tools_dev</id>
-	<dependency type="executable" location="extensions">gcode_tools-develope.py</dependency>
+    <name>Gcodetools dev</name>
+    <id>ru.cnc-club.filter.gcodetools_dev</id>
+	<dependency type="executable" location="extensions">gcodetools-dev.py</dependency>
 	<dependency type="executable" location="extensions">inkex.py</dependency>
 	<param name='active-tab' type="notebook">
 		<page name='help' _gui-text='Help'>
 			<_param name="fullhelp" type="description">
-Gcode tools plug-in: converts paths to Gcode (using circular interpolation), makes offset paths and engraves sharp corners using cone cutters. 
+Gcodetools plug-in: converts paths to Gcode (using circular interpolation), makes offset paths and engraves sharp corners using cone cutters. 
 This plug-in calculates Gcode for paths using circular interpolation or linear motion when needed.
 
 Tutorials, manuals and support can be found at
@@ -20,7 +20,7 @@ and Russian support forum:
 Credits: Nick Drobchenko, Vladimir Kalayev, John Brooker.
 
 
-Gcode tools ver. 1.5 
+Gcodetools ver. 1.6 
 </_param>	
 
 		</page>
@@ -134,6 +134,6 @@ Press Apply to create new tool.
 		<object-type>path</object-type>
     </effect>
     <script>
-        <command reldir="extensions" interpreter="python">gcode_tools-develope.py</command>
+        <command reldir="extensions" interpreter="python">gcodetools-dev.py</command>
     </script>
 </inkscape-extension>
