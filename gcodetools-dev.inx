@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <inkscape-extension>
     <name>Gcodetools dev</name>
+    <!-- Gcodetools: id -->
     <id>ru.cnc-club.filter.gcodetools_dev</id>
+    <!-- Gcodetools: /id -->
 	<dependency type="executable" location="extensions">gcodetools-dev.py</dependency>
 	<dependency type="executable" location="extensions">inkex.py</dependency>
 	<param name='active-tab' type="notebook">
+<!-- Gcodetools: notebook -->
+<!-- Gcodetools: help -->
 		<page name='help' _gui-text='Help'>
 			<_param name="fullhelp" type="description">
 Gcodetools plug-in: converts paths to Gcode (using circular interpolation), makes offset paths and engraves sharp corners using cone cutters. 
@@ -24,6 +28,8 @@ Gcodetools ver. 1.6
 </_param>	
 
 		</page>
+<!-- Gcodetools: /help -->
+<!-- Gcodetools: options -->
 		<page name='options' _gui-text='Options'>
 			<param name="Zscale" type="float" precision="5" min="-100000" max="100000" _gui-text="Scale along Z axis">1</param>			
 			<param name="Zoffset" type="float" precision="5" min="-100000" max="100000" _gui-text="Offset along Z axis">0.0</param>
@@ -46,7 +52,9 @@ Gcodetools ver. 1.6
 			<param name="create-log" type="boolean" _gui-text="Generate log file">false</param>			
 			<param name="log-filename" type="string" _gui-text="Full path to log file:"></param>			
 			
-		</page>	
+		</page>
+<!-- Gcodetools: /options -->
+<!-- Gcodetools: ptg -->
 		<page name='path-to-gcode' _gui-text='Path to Gcode'>	
 				<param name="biarc-tolerance" type='float' precision="5" _gui-text='Biarc interpolation tolerance'>1</param>
 				<param name="biarc-max-split-depth" type="int" _gui-text="Maximum splitting depth">4</param>
@@ -55,6 +63,8 @@ Biarc interpolation tolerance is the maximum distance between path and its appro
 The segment will be split into two segments if the distance between path's segment and it's approximation exceeds biarc interpolation tolerance.
 </_param>
 		</page>
+<!-- Gcodetools: /ptg -->
+<!-- Gcodetools: area -->
 		<page name='area' _gui-text='Area'>	
 			<param name="max-area-curves" type="int" min="0" max="1000" _gui-text="Maximum area cutting curves">100</param>
 			<param name="area-inkscape-radius" type="float" min="-1000" max="1000" _gui-text="Area width">-10</param>
@@ -67,8 +77,9 @@ Only one offset will be created if the "Area width" is equal to "1/2 D".
 
 Fill in "Area width" and press Apply.
 			</_param>
-
-		</page>			
+		</page>		
+<!-- Gcodetools: /area -->
+<!-- Gcodetools: engraving -->
 		<page name='engraving' _gui-text='Engraving'>	
 			<param name="engraving-sharp-angle-tollerance" type="float"  precision="5" min="0" max="180" _gui-text="Sharp angle tolerance">150</param>
 			<param name="engraving-max-dist" type="float" precision="5" min="0" max="1000" _gui-text="Maximum distance for engraving">10</param>
@@ -83,8 +94,9 @@ cone....(45 degrees)...........: w
 cone....(height/diameter=10/3).: 10/3 w
 sphere..("r" diameter).........: math.sqrt(max(0,r**2-w**2))
 ellipse.(R1=r and R2=r*4r).....: math.sqrt(max(0,r**2-w**2))*4</_param>
-		</page>			
-		
+		</page>
+<!-- Gcodetools: /engraving -->
+<!-- Gcodetools: orientation -->
 		<page name='orientation' _gui-text='Orientation'>	
 
 			<param name="orientation-points-count" type="optiongroup" _gui-text="Orientation type: ">
@@ -111,7 +123,8 @@ Do not ungroup orientation points! You can select them using double click to ent
 Now press apply to create control points (independent set for each layer).
 			</_param>
 		</page>
-
+<!-- Gcodetools: /orientation -->
+<!-- Gcodetools: tools_library -->
 		<page name='tools_library' _gui-text='Tools library'>	
 			
 			<param type='optiongroup' name='tools-library-type' _gui-text="Tools type:">
@@ -131,6 +144,8 @@ The topmost (z order) tool in the active layer is used. If there is no tool insi
 Press Apply to create new tool.
 			</_param>
 	</page>
+<!-- Gcodetools: /tools_library -->
+<!-- Gcodetools: /notebook -->
 	</param>	
     <effect>
 		<object-type>path</object-type>
