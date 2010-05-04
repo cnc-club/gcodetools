@@ -119,6 +119,8 @@ Now press apply to create control points (independent set for each layer).
 <_option value='cylinder cutter'>cylinder</_option>
 <_option value='cone cutter'>cone</_option>
 <_option value='plasma cutter'>plasma</_option>
+<_option value='check'>Just check tools</_option>
+
 			</param>
 			
 			<_param name="help" type="description">
