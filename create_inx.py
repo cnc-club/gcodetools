@@ -43,7 +43,7 @@ def main():
 			name = r.group(2) if r.group(2)!=None else r.group(3)
 			id = re.sub("\s|[\.,!@#$%^&*]", "_", r.group(3).lower())
 			res = re.sub("(?ims)<!--\s*Gcodetools\s*:\s*name\s*-->(.*)<!--\s*Gcodetools\s*:\s*/name\s*-->","<name>%s</name>"%name,res)
-			res = re.sub("(?ims)<!--\s*Gcodetools\s*:\s*id\s*-->(.*)<!--\s*Gcodetools\s*:\s*/id\s*-->","<id>ru.cnc-club.filter.gcodetools_%s</id>"%id,res)
+			res = re.sub("(?ims)<!--\s*Gcodetools\s*:\s*id\s*-->(.*)<!--\s*Gcodetools\s*:\s*/id\s*-->","<id>ru.cnc-club.filter.gcodetools%s</id>"%id,res)
 
 			if 'help' not in arg and 'no_help' not in arg : res += tags['help']
 			if 'options' not in arg and 'no_options' not in arg: res += tags['options']

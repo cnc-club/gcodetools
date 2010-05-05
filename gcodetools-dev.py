@@ -141,6 +141,10 @@ biarc_style_dark_i = {
 ###
 ################################################################################
 
+def atan2(x,y):
+	return (math.pi/2 - math.atan2(x,y))%math.pi2
+	
+
 def vectors_are_cw(a,b):
 	return a[0]*b[1]-a[1]*b[0] < 0
 
@@ -618,6 +622,10 @@ class Gcodetools(inkex.Effect):
 					"spinlde rpm":"",
 					"CW or CCW":"",
 					"tool change gcode":" ",
+					"4th axis meaning": " ",
+					"4th axis scale": 1.,
+					"4th axis offset": 0,
+					
 				}			
 		self.tools_field_order = [
 					'name',
@@ -760,6 +768,9 @@ class Gcodetools(inkex.Effect):
 ###
 ###		Generate Gcode
 ###		Generates Gcode on given curve.
+###
+###		Crve defenitnion [start point, type = {'arc','line','move','end'}, arc center, arc angle, end point, [zstart, zend]]		
+###
 ################################################################################
 
 	def generate_gcode(self, curve, layer, depth):
@@ -779,6 +790,11 @@ class Gcodetools(inkex.Effect):
 				if c[i]!=None:
 					r += s[i] + ("%f" % (c[i]*m[i]+a[i])) + s1[i]
 			return r
+		def calculate_angle(a, current_a):
+			return  min(					
+						[abs(a-current_a%math.pi2+math.pi2), a+current_a-current_a%math.pi2+math.pi2],
+						[abs(a-current_a%math.pi2-math.pi2), a+current_a-current_a%math.pi2-math.pi2],
+						[abs(a-current_a%math.pi2),			 a+current_a-current_a%math.pi2])[1]
 		if len(curve)==0 : return ""	
 		
 		try :
@@ -787,11 +803,12 @@ class Gcodetools(inkex.Effect):
 			self.last_used_tool = None
 		g = tool['tool change gcode'] +"\n" if tool != self.last_used_tool else "\n"
 		
-		
 		lg, zs, f =  'G00', self.options.Zsafe, " F%f"%tool['feed'] 
+		current_a = 0
 		go_to_safe_distance = "G00" + c([None,None,zs]) + "\n" if self.options.generate_not_parametric_code else 'G00 Z[#11*#7+#10]\n' 
 		penetration_feed = " F%s"%tool['penetration feed'] 
 		for i in range(1,len(curve)):
+### 	Creating Gcode for curve between s=curve[i-1] and si=curve[i] start at s[0] end at s[4]=si[0]
 			s, si = curve[i-1], curve[i]
 			feed = f if lg not in ['G01','G02','G03'] else ''
 			if s[1]	== 'move':
@@ -801,21 +818,45 @@ class Gcodetools(inkex.Effect):
 				g += go_to_safe_distance + tool['gcode after path'] + "\n"
 				lg = 'G00'
 			elif s[1] == 'line':
+				if tool['4th axis meaning'] == "tangent knife" : 
+					a = atan2(si[0][0]-s[0][0],si[0][1]-s[0][1])
+					print_(((si[0][0]-s[0][0],si[0][1]-s[0][1]),a))
+					a = calculate_angle(a, current_a)
+					g+="G01 A%s\n" % (a*tool['4th axis scale']+tool['4th axis offset'])
+					print_((s[0],si[0],current_a,a))
+					current_a = a
 				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + penetration_feed +"\n"	
 				g += "G01" +c(si[0]+[s[5][1]+depth]) + feed + "\n"
 				lg = 'G01'
 			elif s[1] == 'arc':
 				r = [(s[2][0]-s[0][0]), (s[2][1]-s[0][1])]
+				if tool['4th axis meaning'] == "tangent knife" : 
+					if s[3]<0 : # CW
+						a1 = atan2(s[2][1]-s[0][1],-s[2][0]+s[0][0]) + math.pi 
+					else: #CCW
+						a1 = atan2(-s[2][1]+s[0][1],s[2][0]-s[0][0]) + math.pi
+					a = calculate_angle(a1, current_a)
+					g+="G01 A%s\n" % (a*tool['4th axis scale']+tool['4th axis offset'])
+					print_((current_a/math.pi*180,a1/math.pi*180,a/math.pi*180,(a+s[3])/math.pi*180))
+					current_a = a
+					axis4 = " A%s"%((current_a+s[3])*tool['4th axis scale']+tool['4th axis offset'])
+					current_a = current_a+s[3]
+				else : axis4 = ""
 				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + penetration_feed + "\n"				
 				if (r[0]**2 + r[1]**2)>self.options.min_arc_radius:
 					r1, r2 = (P(s[0])-P(s[2])), (P(si[0])-P(s[2]))
 					if abs(r1.mag()-r2.mag()) < 0.001 :
-						g += ("G02" if s[3]<0 else "G03") + c(si[0]+[ s[5][1]+depth, (s[2][0]-s[0][0]),(s[2][1]-s[0][1])  ]) + feed + "\n"
+						g += ("G02" if s[3]<0 else "G03") + c(si[0]+[ s[5][1]+depth, (s[2][0]-s[0][0]),(s[2][1]-s[0][1])  ]) + feed + axis4 + "\n"
 					else:
 						r = (r1.mag()+r2.mag())/2
-						g += ("G02" if s[3]<0 else "G03") + c(si[0]+[s[5][1]+depth]) + " R%f" % (r) + feed  + "\n"
+						g += ("G02" if s[3]<0 else "G03") + c(si[0]+[s[5][1]+depth]) + " R%f" % (r) + feed  + axis4 + "\n"
 					lg = 'G02'
 				else:
+					if tool['4th axis meaning'] == "tangent knife" : 
+						a = atan2(si[0][0]-s[0][0],si[0][1]-s[0][1]) + math.pi
+						a = calculate_angle(a, current_a)
+						g+="G01 A%s\n" % (a*tool['4th axis scale']+tool['4th axis offset'])
+						current_a = a
 					g += "G01" +c(si[0]+[s[5][1]+depth]) + feed + "\n"
 					lg = 'G01'
 		if si[1] == 'end':
@@ -1640,6 +1681,19 @@ class Gcodetools(inkex.Effect):
 					"depth step":"1",
 					"tool change gcode":" "
 			}
+		elif self.options.tools_library_type == "tangent knife":	
+			tool = {
+					"name": "Tangent knife",
+					"id": "Tangent knife 0001",
+					"feed":"400",
+					"penetration feed":"100",
+					"depth step":"100",
+					"4th axis meaning": "tangent knife",
+					"4th axis scale": 1.,
+					"4th axis offset": 0,
+					"tool change gcode":" "
+			}
+			
 		elif self.options.tools_library_type == "plasma cutter":	
 			tool = {
 				"name": "Plasma cutter",
