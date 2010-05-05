@@ -820,10 +820,8 @@ class Gcodetools(inkex.Effect):
 			elif s[1] == 'line':
 				if tool['4th axis meaning'] == "tangent knife" : 
 					a = atan2(si[0][0]-s[0][0],si[0][1]-s[0][1])
-					print_(((si[0][0]-s[0][0],si[0][1]-s[0][1]),a))
 					a = calculate_angle(a, current_a)
 					g+="G01 A%s\n" % (a*tool['4th axis scale']+tool['4th axis offset'])
-					print_((s[0],si[0],current_a,a))
 					current_a = a
 				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + penetration_feed +"\n"	
 				g += "G01" +c(si[0]+[s[5][1]+depth]) + feed + "\n"
@@ -837,7 +835,6 @@ class Gcodetools(inkex.Effect):
 						a1 = atan2(-s[2][1]+s[0][1],s[2][0]-s[0][0]) + math.pi
 					a = calculate_angle(a1, current_a)
 					g+="G01 A%s\n" % (a*tool['4th axis scale']+tool['4th axis offset'])
-					print_((current_a/math.pi*180,a1/math.pi*180,a/math.pi*180,(a+s[3])/math.pi*180))
 					current_a = a
 					axis4 = " A%s"%((current_a+s[3])*tool['4th axis scale']+tool['4th axis offset'])
 					current_a = current_a+s[3]
