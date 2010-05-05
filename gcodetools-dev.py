@@ -937,7 +937,8 @@ class Gcodetools(inkex.Effect):
 			print_(self.transform_matrix)
 			print_(self.transform_matrix_reverse)
 
-			self.Zauto_scale[layer]  = math.sqrt( (self.transform_matrix[layer][0][0]**2 + self.transform_matrix[layer][1][1]**2)/2 )
+			###self.Zauto_scale[layer]  = math.sqrt( (self.transform_matrix[layer][0][0]**2 + self.transform_matrix[layer][1][1]**2)/2 )
+			### Zautoscale is absolete
 			self.Zauto_scale[layer] = 1
 			print_("Z automatic scale = %s (computed according orientation points)" % self.Zauto_scale[layer])
 
