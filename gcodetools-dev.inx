@@ -151,6 +151,14 @@ Press Apply to create new tool.
 			</_param>
 	</page>
 <!-- Gcodetools: /tools_library block -->
+<!-- Gcodetools: lathe -->
+	<page name="lathe" _gui-text="Lathe">
+		<param name="lathe-width" type="float" precision="5" min="0" max="100000" _gui-text="Lathe width">10</param>
+		
+		
+	</page>
+<!-- Gcodetools: lathe -->
+
 <!-- Gcodetools: footer block -->
 	</param>	
     <effect>
