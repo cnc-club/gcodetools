@@ -595,6 +595,8 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--engraving-draw-calculation-paths",action="store", type="inkbool",	dest="engraving_draw_calculation_paths", default=False,help="Draw additional graphics to debug engraving path")		
 		self.OptionParser.add_option("",   "--engraving-cutter-shape-function",action="store", type="string", 	dest="engraving_cutter_shape_function", default="w",help="Cutter shape function z(w). Ex. cone: w. ")
 
+		self.OptionParser.add_option("",   "--lathe-width",action="store", type="float", 	dest="lathe_width", default=10.,help="Lathe width")
+
 		self.OptionParser.add_option("",   "--create-log",					action="store", type="inkbool", 	dest="log_create_log", default=False,	help="Create log files")
 		self.OptionParser.add_option("",   "--log-filename",				action="store", type="string", 		dest="log_filename", default='',		help="Create log files")
 
@@ -820,10 +822,8 @@ class Gcodetools(inkex.Effect):
 			elif s[1] == 'line':
 				if tool['4th axis meaning'] == "tangent knife" : 
 					a = atan2(si[0][0]-s[0][0],si[0][1]-s[0][1])
-					print_(((si[0][0]-s[0][0],si[0][1]-s[0][1]),a))
 					a = calculate_angle(a, current_a)
 					g+="G01 A%s\n" % (a*tool['4th axis scale']+tool['4th axis offset'])
-					print_((s[0],si[0],current_a,a))
 					current_a = a
 				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + penetration_feed +"\n"	
 				g += "G01" +c(si[0]+[s[5][1]+depth]) + feed + "\n"
@@ -837,7 +837,6 @@ class Gcodetools(inkex.Effect):
 						a1 = atan2(-s[2][1]+s[0][1],s[2][0]-s[0][0]) + math.pi
 					a = calculate_angle(a1, current_a)
 					g+="G01 A%s\n" % (a*tool['4th axis scale']+tool['4th axis offset'])
-					print_((current_a/math.pi*180,a1/math.pi*180,a/math.pi*180,(a+s[3])/math.pi*180))
 					current_a = a
 					axis4 = " A%s"%((current_a+s[3])*tool['4th axis scale']+tool['4th axis offset'])
 					current_a = current_a+s[3]
@@ -940,7 +939,8 @@ class Gcodetools(inkex.Effect):
 			print_(self.transform_matrix)
 			print_(self.transform_matrix_reverse)
 
-			self.Zauto_scale[layer]  = math.sqrt( (self.transform_matrix[layer][0][0]**2 + self.transform_matrix[layer][1][1]**2)/2 )
+			###self.Zauto_scale[layer]  = math.sqrt( (self.transform_matrix[layer][0][0]**2 + self.transform_matrix[layer][1][1]**2)/2 )
+			### Zautoscale is absolete
 			self.Zauto_scale[layer] = 1
 			print_("Z automatic scale = %s (computed according orientation points)" % self.Zauto_scale[layer])
 
@@ -955,7 +955,8 @@ class Gcodetools(inkex.Effect):
 			
 
 
-	def transform_csp(self, csp, layer, reverse = False):
+	def transform_csp(self, csp_, layer, reverse = False):
+		csp = copy.deepcopy(csp_)
 		for i in xrange(len(csp)):
 			for j in xrange(len(csp[i])): 
 				for k in xrange(len(csp[i][j])): 
@@ -1836,8 +1837,56 @@ G01 Z1 (going to cutting z)\n""",
 		self.error(_("""Tutorials, manuals and support can be found at\nEnglish support forum:\n    http://www.cnc-club.ru/gcodetools\nand Russian support forum:\n    http://www.cnc-club.ru/gcodetoolsru"""),"warning")
 		return
 
+################################################################################
+###		Lathe
+################################################################################
 
-
+	def lathe(self):
+		paths = self.selected_paths
+		for layer in self.layers :
+			if layer in paths :
+				self.set_tool(layer)
+				tool = self.tools[layer][0]
+				for path in paths[layer]:
+					print_(paths)
+					print_(path.get("d"))
+					csp = cubicsuperpath.parsePath(path.get("d"))
+					print_(csp)
+					real_bounds = csp_simple_bound(self.transform_csp(csp,layer))
+					print_(csp)
+					for i in range(0, int(math.ceil(self.options.lathe_width/tool['depth step']))):
+						a = [real_bounds[0],tool['depth step']*i]
+						b = [real_bounds[2],tool['depth step']*i]
+						t = self.transform_csp([[ [a,a,a], [b,b,b] ]], layer, True)
+						a, b = t[0][0][0], t[0][1][0]
+						inkex.etree.SubElement( layer, inkex.addNS("path","svg"), 
+							{	"d": cubicsuperpath.formatPath(t),
+								"style": "stroke-width:1;stroke:#0055ff;"	}
+						)
+						cspn = []
+						for subpath in csp:
+							cspn += [[]]
+							for i in range(1,len(subpath)):
+								sp1, sp2 = subpath[i-1], subpath[i]
+								intersection = csp_line_intersection(a,b,sp1,sp2)
+								print_((a,b,sp1,sp2))
+								print_(intersection)
+								print_()
+								for t in intersection:
+									p = csp_at_t(sp1,sp2,t)
+										
+									inkex.etree.SubElement(	layer, inkex.addNS('path','svg'), 
+										 {
+											'style': "stroke:#ccff55; fill:none",
+											 inkex.addNS('cx','sodipodi'):		str(p[0]),
+											 inkex.addNS('cy','sodipodi'):		str(p[1]),
+											 inkex.addNS('rx','sodipodi'):		str(2),
+											 inkex.addNS('ry','sodipodi'):		str(2),
+											 inkex.addNS('type','sodipodi'):	'arc',
+										})
+									#cspn += 
+					
+	
 
 ################################################################################
 ###
@@ -1868,12 +1917,12 @@ G01 Z1 (going to cutting z)\n""",
 		if self.options.active_tab == '"help"' :
 			self.help()
 			return
-		elif self.options.active_tab not in ['"path-to-gcode"', '"area"', '"engraving"', '"orientation"', '"tools_library"']:
+		elif self.options.active_tab not in ['"path-to-gcode"', '"area"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"']:
 			self.error(_("Select one of the active tabs - Path to Gcode, Area, Engraving, Orientation ot Tools library."),"error")
 		else:
 			# Get all Gcodetools data from the scene.
 			self.get_info()
-			if self.options.active_tab in ['"path-to-gcode"', '"area"', '"engraving"']:
+			if self.options.active_tab in ['"path-to-gcode"', '"area"', '"engraving"', '"lathe"']:
 				if self.orientation_points == {} :
 					self.error(_("Orientation points have not been defined! A default set of orientation points has been automatically added."),"warning")
 					self.orientation( self.layers[min(1,len(self.layers))] )		
@@ -1896,7 +1945,8 @@ G01 Z1 (going to cutting z)\n""",
 					self.tools_library()
 				else :	
 					self.check_tools_and_op()
-			
+			elif self.options.active_tab == '"lathe"': 
+				self.lathe()
 					
 e = Gcodetools()
 e.affect()					

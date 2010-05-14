@@ -24,7 +24,7 @@ English support forum:
 and Russian support forum:
 	http://www.cnc-club.ru/gcodetoolsru
 
-Credits: Nick Drobchenko, Vladimir Kalayev, John Brooker.
+Credits: Nick Drobchenko, Vladimir Kalyaev, John Brooker.
 
 
 Gcodetools ver. 1.6 
@@ -151,6 +151,14 @@ Press Apply to create new tool.
 			</_param>
 	</page>
 <!-- Gcodetools: /tools_library block -->
+<!-- Gcodetools: lathe -->
+	<page name="lathe" _gui-text="Lathe">
+		<param name="lathe-width" type="float" precision="5" min="0" max="100000" _gui-text="Lathe width">10</param>
+		
+		
+	</page>
+<!-- Gcodetools: lathe -->
+
 <!-- Gcodetools: footer block -->
 	</param>	
     <effect>
