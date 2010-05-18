@@ -1621,6 +1621,9 @@ class Gcodetools(inkex.Effect):
 		
 		orientation_group = inkex.etree.SubElement(layer, inkex.addNS('g','svg'), {"gcodetools":"Gcodetools orientation group"})
 		doc_height = inkex.unittouu(self.document.getroot().get('height'))
+		if doc_height == 100 :
+			doc_height = 1052.3622047
+			print_("Overruding height from 100 percents to %s" % doc_height)
 		if self.options.unit == "G21 (All units in mm)" : 
 			points = [[0.,0.,self.options.Zsurface],[100.,0.,self.options.Zdepth],[0.,100.,0.]]
 			orientation_scale = 3.5433070660
