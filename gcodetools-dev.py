@@ -610,12 +610,12 @@ class Gcodetools(inkex.Effect):
 		self.default_tool = {
 					"name": "Default tool",
 					"id": "default tool",
-					"diameter":10,
+					"diameter":10.,
 					"shape": "10",
-					"penetration angle":90,
-					"penetration feed":100,
-					"depth step":1,
-					"feed":400,
+					"penetration angle":90.,
+					"penetration feed":100.,
+					"depth step":1.,
+					"feed":400.,
 					"in trajectotry":"",
 					"out trajectotry":"",
 					"gcode before path":"",
@@ -626,7 +626,7 @@ class Gcodetools(inkex.Effect):
 					"tool change gcode":" ",
 					"4th axis meaning": " ",
 					"4th axis scale": 1.,
-					"4th axis offset": 0,
+					"4th axis offset": 0.,
 					
 				}			
 		self.tools_field_order = [
