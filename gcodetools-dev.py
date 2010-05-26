@@ -1187,7 +1187,7 @@ class Gcodetools(inkex.Effect):
 						x=tmp_curve[0][0][0][0]
 						y=tmp_curve[0][0][0][1]
 						print_("got dxfpoint (scaled) at (%f,%f)" % (x,y)) #self.options.Zsafe, " F%f"%tool['feed'] , (self.Zcoordinates[layer][1]-self.Zcoordinates[layer][0])
-						gcode +="(drilling dxfpoint)\nG00 z%f\nG00 %f,%f\nG01 z%f f%f\nG04 p%f\nG00 z%f\n" % (self.options.Zsafe,x,y,self.Zcoordinates[layer][1],self.tools[layer][0]["penetration feed"],0.2,self.options.Zsafe) 
+						gcode +="(drilling dxfpoint)\nG00 Z%f\nG00 X%f Y%f\nG01 Z%f F%f\nG04 P%f\nG00 Z%f\n" % (self.options.Zsafe,x,y,self.Zcoordinates[layer][1],self.tools[layer][0]["penetration feed"],0.2,self.options.Zsafe) 
 					else:
 						p += csp
 				curve = self.parse_curve(p, layer)
