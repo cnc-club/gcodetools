@@ -803,11 +803,13 @@ class Gcodetools(inkex.Effect):
 						[abs(a-current_a%math.pi2-math.pi2), a+current_a-current_a%math.pi2-math.pi2],
 						[abs(a-current_a%math.pi2),			 a+current_a-current_a%math.pi2])[1]
 		if len(curve)==0 : return ""	
-		
+				
 		try :
 			self.last_used_tool == None
 		except :
 			self.last_used_tool = None
+		print_("working on curve")
+		print_(curve)
 		g = tool['tool change gcode'] +"\n" if tool != self.last_used_tool else "\n"
 		
 		lg, zs, f =  'G00', self.options.Zsafe, " F%f"%tool['feed'] 
@@ -1157,6 +1159,12 @@ class Gcodetools(inkex.Effect):
 ################################################################################
 
 	def path_to_gcode(self) :
+		def check_path_is_dxfpoint(path):
+			if path.get("dxfpoint"):
+				return True
+			else:
+				return False
+
 		if self.selected_paths == {} and self.options.auto_select_paths:
 			paths=self.paths
 			self.error(_("No paths are selected! Trying to work on all available paths."),"warning")
@@ -1174,7 +1182,14 @@ class Gcodetools(inkex.Effect):
 				for path in paths[layer] :
 					csp = cubicsuperpath.parsePath(path.get("d"))
 					cap = self.apply_transforms(path, csp)
-					p += csp
+					if check_path_is_dxfpoint(path):
+						tmp_curve=self.transform_csp(csp, layer)
+						x=tmp_curve[0][0][0][0]
+						y=tmp_curve[0][0][0][1]
+						print_("got dxfpoint (scaled) at (%f,%f)" % (x,y)) #self.options.Zsafe, " F%f"%tool['feed'] , (self.Zcoordinates[layer][1]-self.Zcoordinates[layer][0])
+						gcode +="(drilling dxfpoint)\nG00 z%f\nG00 %f,%f\nG01 z%f f%f\nG04 p%f\nG00 z%f\n" % (self.options.Zsafe,x,y,self.Zcoordinates[layer][1],self.tools[layer][0]["penetration feed"],0.2,self.options.Zsafe) 
+					else:
+						p += csp
 				curve = self.parse_curve(p, layer)
 				self.draw_curve(curve, layer, biarc_group)
 				if self.tools[layer][0]["depth step"] == 0 : self.tools[layer][0]["depth step"] = 1
