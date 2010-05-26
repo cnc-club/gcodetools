@@ -22,7 +22,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 """
 
 ###
-###		Gcodetools v 1.5 
+###		Gcodetools v 1.6 dev 
 ###
 
 import inkex, simplestyle, simplepath
@@ -38,7 +38,12 @@ import time
 import cmath
 import numpy
 import codecs
-_ = inkex._
+
+import gettext
+_ = gettext.gettext
+
+
+
 
 
 def bezierparameterize(((bx0,by0),(bx1,by1),(bx2,by2),(bx3,by3))):
