@@ -1159,6 +1159,101 @@ class Gcodetools(inkex.Effect):
 ################################################################################
 
 	def path_to_gcode(self) :
+
+		def get_boundaries(points):
+			minx,miny,maxx,maxy=None,None,None,None
+			out=[[],[],[],[]]
+			for p in points:
+				if minx==p[0]:
+					out[0]+=[p]
+				if minx==None or p[0]<minx: 
+					minx=p[0]
+					out[0]=[p]
+
+				if miny==p[1]:
+					out[1]+=[p]
+				if miny==None or p[1]<miny: 
+					miny=p[1]
+					out[1]=[p]
+
+				if maxx==p[0]:
+					out[2]+=[p]
+				if maxx==None or p[0]>maxx: 
+					maxx=p[0]
+					out[2]=[p]
+
+				if maxy==p[1]:
+					out[3]+=[p]
+				if maxy==None or p[1]>maxy: 
+					maxy=p[1]
+					out[3]=[p]
+			return out
+
+		def remove_duplicates(points):
+			i=0		
+			out=[]
+			for p in points:
+				for j in xrange(i,len(points)):
+					if p==points[j]: points[j]=[None,None]	
+				if p!=[None,None]: out+=[p]
+			i+=1
+			return(out)
+		def get_way_len(points):
+			l=0
+			for i in xrange(1,len(points)):
+				l+=math.sqrt((points[i][0]-points[i-1][0])**2 + (points[i][1]-points[i-1][1])**2)
+			return l
+
+		def sort_dxfpoints(points):
+			points=remove_duplicates(points)
+#			print_(get_boundaries(get_boundaries(points)[2])[1])
+			ways=[
+						  # l=0, d=1, r=2, u=3
+			 [3,0], # ul
+			 [3,2], # ur
+			 [1,0], # dl
+			 [1,2], # dr
+			 [0,3], # lu
+			 [0,1], # ld
+			 [2,3], # ru
+			 [2,1], # rd
+			]
+#			print_(("points=",points))
+			minimal_way=[]
+			minimal_len=None
+			minimal_way_type=None
+			for w in ways:
+				tpoints=points[:]
+				cw=[]
+#				print_(("tpoints=",tpoints))
+				for j in xrange(0,len(points)):
+					p=get_boundaries(get_boundaries(tpoints)[w[0]])[w[1]]
+#					print_(p)
+					tpoints.remove(p[0])
+					cw+=p
+				curlen = get_way_len(cw)
+				if minimal_len==None or curlen < minimal_len: 
+					minimal_len=curlen
+					minimal_way=cw
+					minimal_way_type=w
+#			print_(("len=",minimal_len,"way_type=",minimal_way_type,"way=",minimal_way))
+#				print_((cw,get_way_len(cw)))
+#			exl=get_extremum_list(points,[boundaries[0],None])
+#			print_(("boundaries=",boundaries,"exl=",exl))
+			
+			return minimal_way
+
+		def print_dxfpoints(points):
+			gcode=""
+			for point in points:
+				if self.options.generate_not_parametric_code:
+					gcode +="(drilling dxfpoint)\nG00 Z%f\nG00 X%f Y%f\nG01 Z%f F%f\nG04 P%f\nG00 Z%f\n" % (self.options.Zsafe,point[0],point[1],self.Zcoordinates[layer][1],self.tools[layer][0]["penetration feed"],0.2,self.options.Zsafe) 
+				else:
+				  gcode +="(drilling dxfpoint)\nG00 Z%s\nG00 X%f Y%f\nG01 Z%f F%f\nG04 P%f\nG00 Z%s\n" % ("[#11*#7+#10]",point[0],point[1],self.Zcoordinates[layer][1],self.tools[layer][0]["penetration feed"],0.2,"[#11*#7+#10]") 
+#			print_("got dxfpoints array=")
+#			print_(points)
+			return gcode
+			
 		def check_path_is_dxfpoint(path):
 			if path.get("dxfpoint"):
 				return True
@@ -1179,6 +1274,7 @@ class Gcodetools(inkex.Effect):
 			if layer in paths :
 				self.set_tool(layer)
 				p = []	
+				dxfpoints = []
 				for path in paths[layer] :
 					csp = cubicsuperpath.parsePath(path.get("d"))
 					cap = self.apply_transforms(path, csp)
@@ -1187,12 +1283,11 @@ class Gcodetools(inkex.Effect):
 						x=tmp_curve[0][0][0][0]
 						y=tmp_curve[0][0][0][1]
 						print_("got dxfpoint (scaled) at (%f,%f)" % (x,y))
-						if self.options.generate_not_parametric_code:
-							gcode +="(drilling dxfpoint)\nG00 Z%f\nG00 X%f Y%f\nG01 Z%f F%f\nG04 P%f\nG00 Z%f\n" % (self.options.Zsafe,x,y,self.Zcoordinates[layer][1],self.tools[layer][0]["penetration feed"],0.2,self.options.Zsafe) 
-						else:
-						  gcode +="(drilling dxfpoint)\nG00 Z%s\nG00 X%f Y%f\nG01 Z%f F%f\nG04 P%f\nG00 Z%s\n" % ("[#11*#7+#10]",x,y,self.Zcoordinates[layer][1],self.tools[layer][0]["penetration feed"],0.2,"[#11*#7+#10]") 
+						dxfpoints += [[x,y]]
 					else:
 						p += csp
+				dxfpoints=sort_dxfpoints(dxfpoints)
+				gcode+=print_dxfpoints(dxfpoints)
 				curve = self.parse_curve(p, layer)
 				self.draw_curve(curve, layer, biarc_group)
 				if self.tools[layer][0]["depth step"] == 0 : self.tools[layer][0]["depth step"] = 1
