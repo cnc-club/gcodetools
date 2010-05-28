@@ -1329,6 +1329,7 @@ class Gcodetools(inkex.Effect):
 #							arg = r.group(3).split()
 							print_(("got path=",r.group(1)))
 							path.set("d","m %s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z" % r.group(1))
+							path.set("style","stroke:#ff0000;fill:#ff0000")
 
 					if self.options.dxfpoints_action == 'save':
 #						print_("trying to set as dxfpoint")
