@@ -297,7 +297,7 @@ def generate_ellipse(xc, yc, xm, ym, w, a1, a2):
     inkex.etree.SubElement(layer, 'path', attribs)
 
 def generate_gcodetools_point(xc, yc):
-		path=	'm %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z z' % (xc,yc)
+		path=	'm %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z' % (xc,yc)
 		attribs = {'d': path, 'dxfpoint':'1', 'style': 'stroke:#ff0000;fill:#ff0000'}
 		inkex.etree.SubElement(layer, 'path', attribs)
 
