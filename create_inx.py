@@ -26,7 +26,7 @@ def main():
 			assert False, "unhandled option"
 
 	if args == []: 
-		args = ["DXF Points: dxfpoints", "Path to Gcode: ptg", "Area offset: area", "Engraving: engraving", "Tools library: tools_library no_options no_preferences", "Orientation points: orientation no_options no_preferences", "All in one: ptg area engraving tools_library orientation"]
+		args = ["DXF Points: dxfpoints no_options no_preferences", "Path to Gcode: ptg", "Area offset: area", "Engraving: engraving", "Tools library: tools_library no_options no_preferences", "Orientation points: orientation no_options no_preferences", "All in one: ptg area engraving dxfpoints tools_library orientation"]
 
 	f = open("gcodetools-dev.inx" if input_file == None else input_file,"r")
 	s = f.read()

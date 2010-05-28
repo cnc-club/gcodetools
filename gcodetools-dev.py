@@ -1238,10 +1238,6 @@ class Gcodetools(inkex.Effect):
 					minimal_len=curlen
 					minimal_way=cw
 					minimal_way_type=w
-#			print_(("len=",minimal_len,"way_type=",minimal_way_type,"way=",minimal_way))
-#				print_((cw,get_way_len(cw)))
-#			exl=get_extremum_list(points,[boundaries[0],None])
-#			print_(("boundaries=",boundaries,"exl=",exl))
 			
 			return minimal_way
 
@@ -1252,16 +1248,9 @@ class Gcodetools(inkex.Effect):
 					gcode +="(drilling dxfpoint)\nG00 Z%f\nG00 X%f Y%f\nG01 Z%f F%f\nG04 P%f\nG00 Z%f\n" % (self.options.Zsafe,point[0],point[1],self.Zcoordinates[layer][1],self.tools[layer][0]["penetration feed"],0.2,self.options.Zsafe) 
 				else:
 				  gcode +="(drilling dxfpoint)\nG00 Z%s\nG00 X%f Y%f\nG01 Z%f F%f\nG04 P%f\nG00 Z%s\n" % ("[#11*#7+#10]",point[0],point[1],self.Zcoordinates[layer][1],self.tools[layer][0]["penetration feed"],0.2,"[#11*#7+#10]") 
-#			print_("got dxfpoints array=")
-#			print_(points)
+#			print_(("got dxfpoints array=",points))
 			return gcode
 			
-		def check_path_is_dxfpoint(path):
-			if path.get("dxfpoint") == '1':
-				return True
-			else:
-				return False
-
 		if self.selected_paths == {} and self.options.auto_select_paths:
 			paths=self.paths
 			self.error(_("No paths are selected! Trying to work on all available paths."),"warning")
@@ -1270,17 +1259,18 @@ class Gcodetools(inkex.Effect):
 		self.check_dir() 
 		gcode = self.header
 
-		#	Set group
 		biarc_group = inkex.etree.SubElement( self.selected_paths.keys()[0] if len(self.selected_paths.keys())>0 else self.layers[0], inkex.addNS('g','svg') )
 		for layer in self.layers :
+#			print_(("processing layer",layer," of layers:",self.layers))
 			if layer in paths :
+#				print_(("layer ",layer, " is in paths:",paths))
 				self.set_tool(layer)
 				p = []	
 				dxfpoints = []
 				for path in paths[layer] :
 					csp = cubicsuperpath.parsePath(path.get("d"))
 					cap = self.apply_transforms(path, csp)
-					if check_path_is_dxfpoint(path):
+					if path.get("dxfpoint") == "1":
 						tmp_curve=self.transform_csp(csp, layer)
 						x=tmp_curve[0][0][0][0]
 						y=tmp_curve[0][0][0][1]
@@ -1312,8 +1302,6 @@ class Gcodetools(inkex.Effect):
 ################################################################################
 
 	def dxfpoints(self):
-#		print_(("entering dxfpoints with action=",self.options.dxfpoints_action))
-#dxfpoints dxfpoints_action dxfpoints-action save replace clear
 		if self.selected_paths == {}:
 			self.error(_("Noting is selected. Please select something to convert to drill point (dxfpoint) or clear point sign."),"warning")
 		for layer in self.layers :
@@ -1326,26 +1314,17 @@ class Gcodetools(inkex.Effect):
 						path.set("dxfpoint","1")
 						r = re.match("^\s*.\s*(\S+)",path.get("d"))
 						if r!=None:
-#							arg = r.group(3).split()
 							print_(("got path=",r.group(1)))
 							path.set("d","m %s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z" % r.group(1))
 							path.set("style","stroke:#ff0000;fill:#ff0000")
 
 					if self.options.dxfpoints_action == 'save':
-#						print_("trying to set as dxfpoint")
 						path.set("dxfpoint","1")
 
 					if self.options.dxfpoints_action == 'clear' and path.get("dxfpoint") == "1":
 						path.set("dxfpoint","0")
-						for id, node in self.selected.iteritems():
-							print_((id,node,node.attrib))
-#							node.remove("dxfpoint")
-#							if node.tag == inkex.addNS('path','svg'):
-#                p = cubicsuperpath.parsePath(node.get('d'))
-#						path.remove("dxfpoint")
-#		path=	'm %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z z' % (xc,yc)
-#		attribs = {'d': path, 'dxfpoint':'1', 'style': 'stroke:#ff0000;fill:#ff0000'}
-#		inkex.etree.SubElement(layer, 'path', attribs)
+#						for id, node in self.selected.iteritems():
+#							print_((id,node,node.attrib))
 
 
 ################################################################################
@@ -1777,6 +1756,7 @@ class Gcodetools(inkex.Effect):
 ################################################################################
 
 	def orientation(self, layer=None) :
+		print_("entering orientations")
 		if layer == None :
 			layer = self.current_layer if self.current_layer is not None else self.document.getroot()
 		if layer in self.orientation_points:
@@ -1797,6 +1777,7 @@ class Gcodetools(inkex.Effect):
 			print_("orientation_scale < 0 ===> switching to inches units=%0.10f"%orientation_scale )
 		if self.options.orientation_points_count == 2 :
 			points = points[:2]
+		print_(("using orientation scale",orientation_scale,"i=",points))
 		for i in points :
 			si = [i[0]*orientation_scale, i[1]*orientation_scale]
 			g = inkex.etree.SubElement(orientation_group, inkex.addNS('g','svg'), {'gcodetools': "Gcodetools orientation point (%s points)" % self.options.orientation_points_count})
