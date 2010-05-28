@@ -24,7 +24,7 @@ English support forum:
 and Russian support forum:
 	http://www.cnc-club.ru/gcodetoolsru
 
-Credits: Nick Drobchenko, Vladimir Kalayev, John Brooker.
+Credits: Nick Drobchenko, Vladimir Kalyaev, John Brooker.
 
 
 Gcodetools ver. 1.6 
@@ -58,6 +58,22 @@ Gcodetools ver. 1.6
 			
 		</page>
 <!-- Gcodetools: /preferences block -->
+<!-- Gcodetools: dxfpoints block -->
+		<page name='dxfpoints' _gui-text='DXF points'>
+			<_param name="help" type="description">
+
+Convert selected objects to drill points (as dxf_import plugin does). Also you can save original shape. Only the start point of each curve will be used.
+
+Also you can manually select object, open XML editor (Shift+Ctrl+X) and add or remove XML tag 'dxfpoint' with any value.
+		  </_param>
+			<param type='optiongroup' name='dxfpoints-action' _gui-text="Convert selection">
+<_option value='save'>set as dxfpoint and save shape</_option>
+<_option value='replace'>set as dxfpoint and draw arrow</_option>
+<_option value='clear'>clear dxfpoint sign</_option>
+			</param>
+
+		</page>
+<!-- Gcodetools: /dxfpoints block -->
 <!-- Gcodetools: ptg block -->
 		<page name='path-to-gcode' _gui-text='Path to Gcode'>	
 				<param name="biarc-tolerance" type='float' precision="5" _gui-text='Biarc interpolation tolerance'>1</param>
