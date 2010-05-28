@@ -26,8 +26,8 @@ def main():
 			assert False, "unhandled option"
 
 	if args == []: 
-		args = ["Cutting: ptg area", "ptg area",  "Engraving: engraving", "Tools library: tools_library no_options no_preferences", "Orientation points: orientation no_options no_preferences", "All in one: ptg area engraving tools_library orientation"]
-	
+		args = ["Path to Gcode: ptg", "Area offset: area", "Engraving: engraving", "Tools library: tools_library no_options no_preferences", "Orientation points: orientation no_options no_preferences", "All in one: ptg area engraving tools_library orientation"]
+
 	f = open("gcodetools-dev.inx" if input_file == None else input_file,"r")
 	s = f.read()
 	f.close()
@@ -45,15 +45,15 @@ def main():
 			res = re.sub("(?ims)<!--\s*Gcodetools\s*:\s*name\s*-->(.*)<!--\s*Gcodetools\s*:\s*/name\s*-->","<name>%s</name>"%name,res)
 			res = re.sub("(?ims)<!--\s*Gcodetools\s*:\s*id\s*-->(.*)<!--\s*Gcodetools\s*:\s*/id\s*-->","<id>ru.cnc-club.filter.gcodetools%s</id>"%id,res)
 
-			if 'help' not in arg and 'no_help' not in arg : res += tags['help']
-			if 'options' not in arg and 'no_options' not in arg: res += tags['options']
-			if 'preferences' not in arg and 'no_preferences' not in arg : res += tags['preferences']
-
 			for i in arg:
 				if i not in tags and not re.match("no_",i): 
 					print "Can not find tag %s. Ignoring this set %s!\n" % (i,arg_)
 					break
 				if not re.match("no_",i): res += tags[i]
+			if 'options' not in arg and 'no_options' not in arg: res += tags['options']
+			if 'preferences' not in arg and 'no_preferences' not in arg : res += tags['preferences']
+			if 'help' not in arg and 'no_help' not in arg : res += tags['help']
+
 			if i not in tags and not re.match("no_",i) : continue				
 			submenu ="""		<effects-menu>
 			<submenu _name="Gcodetools"/>
