@@ -609,6 +609,8 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--orientation-points-count",	action="store", type="int", 		dest="orientation_points_count", default='2',			help="Orientation points count")
 		self.OptionParser.add_option("",   "--tools-library-type",			action="store", type="string", 		dest="tools_library_type", default='cylinder cutter',	help="Create tools defention")
 
+		self.OptionParser.add_option("",   "--dxfpoints-action",			action="store", type="string", 		dest="dxfpoints_action", default='replace',	help="dxfpoint sign toggle")
+                                                                                                          
 		self.OptionParser.add_option("",   "--help-language",				action="store", type="string", 		dest="help_language", default='http://www.cnc-club.ru/forum/viewtopic.php?f=33&t=35',	help="Open help page in webbrowser.")
 
 
@@ -1255,7 +1257,7 @@ class Gcodetools(inkex.Effect):
 			return gcode
 			
 		def check_path_is_dxfpoint(path):
-			if path.get("dxfpoint"):
+			if path.get("dxfpoint") == '1':
 				return True
 			else:
 				return False
@@ -1301,6 +1303,48 @@ class Gcodetools(inkex.Effect):
 			f.close()							
 		except:
 			self.error(_("Can not write to specified file!"),"error")
+
+
+################################################################################
+###
+###		dxfpoints
+###
+################################################################################
+
+	def dxfpoints(self):
+#		print_(("entering dxfpoints with action=",self.options.dxfpoints_action))
+#dxfpoints dxfpoints_action dxfpoints-action save replace clear
+		if self.selected_paths == {}:
+			self.error(_("Noting is selected. Please select something to convert to drill point (dxfpoint) or clear point sign."),"warning")
+		for layer in self.layers :
+			if layer in self.selected_paths :
+				for path in self.selected_paths[layer]:
+#					print_(("processing path",path.get('d')))
+					if self.options.dxfpoints_action == 'replace':
+#						print_("trying to set as dxfpoint")
+						
+						path.set("dxfpoint","1")
+						r = re.match("^\s*.\s*(\S+)",path.get("d"))
+						if r!=None:
+#							arg = r.group(3).split()
+							print_(("got path=",r.group(1)))
+							path.set("d","m %s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z" % r.group(1))
+
+					if self.options.dxfpoints_action == 'save':
+#						print_("trying to set as dxfpoint")
+						path.set("dxfpoint","1")
+
+					if self.options.dxfpoints_action == 'clear' and path.get("dxfpoint") == "1":
+						path.set("dxfpoint","0")
+						for id, node in self.selected.iteritems():
+							print_((id,node,node.attrib))
+#							node.remove("dxfpoint")
+#							if node.tag == inkex.addNS('path','svg'):
+#                p = cubicsuperpath.parsePath(node.get('d'))
+#						path.remove("dxfpoint")
+#		path=	'm %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z z' % (xc,yc)
+#		attribs = {'d': path, 'dxfpoint':'1', 'style': 'stroke:#ff0000;fill:#ff0000'}
+#		inkex.etree.SubElement(layer, 'path', attribs)
 
 
 ################################################################################
@@ -2038,12 +2082,12 @@ G01 Z1 (going to cutting z)\n""",
 		if self.options.active_tab == '"help"' :
 			self.help()
 			return
-		elif self.options.active_tab not in ['"path-to-gcode"', '"area"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"']:
-			self.error(_("Select one of the active tabs - Path to Gcode, Area, Engraving, Orientation ot Tools library."),"error")
+		elif self.options.active_tab not in ['"dxfpoints"','"path-to-gcode"', '"area"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"']:
+			self.error(_("Select one of the active tabs - Path to Gcode, Area, Engraving, DXF points, Orientation or Tools library."),"error")
 		else:
 			# Get all Gcodetools data from the scene.
 			self.get_info()
-			if self.options.active_tab in ['"path-to-gcode"', '"area"', '"engraving"', '"lathe"']:
+			if self.options.active_tab in ['"dxfpoints"','"path-to-gcode"', '"area"', '"engraving"', '"lathe"']:
 				if self.orientation_points == {} :
 					self.error(_("Orientation points have not been defined! A default set of orientation points has been automatically added."),"warning")
 					self.orientation( self.layers[min(1,len(self.layers))] )		
@@ -2057,6 +2101,8 @@ G01 Z1 (going to cutting z)\n""",
 				self.path_to_gcode()		
 			elif self.options.active_tab == '"area"': 
 				self.area()		
+			elif self.options.active_tab == '"dxfpoints"': 
+				self.dxfpoints()		
 			elif self.options.active_tab == '"engraving"': 
 				self.engraving()		
 			elif self.options.active_tab == '"orientation"': 
