@@ -42,9 +42,9 @@ import codecs
 import gettext
 _ = gettext.gettext
 
-
-
-
+### Check if inkex has errormsg (0.46 version doesnot have one.) Could be removed later
+if "errormsg" not in dir(inkex):
+	inkex.errormsg = lambda msg: sys.stderr.write((unicode(msg) + "\n").encode("UTF-8"))
 
 def bezierparameterize(((bx0,by0),(bx1,by1),(bx2,by2),(bx3,by3))):
 	#parametric bezier
@@ -691,7 +691,7 @@ class Gcodetools(inkex.Effect):
 
 	def draw_curve(self, curve, layer, group=None, style=biarc_style):
 		if group==None:
-			group = inkex.etree.SubElement( self.layers[min(1,len(self.layers))], inkex.addNS('g','svg') )
+			group = inkex.etree.SubElement( self.layers[min(1,len(self.layers)-1)], inkex.addNS('g','svg') )
 		s, arcn = '', 0
 		
 		
@@ -2072,12 +2072,12 @@ G01 Z1 (going to cutting z)\n""",
 			if self.options.active_tab in ['"dxfpoints"','"path-to-gcode"', '"area"', '"engraving"', '"lathe"']:
 				if self.orientation_points == {} :
 					self.error(_("Orientation points have not been defined! A default set of orientation points has been automatically added."),"warning")
-					self.orientation( self.layers[min(1,len(self.layers))] )		
+					self.orientation( self.layers[min(1,len(self.layers)-1)] )		
 					self.get_info()
 				if self.tools == {} :
 					self.error(_("Cutting tool has not been defined! A default tool has been automatically added."),"warning")
 					self.options.tools_library_type = "default"
-					self.tools_library( self.layers[min(1,len(self.layers))] )		
+					self.tools_library( self.layers[min(1,len(self.layers)-1)] )		
 					self.get_info()
 			if self.options.active_tab == '"path-to-gcode"': 
 				self.path_to_gcode()		
