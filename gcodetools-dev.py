@@ -42,9 +42,11 @@ import codecs
 import gettext
 _ = gettext.gettext
 
+ 
 ### Check if inkex has errormsg (0.46 version doesnot have one.) Could be removed later
 if "errormsg" not in dir(inkex):
 	inkex.errormsg = lambda msg: sys.stderr.write((unicode(msg) + "\n").encode("UTF-8"))
+
 
 def bezierparameterize(((bx0,by0),(bx1,by1),(bx2,by2),(bx3,by3))):
 	#parametric bezier
@@ -580,7 +582,9 @@ class Gcodetools(inkex.Effect):
 
 		self.OptionParser.add_option("",   "--tool-diameter",				action="store", type="float", 		dest="tool_diameter", default="3",					help="Tool diameter used for area cutting")		
 		self.OptionParser.add_option("",   "--max-area-curves",				action="store", type="int", 		dest="max_area_curves", default="100",				help="Maximum area curves for each area")
-		self.OptionParser.add_option("",   "--area-inkscape-radius",		action="store", type="float", 		dest="area_inkscape_radius", default="-10",			help="Radius for preparing curves using inkscape")
+		self.OptionParser.add_option("",   "--area-inkscape-radius",	action="store", type="float", 		dest="area_inkscape_radius", default="-10",			help="Radius for preparing curves using inkscape")
+		self.OptionParser.add_option("",   "--area-action",			action="store", type="string", 		dest="area_action", default='replace',	help="Area offset action")
+		self.OptionParser.add_option("",   "--area-find-artefacts-diameter",	action="store", type="float", 		dest="area_find_artefacts_diameter", default="1",			help="artefacts seeking radius")
 		self.OptionParser.add_option("",   "--unit",						action="store", type="string", 		dest="unit", default="G21 (All units in mm)",		help="Units")
 		self.OptionParser.add_option("",   "--active-tab",					action="store", type="string", 		dest="active_tab", default="",						help="Defines which tab is active")
 
@@ -1332,8 +1336,39 @@ class Gcodetools(inkex.Effect):
 ###		Calculate area curves
 ###
 ################################################################################
-
 	def area(self) :
+
+		def trapezium_bbox(csp):
+			xmin,xMax,ymin,yMax=csp[0][0][0][0],csp[0][0][0][0],csp[0][0][0][1],csp[0][0][0][1]
+			for outer in csp:
+				for inner in outer:
+					for p in inner:
+						xmin=min(xmin,p[0])
+						xMax=max(xMax,p[0])
+						ymin=min(ymin,p[1])
+						yMax=max(yMax,p[1])
+			return xmin,ymin,xMax-xmin,yMax-ymin
+
+
+		if self.options.area_action=="locate":
+#			if self.selected_paths == {} and self.options.auto_select_paths:
+#				paths=self.paths
+#				self.error(_("No paths are selected! Trying to work on all available paths."),"warning")
+#			else :
+#				paths = self.selected_paths
+
+			paths = self.paths
+			for layer in self.layers :
+				if layer in paths :
+					for path in paths[layer] :
+						bbox=[]
+						bbox=trapezium_bbox(cubicsuperpath.parsePath(path.get("d")))
+						print_(("got bbox=",bbox))
+						if (bbox[2]**2+bbox[3]**2) < self.options.area_find_artefacts_diameter**2:
+							path=	'm %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z' % (bbox[0],bbox[1])
+							attribs = {'d': path, 'artefact':'1', 'style': 'stroke:#ff0000;fill:#00ffff'}
+							inkex.etree.SubElement(layer, 'path', attribs)
+			return
 		if len(self.selected_paths)<=0:
 			self.error(_("This extension requires at least one selected path."),"warning")
 			return
@@ -1423,9 +1458,11 @@ class Gcodetools(inkex.Effect):
 
 	 					 	
 						d = cubicsuperpath.formatPath(csp)
+						print_(("original  d=",d))
 						d = re.sub(r'(?i)(m[^mz]+)',r'\1 Z ',d)
 						d = re.sub(r'(?i)\s*z\s*z\s*',r' Z ',d)
 						d = re.sub(r'(?i)\s*([A-Za-z])\s*',r' \1 ',d)
+						print_(("formatted d=",d))
 					# scale = sqrt(Xscale**2 + Yscale**2) / sqrt(1**2 + 1**2)
 					self.transform([0,0],layer)
 					scale = 1/self.Zauto_scale[layer]
@@ -1446,6 +1483,7 @@ class Gcodetools(inkex.Effect):
 											 inkex.addNS('original','inkscape'):	d,
 											'style':				biarc_style_i['area']
 										})
+						print_(("adding curve",area_group,d,biarc_style_i['area']))
 						if radius == -r : break 
 
 
@@ -2077,7 +2115,7 @@ G01 Z1 (going to cutting z)\n""",
 				if self.tools == {} :
 					self.error(_("Cutting tool has not been defined! A default tool has been automatically added."),"warning")
 					self.options.tools_library_type = "default"
-					self.tools_library( self.layers[min(1,len(self.layers)-1)] )		
+					self.tools_library( self.layers[min(1,len(self.layers)-1)] )
 					self.get_info()
 			if self.options.active_tab == '"path-to-gcode"': 
 				self.path_to_gcode()		
