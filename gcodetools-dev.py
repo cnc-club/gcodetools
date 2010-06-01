@@ -1277,12 +1277,10 @@ class Gcodetools(inkex.Effect):
 				p = []	
 				dxfpoints = []
 				for path in paths[layer] :
-					d=path.get("d")
-					if d==None:
-						print_("omitting non-path")
-						self.error(_("Warning: omitting non-path"),"selection_contains_objects_that_are_not_paths")
+					if "d" not in path.keys() : 
+						self.error(_("Warning: One or more paths dont have 'd' parameter, try to Ungroup (Ctrl+Shift+G) and Object to Path (Ctrl+Shift+C)!"),"selection_contains_objects_that_are_not_paths")
 						continue					
-					csp = cubicsuperpath.parsePath(d)
+					csp = cubicsuperpath.parsePath(path.get("d"))
 					csp = self.apply_transforms(path, csp)
 					if path.get("dxfpoint") == "1":
 						tmp_curve=self.transform_csp(csp, layer)
@@ -1354,17 +1352,14 @@ class Gcodetools(inkex.Effect):
 				paths = self.selected_paths
 			for layer in self.paths :
 				for path in paths[layer] :
-					print_(path.get("d"))
-					print_(path.keys())
 					parent = path.getparent()
 					style = path.get("style") if "style" in path.keys() else ""
-					d=path.get("d")
-					if d==None:
-						print_("omitting non-path")
-						self.error(_("Warning: omitting non-path"),"selection_contains_objects_that_are_not_paths")
+
+					if "d" not in path.keys() : 
+						self.error(_("Warning: One or more paths dont have 'd' parameter, try to Ungroup (Ctrl+Shift+G) and Object to Path (Ctrl+Shift+C)!"),"selection_contains_objects_that_are_not_paths")
 						continue					
 
-					csp = cubicsuperpath.parsePath(d)
+					csp = cubicsuperpath.parsePath(path.get("d"))
 					csp = self.apply_transforms(path, csp)
 					for subpath in csp :
 						bounds = csp_simple_bound([subpath])
