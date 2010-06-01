@@ -101,45 +101,47 @@ defaults = {
 }
 
 
-loft_style = {
-		'main curve':	simplestyle.formatStyle({ 'stroke': '#88f', 'fill': 'none', 'stroke-width':'1', 'marker-end':'url(#Arrow2Mend)' }),
-	}
 
-biarc_style = {
-		'biarc0':	simplestyle.formatStyle({ 'stroke': '#88f', 'fill': 'none', 'stroke-width':'1' }),
-		'biarc1':	simplestyle.formatStyle({ 'stroke': '#8f8', 'fill': 'none', 'stroke-width':'1' }),
-		'line':		simplestyle.formatStyle({ 'stroke': '#f88', 'fill': 'none', 'stroke-width':'1' }),
-		'area':		simplestyle.formatStyle({ 'stroke': '#777', 'fill': 'none', 'stroke-width':'0.1' }),
+styles = {
+		"loft_style" : {
+				'main curve':	simplestyle.formatStyle({ 'stroke': '#88f', 'fill': 'none', 'stroke-width':'1', 'marker-end':'url(#Arrow2Mend)' }),
+			},
+		"biarc_style" : {
+				'biarc0':	simplestyle.formatStyle({ 'stroke': '#88f', 'fill': 'none', 'stroke-width':'1' }),
+				'biarc1':	simplestyle.formatStyle({ 'stroke': '#8f8', 'fill': 'none', 'stroke-width':'1' }),
+				'line':		simplestyle.formatStyle({ 'stroke': '#f88', 'fill': 'none', 'stroke-width':'1' }),
+				'area':		simplestyle.formatStyle({ 'stroke': '#777', 'fill': 'none', 'stroke-width':'0.1' }),
+			},
+		"biarc_style_dark" : {
+				'biarc0':	simplestyle.formatStyle({ 'stroke': '#33a', 'fill': 'none', 'stroke-width':'1' }),
+				'biarc1':	simplestyle.formatStyle({ 'stroke': '#3a3', 'fill': 'none', 'stroke-width':'1' }),
+				'line':		simplestyle.formatStyle({ 'stroke': '#a33', 'fill': 'none', 'stroke-width':'1' }),
+				'area':		simplestyle.formatStyle({ 'stroke': '#222', 'fill': 'none', 'stroke-width':'0.3' }),
+			},
+		"biarc_style_dark_area" : {
+				'biarc0':	simplestyle.formatStyle({ 'stroke': '#33a', 'fill': 'none', 'stroke-width':'0.1' }),
+				'biarc1':	simplestyle.formatStyle({ 'stroke': '#3a3', 'fill': 'none', 'stroke-width':'0.1' }),
+				'line':		simplestyle.formatStyle({ 'stroke': '#a33', 'fill': 'none', 'stroke-width':'0.1' }),
+				'area':		simplestyle.formatStyle({ 'stroke': '#222', 'fill': 'none', 'stroke-width':'0.3' }),
+			},
+		"biarc_style_i"  : {
+				'biarc0':	simplestyle.formatStyle({ 'stroke': '#880', 'fill': 'none', 'stroke-width':'1' }),
+				'biarc1':	simplestyle.formatStyle({ 'stroke': '#808', 'fill': 'none', 'stroke-width':'1' }),
+				'line':		simplestyle.formatStyle({ 'stroke': '#088', 'fill': 'none', 'stroke-width':'1' }),
+				'area':		simplestyle.formatStyle({ 'stroke': '#999', 'fill': 'none', 'stroke-width':'0.3' }),
+			},
+		"biarc_style_dark_i" : {
+				'biarc0':	simplestyle.formatStyle({ 'stroke': '#dd5', 'fill': 'none', 'stroke-width':'1' }),
+				'biarc1':	simplestyle.formatStyle({ 'stroke': '#d5d', 'fill': 'none', 'stroke-width':'1' }),
+				'line':		simplestyle.formatStyle({ 'stroke': '#5dd', 'fill': 'none', 'stroke-width':'1' }),
+				'area':		simplestyle.formatStyle({ 'stroke': '#aaa', 'fill': 'none', 'stroke-width':'0.3' }),
+			},
+		"area artefact": 		simplestyle.formatStyle({ 'stroke': '#ff0000', 'fill': 'ffff00', 'stroke-width':'1' }),
+		"area artefact arrow":	simplestyle.formatStyle({ 'stroke': '#ff0000', 'fill': 'ffff00', 'stroke-width':'1' }),
+		"dxf_points":		 	simplestyle.formatStyle({ "stroke": "#0000ff", "fill": "#ffff00"}),
+		
+		
 	}
-
-biarc_style_dark = {
-		'biarc0':	simplestyle.formatStyle({ 'stroke': '#33a', 'fill': 'none', 'stroke-width':'1' }),
-		'biarc1':	simplestyle.formatStyle({ 'stroke': '#3a3', 'fill': 'none', 'stroke-width':'1' }),
-		'line':		simplestyle.formatStyle({ 'stroke': '#a33', 'fill': 'none', 'stroke-width':'1' }),
-		'area':		simplestyle.formatStyle({ 'stroke': '#222', 'fill': 'none', 'stroke-width':'0.3' }),
-	}
-
-biarc_style_dark_area = {
-		'biarc0':	simplestyle.formatStyle({ 'stroke': '#33a', 'fill': 'none', 'stroke-width':'0.1' }),
-		'biarc1':	simplestyle.formatStyle({ 'stroke': '#3a3', 'fill': 'none', 'stroke-width':'0.1' }),
-		'line':		simplestyle.formatStyle({ 'stroke': '#a33', 'fill': 'none', 'stroke-width':'0.1' }),
-		'area':		simplestyle.formatStyle({ 'stroke': '#222', 'fill': 'none', 'stroke-width':'0.3' }),
-	}
-
-biarc_style_i = {
-		'biarc0':	simplestyle.formatStyle({ 'stroke': '#880', 'fill': 'none', 'stroke-width':'1' }),
-		'biarc1':	simplestyle.formatStyle({ 'stroke': '#808', 'fill': 'none', 'stroke-width':'1' }),
-		'line':		simplestyle.formatStyle({ 'stroke': '#088', 'fill': 'none', 'stroke-width':'1' }),
-		'area':		simplestyle.formatStyle({ 'stroke': '#999', 'fill': 'none', 'stroke-width':'0.3' }),
-	}
-
-biarc_style_dark_i = {
-		'biarc0':	simplestyle.formatStyle({ 'stroke': '#dd5', 'fill': 'none', 'stroke-width':'1' }),
-		'biarc1':	simplestyle.formatStyle({ 'stroke': '#d5d', 'fill': 'none', 'stroke-width':'1' }),
-		'line':		simplestyle.formatStyle({ 'stroke': '#5dd', 'fill': 'none', 'stroke-width':'1' }),
-		'area':		simplestyle.formatStyle({ 'stroke': '#aaa', 'fill': 'none', 'stroke-width':'0.3' }),
-	}
-
 
 
 ################################################################################
@@ -582,15 +584,16 @@ class Gcodetools(inkex.Effect):
 
 		self.OptionParser.add_option("",   "--tool-diameter",				action="store", type="float", 		dest="tool_diameter", default="3",					help="Tool diameter used for area cutting")		
 		self.OptionParser.add_option("",   "--max-area-curves",				action="store", type="int", 		dest="max_area_curves", default="100",				help="Maximum area curves for each area")
-		self.OptionParser.add_option("",   "--area-inkscape-radius",	action="store", type="float", 		dest="area_inkscape_radius", default="-10",			help="Radius for preparing curves using inkscape")
+		self.OptionParser.add_option("",   "--area-inkscape-radius",		action="store", type="float", 		dest="area_inkscape_radius", default="-10",			help="Radius for preparing curves using inkscape")
 		self.OptionParser.add_option("",   "--unit",						action="store", type="string", 		dest="unit", default="G21 (All units in mm)",		help="Units")
 		self.OptionParser.add_option("",   "--active-tab",					action="store", type="string", 		dest="active_tab", default="",						help="Defines which tab is active")
 
-		self.OptionParser.add_option("",   "--area-find-artefacts-diameter",	action="store", type="float", 		dest="area_find_artefacts_diameter", default="1",			help="artefacts seeking radius")
+		self.OptionParser.add_option("",   "--area-find-artefacts-diameter",action="store", type="float", 		dest="area_find_artefacts_diameter", default="1",					help="artefacts seeking radius")
+		self.OptionParser.add_option("",   "--area-find-artefacts-action",	action="store", type="string",	 	dest="area_find_artefacts_action", default="mark with an arrow",	help="artefacts action type")
 
 
 		self.OptionParser.add_option("",   "--generate_not_parametric_code",action="store", type="inkbool",		dest="generate_not_parametric_code", default=False,	help="Generated code will be not parametric.")		
-		self.OptionParser.add_option("",   "--auto_select_paths",action="store", type="inkbool",		dest="auto_select_paths", default=True,	help="Select all paths if nothing is selected.")		
+		self.OptionParser.add_option("",   "--auto_select_paths",			action="store", type="inkbool",		dest="auto_select_paths", default=True,				help="Select all paths if nothing is selected.")		
 
 		self.OptionParser.add_option("",   "--loft-distances",				action="store", type="string", 		dest="loft_distances", default="10",				help="Distances between paths.")
 		self.OptionParser.add_option("",   "--loft-direction",				action="store", type="string", 		dest="loft_direction", default="crosswise",			help="Direction of loft's interpolation.")
@@ -599,22 +602,22 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--min-arc-radius",				action="store", type="float", 		dest="min_arc_radius", default=".1",				help="All arc having radius less than minimum will be considered as straight line")		
 
 
-		self.OptionParser.add_option("",   "--engraving-sharp-angle-tollerance",action="store", type="float",	dest="engraving_sharp_angle_tollerance", default="150",	help="All angles thar are less than engraving-sharp-angle-tollerance will be thought sharp")		
-		self.OptionParser.add_option("",   "--engraving-max-dist",			action="store", type="float", 		dest="engraving_max_dist", default="10",			help="Distanse from original path where engraving is not needed (usualy it's cutting tool diameter)")		
-		self.OptionParser.add_option("",   "--engraving-newton-iterations", action="store", type="int", 		dest="engraving_newton_iterations", default="4",	help="Number of sample points used to calculate distance")		
-		self.OptionParser.add_option("",   "--engraving-draw-calculation-paths",action="store", type="inkbool",	dest="engraving_draw_calculation_paths", default=False,help="Draw additional graphics to debug engraving path")		
-		self.OptionParser.add_option("",   "--engraving-cutter-shape-function",action="store", type="string", 	dest="engraving_cutter_shape_function", default="w",help="Cutter shape function z(w). Ex. cone: w. ")
+		self.OptionParser.add_option("",   "--engraving-sharp-angle-tollerance",action="store", type="float",	dest="engraving_sharp_angle_tollerance", default="150",		help="All angles thar are less than engraving-sharp-angle-tollerance will be thought sharp")		
+		self.OptionParser.add_option("",   "--engraving-max-dist",			action="store", type="float", 		dest="engraving_max_dist", default="10",					help="Distanse from original path where engraving is not needed (usualy it's cutting tool diameter)")		
+		self.OptionParser.add_option("",   "--engraving-newton-iterations", action="store", type="int", 		dest="engraving_newton_iterations", default="4",			help="Number of sample points used to calculate distance")		
+		self.OptionParser.add_option("",   "--engraving-draw-calculation-paths",action="store", type="inkbool",	dest="engraving_draw_calculation_paths", default=False,		help="Draw additional graphics to debug engraving path")		
+		self.OptionParser.add_option("",   "--engraving-cutter-shape-function",action="store", type="string", 	dest="engraving_cutter_shape_function", default="w",		help="Cutter shape function z(w). Ex. cone: w. ")
 
-		self.OptionParser.add_option("",   "--lathe-width",action="store", type="float", 	dest="lathe_width", default=10.,help="Lathe width")
+		self.OptionParser.add_option("",   "--lathe-width",					action="store", type="float", 		dest="lathe_width", default=10.,help="Lathe width")
 
-		self.OptionParser.add_option("",   "--create-log",					action="store", type="inkbool", 	dest="log_create_log", default=False,	help="Create log files")
-		self.OptionParser.add_option("",   "--log-filename",				action="store", type="string", 		dest="log_filename", default='',		help="Create log files")
+		self.OptionParser.add_option("",   "--create-log",					action="store", type="inkbool", 	dest="log_create_log", default=False,				help="Create log files")
+		self.OptionParser.add_option("",   "--log-filename",				action="store", type="string", 		dest="log_filename", default='',					help="Create log files")
 
 
 		self.OptionParser.add_option("",   "--orientation-points-count",	action="store", type="int", 		dest="orientation_points_count", default='2',			help="Orientation points count")
 		self.OptionParser.add_option("",   "--tools-library-type",			action="store", type="string", 		dest="tools_library_type", default='cylinder cutter',	help="Create tools defention")
 
-		self.OptionParser.add_option("",   "--dxfpoints-action",			action="store", type="string", 		dest="dxfpoints_action", default='replace',	help="dxfpoint sign toggle")
+		self.OptionParser.add_option("",   "--dxfpoints-action",			action="store", type="string", 		dest="dxfpoints_action", default='replace',			help="dxfpoint sign toggle")
                                                                                                           
 		self.OptionParser.add_option("",   "--help-language",				action="store", type="string", 		dest="help_language", default='http://www.cnc-club.ru/forum/viewtopic.php?f=33&t=35',	help="Open help page in webbrowser.")
 
@@ -694,7 +697,7 @@ class Gcodetools(inkex.Effect):
 
 
 
-	def draw_curve(self, curve, layer, group=None, style=biarc_style):
+	def draw_curve(self, curve, layer, group=None, style=styles["biarc_style"]):
 		if group==None:
 			group = inkex.etree.SubElement( self.layers[min(1,len(self.layers)-1)], inkex.addNS('g','svg') )
 		s, arcn = '', 0
@@ -1073,9 +1076,10 @@ class Gcodetools(inkex.Effect):
 					self.tools[layer] = self.tools[layer] + [tool.copy()] if layer in self.tools else [tool.copy()]
 					print_("Found tool in '%s' layer: %s" % (layer.get(inkex.addNS('label','inkscape')), tool))
 				elif i.tag == inkex.addNS('path','svg'):
-					self.paths[layer] = self.paths[layer] + [i] if layer in self.paths else [i]  
-					if i.get("id") in self.selected :
-						self.selected_paths[layer] = self.selected_paths[layer] + [i] if layer in self.selected_paths else [i]  
+					if "gcodetools"  not in i.keys() :
+						self.paths[layer] = self.paths[layer] + [i] if layer in self.paths else [i]  
+						if i.get("id") in self.selected :
+							self.selected_paths[layer] = self.selected_paths[layer] + [i] if layer in self.selected_paths else [i]  
 				elif i.tag == inkex.addNS("g",'svg'):
 					recursive_search(i,layer, (i.get("id") in self.selected) )
 				elif i.get("id") in self.selected :
@@ -1274,7 +1278,7 @@ class Gcodetools(inkex.Effect):
 				dxfpoints = []
 				for path in paths[layer] :
 					csp = cubicsuperpath.parsePath(path.get("d"))
-					cap = self.apply_transforms(path, csp)
+					csp = self.apply_transforms(path, csp)
 					if path.get("dxfpoint") == "1":
 						tmp_curve=self.transform_csp(csp, layer)
 						x=tmp_curve[0][0][0][0]
@@ -1321,7 +1325,7 @@ class Gcodetools(inkex.Effect):
 						if r!=None:
 							print_(("got path=",r.group(1)))
 							path.set("d","m %s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z" % r.group(1))
-							path.set("style","stroke:#ff0000;fill:#ff0000")
+							path.set("style",sytles["dxf_points"])
 
 					if self.options.dxfpoints_action == 'save':
 						path.set("dxfpoint","1")
@@ -1336,32 +1340,44 @@ class Gcodetools(inkex.Effect):
 ###		Artefacts
 ###
 ################################################################################
+
 	def area_artefacts(self) :
-
-		def rect_bbox(csp):
-			xmin,xMax,ymin,yMax=csp[0][0][0][0],csp[0][0][0][0],csp[0][0][0][1],csp[0][0][0][1]
-			for outer in csp:
-				for inner in outer:
-					for p in inner:
-						xmin=min(xmin,p[0])
-						xMax=max(xMax,p[0])
-						ymin=min(ymin,p[1])
-						yMax=max(yMax,p[1])
-			return xmin,ymin,xMax-xmin,yMax-ymin
-
-		paths = self.paths
-		for layer in self.layers :
-			if layer in paths :
+			if self.selected_paths == {} and self.options.auto_select_paths:
+				paths=self.paths
+				self.error(_("No paths are selected! Trying to work on all available paths."),"warning")
+			else :
+				paths = self.selected_paths
+			for layer in self.paths :
 				for path in paths[layer] :
-					bbox=[]
-					bbox=rect_bbox(cubicsuperpath.parsePath(path.get("d")))
-					print_(("got bbox=",bbox))
-#					parent_bbox=rect_bbox(cubicsuperpath.parsePath(path.get("")))
-					if (bbox[2]**2+bbox[3]**2) < self.options.area_find_artefacts_diameter**2:
-						path=	'm %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z' % (bbox[0],bbox[1])
-						attribs = {'d': path, 'artefact':'1', 'style': 'stroke:#ff0000;fill:#00ffff'}
-						inkex.etree.SubElement(layer, 'path', attribs)
-		
+					print_(path.get("d"))
+					print_(path.keys())
+					parent = path.getparent()
+					style = path.get("style") if "style" in path.keys() else ""
+					
+					csp = cubicsuperpath.parsePath(path.get("d"))
+					csp = self.apply_transforms(path, csp)
+					
+					for subpath in csp :
+						bounds = csp_simple_bound([subpath])
+						if  (bounds[2]-bounds[0])**2+(bounds[3]-bounds[1])**2 < self.options.area_find_artefacts_diameter**2:
+							if self.options.area_find_artefacts_action == "mark with an arrow" :
+								inkex.etree.SubElement(parent, inkex.addNS('path','svg'), 
+										{
+											'd': 'm %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z' % (subpath[0][1][0],subpath[0][1][1]),
+											'style': styles["area artefact arrow"],
+											'gcodetools': 'area artefact arrow',
+										})
+								inkex.etree.SubElement(parent, inkex.addNS('path','svg'), {'d': cubicsuperpath.formatPath([subpath]), 'style': style, "gcodetools_parameter":"area artefact"})		
+							elif self.options.area_find_artefacts_action == "mark with style" :
+								inkex.etree.SubElement(parent, inkex.addNS('path','svg'), {'d': cubicsuperpath.formatPath([subpath]), 'style': styles["area artefact"]})
+							elif self.options.area_find_artefacts_action == "delete" :
+								print_("Deleted artifact %s" % subpath )
+						else :
+							inkex.etree.SubElement(parent, inkex.addNS('path','svg'), {'d': cubicsuperpath.formatPath([subpath]), 'style': style})
+					parent.remove(path)
+			return
+			
+
 
 ################################################################################
 ###
@@ -1372,6 +1388,7 @@ class Gcodetools(inkex.Effect):
 		if len(self.selected_paths)<=0:
 			self.error(_("This extension requires at least one selected path."),"warning")
 			return
+		print_(self.selected_paths)
 		for layer in self.layers :
 			if layer in self.selected_paths :
 				self.set_tool(layer)
@@ -1481,9 +1498,9 @@ class Gcodetools(inkex.Effect):
 											 inkex.addNS('type','sodipodi'):	'inkscape:offset',
 											 inkex.addNS('radius','inkscape'):	str(radius),
 											 inkex.addNS('original','inkscape'):	d,
-											'style':				biarc_style_i['area']
+											'style': styles["biarc_style_i"]['area']
 										})
-						print_(("adding curve",area_group,d,biarc_style_i['area']))
+						print_(("adding curve",area_group,d,styles["biarc_style_i"]['area']))
 						if radius == -r : break 
 
 
@@ -1756,7 +1773,7 @@ class Gcodetools(inkex.Effect):
 
 								node =  inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 										{
 															 "d":	 cubicsuperpath.formatPath([cspm]),
-															'style':				biarc_style_i['biarc1']
+															'style':	styles["biarc_style_i"]['biarc1']
 														})
 								for i in xrange(len(cspm)):
 									inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
