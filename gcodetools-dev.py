@@ -136,8 +136,8 @@ styles = {
 				'line':		simplestyle.formatStyle({ 'stroke': '#5dd', 'fill': 'none', 'stroke-width':'1' }),
 				'area':		simplestyle.formatStyle({ 'stroke': '#aaa', 'fill': 'none', 'stroke-width':'0.3' }),
 			},
-		"area artefact": 		simplestyle.formatStyle({ 'stroke': '#ff0000', 'fill': 'ffff00', 'stroke-width':'1' }),
-		"area artefact arrow":	simplestyle.formatStyle({ 'stroke': '#ff0000', 'fill': 'ffff00', 'stroke-width':'1' }),
+		"area artefact": 		simplestyle.formatStyle({ 'stroke': '#ff0000', 'fill': '#ffff00', 'stroke-width':'1' }),
+		"area artefact arrow":	simplestyle.formatStyle({ 'stroke': '#ff0000', 'fill': '#ffff00', 'stroke-width':'1' }),
 		"dxf_points":		 	simplestyle.formatStyle({ "stroke": "#0000ff", "fill": "#ffff00"}),
 		
 		
@@ -1351,14 +1351,13 @@ class Gcodetools(inkex.Effect):
 			else :
 				paths = self.selected_paths
 			for layer in self.paths :
+#				paths[layer].reverse() # Reverse list of paths to leave their order 
 				for path in paths[layer] :
 					parent = path.getparent()
 					style = path.get("style") if "style" in path.keys() else ""
-
 					if "d" not in path.keys() : 
 						self.error(_("Warning: One or more paths dont have 'd' parameter, try to Ungroup (Ctrl+Shift+G) and Object to Path (Ctrl+Shift+C)!"),"selection_contains_objects_that_are_not_paths")
-						continue					
-
+						continue		
 					csp = cubicsuperpath.parsePath(path.get("d"))
 					csp = self.apply_transforms(path, csp)
 					for subpath in csp :
