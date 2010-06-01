@@ -85,9 +85,10 @@ The segment will be split into two segments if the distance between path's segme
 		</page>
 <!-- Gcodetools: /ptg block -->
 <!-- Gcodetools: area block -->
-		<page name='area_artefacts' _gui-text='Area'>	
+		<page name='area' _gui-text='Area'>	
 			<param name="max-area-curves" type="int" min="0" max="1000" _gui-text="Maximum area cutting curves">100</param>
 			<param name="area-inkscape-radius" type="float" min="-1000" max="1000" _gui-text="Area width">-10</param>
+
 			<_param name="help" type="description">
 "Create area offset": creates several Inkscape path offsets to fill original path's area up to "Area radius" value. 
 
@@ -99,14 +100,16 @@ Only one offset will be created if the "Area width" is equal to "1/2 D".
 <!-- Gcodetools: area_artefacts block -->
 		<page name='area_artefacts' _gui-text='Area artefacts'>	
 			<param name="area-find-artefacts-diameter" type="float" min="0.01" max="1000" _gui-text="artefact diameter">5.0</param>
+			<param name="area-find-artefacts-action" type="optiongroup" _gui-text="Action">
+				<_option value="mark with an arrow">mark with an arrow</_option>
+				<_option value="mark with style">mark with style</_option>
+				<_option value="delete">delete</_option>
+			</param>	
 			<_param name="help" type="description">
-
 Usage: 
 1. Select all Area Offsets (gray outlines)
 2. Object/Ungroup (Shift+Ctrl+G)
-3. Path/Object to Path (Shift+Ctrl+C) 
-4. Path/Break apart (Shift+Ctrl+K)
-5. Press Apply
+3. Press Apply
 
 Suspected small objects will be marked out by colored arrows.
 			</_param>
