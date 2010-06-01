@@ -169,6 +169,28 @@ def csp_simple_bound(csp):
 	return minx,miny,maxx,maxy		
 
 
+def csp_segments_bounds_intersect(sp1,sp2,sp3,sp4) :
+	return bounds_intersect(csp_segment_bound(sp1,sp2), csp_segment_bound(sp3,sp4))
+
+def csp_segment_bound(sp1,sp2) :
+	return [
+				min(sp1[1][0], sp1[2][0], sp2[0][0], sp2[1][0]),
+				min(sp1[1][1], sp1[2][1], sp2[0][1], sp2[1][1]),
+				max(sp1[1][0], sp1[2][0], sp2[0][0], sp2[1][0]),
+				max(sp1[1][1], sp1[2][1], sp2[0][1], sp2[1][1])
+			]
+
+def bounds_intersect(a, b) :
+	return not ( (a[0]>b[2]) or (b[0]>a[2]) or (a[1]>b[3]) or (b[1]>a[3]) )
+	
+
+
+def csp_segments_intersection(sp1,sp2,sp3,sp4) :
+	pass 
+	
+	# see http://bazaar.launchpad.net/~lib2geom-hackers/lib2geom/path2/annotate/head:/src/path-intersect.cpp
+	
+
 def isnan(x): return type(x) is float and x != x
 def isinf(x): inf = 1e5000; return x == inf or x == -inf
 
