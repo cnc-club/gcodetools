@@ -699,7 +699,7 @@ class Gcodetools(inkex.Effect):
 
 	def draw_curve(self, curve, layer, group=None, style=styles["biarc_style"]):
 		if group==None:
-			group = inkex.etree.SubElement( self.layers[min(1,len(self.layers)-1)], inkex.addNS('g','svg') )
+			group = inkex.etree.SubElement( self.layers[min(1,len(self.layers)-1)], inkex.addNS('g','svg'), {"gcodetools": "Preview group"} )
 		s, arcn = '', 0
 		
 		
@@ -718,7 +718,7 @@ class Gcodetools(inkex.Effect):
 							{
 								'style': style['line'],
 								'd':'M %s,%s L %s,%s' % (s[0][0], s[0][1], si[0][0], si[0][1]),
-								'comment': str(s)
+								"gcodetools": "Preview",
 							}
 						)
 				elif s[1] == 'arc':
@@ -749,7 +749,7 @@ class Gcodetools(inkex.Effect):
 							 inkex.addNS('end','sodipodi'):		str(a_end),
 							 inkex.addNS('open','sodipodi'):	'true',
 							 inkex.addNS('type','sodipodi'):	'arc',
-							'comment': str(s)
+							"gcodetools": "Preview",
 						})
 			s = si
 	
@@ -1667,6 +1667,7 @@ class Gcodetools(inkex.Effect):
 											{
 												 "d":	"M %f,%f L %f,%f" %(p[0][0],p[0][1],p[0][0]+p[1][0]*10,p[0][1]+p[1][1]*10),
 												'style':	"stroke:#0000ff; stroke-opacity:0.46; stroke-width:0.1; fill:none",
+												"gcodetools": "Engraving calculation paths"
 											})				
 
 
@@ -1720,9 +1721,9 @@ class Gcodetools(inkex.Effect):
 													if t1>0 : r = min(t1,r) if r!=None else t1
 									if self.options.engraving_draw_calculation_paths==True:
 										inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
-												{'style':	"fill:#ff00ff; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x1+nx*r), inkex.addNS('cy','sodipodi'):		str(y1+ny*r), inkex.addNS('rx','sodipodi'):	str(1), inkex.addNS('ry','sodipodi'): str(1), inkex.addNS('type','sodipodi'):	'arc'})	
+												{"gcodetools": "Engraving calculation paths", 'style':	"fill:#ff00ff; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x1+nx*r), inkex.addNS('cy','sodipodi'):		str(y1+ny*r), inkex.addNS('rx','sodipodi'):	str(1), inkex.addNS('ry','sodipodi'): str(1), inkex.addNS('type','sodipodi'):	'arc'})	
 										inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
-												{'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x1+nx*r),  inkex.addNS('cy','sodipodi'):		str(y1+ny*r),inkex.addNS('rx','sodipodi'):		str(r), inkex.addNS('ry','sodipodi'):		str(r), inkex.addNS('type','sodipodi'):	'arc'})
+												{"gcodetools": "Engraving calculation paths", 'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x1+nx*r),  inkex.addNS('cy','sodipodi'):		str(y1+ny*r),inkex.addNS('rx','sodipodi'):		str(r), inkex.addNS('ry','sodipodi'):		str(r), inkex.addNS('type','sodipodi'):	'arc'})
 
 									r = min(r, self.options.engraving_max_dist)
 									w = min(r, self.tools[layer][0]['diameter'])
@@ -1773,11 +1774,12 @@ class Gcodetools(inkex.Effect):
 
 								node =  inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 										{
 															 "d":	 cubicsuperpath.formatPath([cspm]),
-															'style':	styles["biarc_style_i"]['biarc1']
+															'style':	styles["biarc_style_i"]['biarc1'],
+															"gcodetools": "Engraving calculation paths",
 														})
 								for i in xrange(len(cspm)):
 									inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
-												{'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(cspm[i][1][0]),  inkex.addNS('cy','sodipodi'):		str(cspm[i][1][1]),inkex.addNS('rx','sodipodi'):		str(w[i]), inkex.addNS('ry','sodipodi'):		str(w[i]), inkex.addNS('type','sodipodi'):	'arc'})
+												{"gcodetools": "Engraving calculation paths", 'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(cspm[i][1][0]),  inkex.addNS('cy','sodipodi'):		str(cspm[i][1][1]),inkex.addNS('rx','sodipodi'):		str(w[i]), inkex.addNS('ry','sodipodi'):		str(w[i]), inkex.addNS('type','sodipodi'):	'arc'})
 
 								cspe += [cspm]
 								we   +=	[w]				
@@ -2028,7 +2030,7 @@ G01 Z1 (going to cutting z)\n""",
 				if layer in tools_bounds :
 					tool = self.tools[layer][0]
 					g = copy.deepcopy(tool["self_group"])
-					g.attrib["gcodetools"] = ""
+					g.attrib["gcodetools"] = "Check tools and OP asignment"
 					trans = [[1,0.3,bounds[2]],[0,0.5,tools_bounds[layer][0]]]	
 					g.set("transform",simpletransform.formatTransform(trans))
 					group.insert( 0, g )
