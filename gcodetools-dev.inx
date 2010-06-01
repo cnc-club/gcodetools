@@ -85,33 +85,34 @@ The segment will be split into two segments if the distance between path's segme
 		</page>
 <!-- Gcodetools: /ptg block -->
 <!-- Gcodetools: area block -->
-		<page name='area' _gui-text='Area'>	
+		<page name='area_artefacts' _gui-text='Area'>	
 			<param name="max-area-curves" type="int" min="0" max="1000" _gui-text="Maximum area cutting curves">100</param>
 			<param name="area-inkscape-radius" type="float" min="-1000" max="1000" _gui-text="Area width">-10</param>
-			<param name="area-find-artefacts-diameter" type="float" min="0.01" max="1000" _gui-text="artefact diameter">5.0</param>
-
-			<param type='optiongroup' name='area-action' _gui-text="Choose action">
-<_option value='create'>create area offset</_option>
-<_option value='locate'>postprocessing: find artefacts</_option>
-			</param>
 			<_param name="help" type="description">
 "Create area offset": creates several Inkscape path offsets to fill original path's area up to "Area radius" value. 
 
 Outlines start from "1/2 D" up to "Area width" total width with "D" steps where D is taken from the nearest tool definition ("Tool diameter" value).
 Only one offset will be created if the "Area width" is equal to "1/2 D".
-
-"postprocessing: find artefacts" - locates all small objects after Area Offset. 
-
-Usage: select Area Offsets (new gray outlines) and ungroup,path,break them and select again: 
-Object/Ungroup (Shift+Ctrl+G)
-Path/Object to Path (Shift+Ctrl+C) 
-Path/Break apart (Shift+Ctrl+K)
-
-Switch radiobutton to "postprocessing: find artefacts" and press Apply. Suspected small objects will be marked out by colored arrows.
-
 			</_param>
 		</page>		
 <!-- Gcodetools: /area block -->
+<!-- Gcodetools: area_artefacts block -->
+		<page name='area_artefacts' _gui-text='Area artefacts'>	
+			<param name="area-find-artefacts-diameter" type="float" min="0.01" max="1000" _gui-text="artefact diameter">5.0</param>
+			<_param name="help" type="description">
+
+Usage: 
+1. Select all Area Offsets (gray outlines)
+2. Object/Ungroup (Shift+Ctrl+G)
+3. Path/Object to Path (Shift+Ctrl+C) 
+4. Path/Break apart (Shift+Ctrl+K)
+5. Press Apply
+
+Suspected small objects will be marked out by colored arrows.
+			</_param>
+		</page>		
+<!-- Gcodetools: /area_artefacts block -->
+
 <!-- Gcodetools: engraving block -->
 		<page name='engraving' _gui-text='Engraving'>	
 			<param name="engraving-sharp-angle-tollerance" type="float"  precision="5" min="0" max="180" _gui-text="Sharp angle tolerance">150</param>

@@ -583,10 +583,11 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--tool-diameter",				action="store", type="float", 		dest="tool_diameter", default="3",					help="Tool diameter used for area cutting")		
 		self.OptionParser.add_option("",   "--max-area-curves",				action="store", type="int", 		dest="max_area_curves", default="100",				help="Maximum area curves for each area")
 		self.OptionParser.add_option("",   "--area-inkscape-radius",	action="store", type="float", 		dest="area_inkscape_radius", default="-10",			help="Radius for preparing curves using inkscape")
-		self.OptionParser.add_option("",   "--area-action",			action="store", type="string", 		dest="area_action", default='replace',	help="Area offset action")
-		self.OptionParser.add_option("",   "--area-find-artefacts-diameter",	action="store", type="float", 		dest="area_find_artefacts_diameter", default="1",			help="artefacts seeking radius")
 		self.OptionParser.add_option("",   "--unit",						action="store", type="string", 		dest="unit", default="G21 (All units in mm)",		help="Units")
 		self.OptionParser.add_option("",   "--active-tab",					action="store", type="string", 		dest="active_tab", default="",						help="Defines which tab is active")
+
+		self.OptionParser.add_option("",   "--area-find-artefacts-diameter",	action="store", type="float", 		dest="area_find_artefacts_diameter", default="1",			help="artefacts seeking radius")
+
 
 		self.OptionParser.add_option("",   "--generate_not_parametric_code",action="store", type="inkbool",		dest="generate_not_parametric_code", default=False,	help="Generated code will be not parametric.")		
 		self.OptionParser.add_option("",   "--auto_select_paths",action="store", type="inkbool",		dest="auto_select_paths", default=True,	help="Select all paths if nothing is selected.")		
@@ -1330,15 +1331,14 @@ class Gcodetools(inkex.Effect):
 #						for id, node in self.selected.iteritems():
 #							print_((id,node,node.attrib))
 
-
 ################################################################################
 ###
-###		Calculate area curves
+###		Artefacts
 ###
 ################################################################################
-	def area(self) :
+	def area_artefacts(self) :
 
-		def trapezium_bbox(csp):
+		def rect_bbox(csp):
 			xmin,xMax,ymin,yMax=csp[0][0][0][0],csp[0][0][0][0],csp[0][0][0][1],csp[0][0][0][1]
 			for outer in csp:
 				for inner in outer:
@@ -1349,26 +1349,26 @@ class Gcodetools(inkex.Effect):
 						yMax=max(yMax,p[1])
 			return xmin,ymin,xMax-xmin,yMax-ymin
 
+		paths = self.paths
+		for layer in self.layers :
+			if layer in paths :
+				for path in paths[layer] :
+					bbox=[]
+					bbox=rect_bbox(cubicsuperpath.parsePath(path.get("d")))
+					print_(("got bbox=",bbox))
+#					parent_bbox=rect_bbox(cubicsuperpath.parsePath(path.get("")))
+					if (bbox[2]**2+bbox[3]**2) < self.options.area_find_artefacts_diameter**2:
+						path=	'm %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z' % (bbox[0],bbox[1])
+						attribs = {'d': path, 'artefact':'1', 'style': 'stroke:#ff0000;fill:#00ffff'}
+						inkex.etree.SubElement(layer, 'path', attribs)
+		
 
-		if self.options.area_action=="locate":
-#			if self.selected_paths == {} and self.options.auto_select_paths:
-#				paths=self.paths
-#				self.error(_("No paths are selected! Trying to work on all available paths."),"warning")
-#			else :
-#				paths = self.selected_paths
-
-			paths = self.paths
-			for layer in self.layers :
-				if layer in paths :
-					for path in paths[layer] :
-						bbox=[]
-						bbox=trapezium_bbox(cubicsuperpath.parsePath(path.get("d")))
-						print_(("got bbox=",bbox))
-						if (bbox[2]**2+bbox[3]**2) < self.options.area_find_artefacts_diameter**2:
-							path=	'm %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z' % (bbox[0],bbox[1])
-							attribs = {'d': path, 'artefact':'1', 'style': 'stroke:#ff0000;fill:#00ffff'}
-							inkex.etree.SubElement(layer, 'path', attribs)
-			return
+################################################################################
+###
+###		Calculate area curves
+###
+################################################################################
+	def area(self) :
 		if len(self.selected_paths)<=0:
 			self.error(_("This extension requires at least one selected path."),"warning")
 			return
@@ -2102,12 +2102,12 @@ G01 Z1 (going to cutting z)\n""",
 		if self.options.active_tab == '"help"' :
 			self.help()
 			return
-		elif self.options.active_tab not in ['"dxfpoints"','"path-to-gcode"', '"area"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"']:
+		elif self.options.active_tab not in ['"dxfpoints"','"path-to-gcode"', '"area"', '"area_artefacts"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"']:
 			self.error(_("Select one of the active tabs - Path to Gcode, Area, Engraving, DXF points, Orientation or Tools library."),"error")
 		else:
 			# Get all Gcodetools data from the scene.
 			self.get_info()
-			if self.options.active_tab in ['"dxfpoints"','"path-to-gcode"', '"area"', '"engraving"', '"lathe"']:
+			if self.options.active_tab in ['"dxfpoints"','"path-to-gcode"', '"area"', '"area_artefacts"', '"engraving"', '"lathe"']:
 				if self.orientation_points == {} :
 					self.error(_("Orientation points have not been defined! A default set of orientation points has been automatically added."),"warning")
 					self.orientation( self.layers[min(1,len(self.layers)-1)] )		
@@ -2121,6 +2121,8 @@ G01 Z1 (going to cutting z)\n""",
 				self.path_to_gcode()		
 			elif self.options.active_tab == '"area"': 
 				self.area()		
+			elif self.options.active_tab == '"area_artefacts"': 
+				self.area_artefacts()		
 			elif self.options.active_tab == '"dxfpoints"': 
 				self.dxfpoints()		
 			elif self.options.active_tab == '"engraving"': 
