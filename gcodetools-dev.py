@@ -138,8 +138,7 @@ styles = {
 			},
 		"area artefact": 		simplestyle.formatStyle({ 'stroke': '#ff0000', 'fill': '#ffff00', 'stroke-width':'1' }),
 		"area artefact arrow":	simplestyle.formatStyle({ 'stroke': '#ff0000', 'fill': '#ffff00', 'stroke-width':'1' }),
-		"dxf_points":		 	simplestyle.formatStyle({ "stroke": "#0000ff", "fill": "#ffff00"}),
-		
+		"dxf_points":		 	simplestyle.formatStyle({ "stroke": "#ff0000", "fill": "#ff0000"}),
 		
 	}
 
@@ -1168,7 +1167,11 @@ class Gcodetools(inkex.Effect):
 		return tool
 		
 	def set_tool(self,layer):
+#		print_(("index(layer)=",self.layers.index(layer),"set_tool():layer=",layer,"self.tools=",self.tools))
+#		for l in self.layers:
+#			print_(("l=",l))
 		for i in range(self.layers.index(layer),-1,-1):
+#			print_(("processing layer",i))
 			if self.layers[i] in self.tools : 
 				break
 		if self.layers[i] in self.tools :
@@ -1291,10 +1294,13 @@ class Gcodetools(inkex.Effect):
 		gcode = self.header
 
 		biarc_group = inkex.etree.SubElement( self.selected_paths.keys()[0] if len(self.selected_paths.keys())>0 else self.layers[0], inkex.addNS('g','svg') )
+		print_(("self.layers=",self.layers))
+		print_(("paths=",paths))
 		for layer in self.layers :
 #			print_(("processing layer",layer," of layers:",self.layers))
 			if layer in paths :
 #				print_(("layer ",layer, " is in paths:",paths))
+				print_(("layer",layer))
 				self.set_tool(layer)
 				p = []	
 				dxfpoints = []
@@ -1350,7 +1356,7 @@ class Gcodetools(inkex.Effect):
 						if r!=None:
 							print_(("got path=",r.group(1)))
 							path.set("d","m %s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z" % r.group(1))
-							path.set("style",sytles["dxf_points"])
+							path.set("style",styles["dxf_points"])
 
 					if self.options.dxfpoints_action == 'save':
 						path.set("dxfpoint","1")
@@ -1690,7 +1696,7 @@ class Gcodetools(inkex.Effect):
 					 				nl += [ n1 ] 
 
 
-
+							print_(("engraving_draw_calculation_paths=",self.options.engraving_draw_calculation_paths))
 							if self.options.engraving_draw_calculation_paths==True:
 								for i in nl:
 									for p in i:
@@ -1755,7 +1761,6 @@ class Gcodetools(inkex.Effect):
 												{"gcodetools": "Engraving calculation paths", 'style':	"fill:#ff00ff; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x1+nx*r), inkex.addNS('cy','sodipodi'):		str(y1+ny*r), inkex.addNS('rx','sodipodi'):	str(1), inkex.addNS('ry','sodipodi'): str(1), inkex.addNS('type','sodipodi'):	'arc'})	
 										inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
 												{"gcodetools": "Engraving calculation paths", 'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x1+nx*r),  inkex.addNS('cy','sodipodi'):		str(y1+ny*r),inkex.addNS('rx','sodipodi'):		str(r), inkex.addNS('ry','sodipodi'):		str(r), inkex.addNS('type','sodipodi'):	'arc'})
-
 									r = min(r, self.options.engraving_max_dist)
 									w = min(r, self.tools[layer][0]['diameter'])
 									p += [ [x1+nx*w,y1+ny*w,r,w] ]
@@ -1802,16 +1807,15 @@ class Gcodetools(inkex.Effect):
 										else :
 											cspm += [sp1[:], sp2[:], sp3[:], sp4[:]]	
 											w += [p[i][3] for i in range(4)]
-
-								node =  inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 										{
+								if self.options.engraving_draw_calculation_paths==True:
+									node =  inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 										{
 															 "d":	 cubicsuperpath.formatPath([cspm]),
 															'style':	styles["biarc_style_i"]['biarc1'],
 															"gcodetools": "Engraving calculation paths",
 														})
-								for i in xrange(len(cspm)):
-									inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
+									for i in xrange(len(cspm)):
+										inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
 												{"gcodetools": "Engraving calculation paths", 'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(cspm[i][1][0]),  inkex.addNS('cy','sodipodi'):		str(cspm[i][1][1]),inkex.addNS('rx','sodipodi'):		str(w[i]), inkex.addNS('ry','sodipodi'):		str(w[i]), inkex.addNS('type','sodipodi'):	'arc'})
-
 								cspe += [cspm]
 								we   +=	[w]				
 
