@@ -181,15 +181,16 @@ def bez_bound(bez) :
 
 def bounds_intersect(a, b) :
 	return not ( (a[0]>b[2]) or (b[0]>a[2]) or (a[1]>b[3]) or (b[1]>a[3]) )
-	
+
+def tpoint((x1,y1),(x2,y2),t):
+	return [x1+t*(x2-x1),y1+t*(y2-y1)]
+
 def csp_segment_to_bez(sp1,sp2):
 	return sp1[1:]+sp2[:2]
 
 def bez_to_csp_segment(bez):
 	return [bez[0],bez[0],bez[1]], [bez[2],bez[3],bez[3]]
 
-def straight_segments_intersection (a,b,c,d) :
-	pass
 
 def csp_segments_intersection(sp1,sp2,sp3,sp4) :
 	a, b = csp_segment_to_bez(sp1,sp2), csp_segment_to_bez(sp3,sp4)
@@ -206,26 +207,31 @@ def csp_segments_intersection(sp1,sp2,sp3,sp4) :
 		 a3 = tpoint(a2,b1,t)
 		 return [a[0],a1,a2,a3], [a3,b1,b2,a[3]]
 		 
-	def recursion(a,b,depth_a,depth_b) :
-		if depth_a<csp_intersection_max_depth and depth_b<csp_intersection_max_depth : 
+	def recursion(a,b, ta0,ta1,tb0,tb1, depth_a,depth_b) :
+		tam, tbm = (ta0+ta1)/2, (tb0+tb1)/2
+		if depth_a>0 and depth_b>0 : 
 			a1,a2 = split(a,0.5)
 			b1,b2 = split(b,0.5)
-			if bez_bounds_intersect(a1,b1) : recursion(a1,b1,depth_a+1,depth_b+1) 
-			if bez_bounds_intersect(a2,b1) : recursion(a2,b1,depth_a+1,depth_b+1) 
-			if bez_bounds_intersect(a1,b2) : recursion(a1,b2,depth_a+1,depth_b+1) 
-			if bez_bounds_intersect(a2,b2) : recursion(a2,b2,depth_a+1,depth_b+1) 
-		elif depth_a<csp_intersection_max_depth  : 
+			if bez_bounds_intersect(a1,b1) : recursion(a1,b1, ta0,tam,tb0,tbm, depth_a-1,depth_b-1) 
+			if bez_bounds_intersect(a2,b1) : recursion(a2,b1, tam,ta1,tb0,tbm, depth_a-1,depth_b-1) 
+			if bez_bounds_intersect(a1,b2) : recursion(a1,b2, ta0,tam,tbm,tb1, depth_a-1,depth_b-1) 
+			if bez_bounds_intersect(a2,b2) : recursion(a2,b2, tam,ta1,tbm,tb1, depth_a-1,depth_b-1) 
+		elif depth_a>0  : 
 			a1,a2 = split(a,0.5)
-			if bez_bounds_intersect(a1,b) : recursion(a1,b,depth_a+1,depth_b) 
-			if bez_bounds_intersect(a2,b) : recursion(a2,b,depth_a+1,depth_b) 
-			
-		else : al= [a]	
-		if depth_b<csp_intersection_max_depth : 
-			bl = split(b,0.5)
-		else : bl= [b]
-			
+			if bez_bounds_intersect(a1,b) : recursion(a1,b, ta0,tam,tb0,tb1, depth_a-1,depth_b) 
+			if bez_bounds_intersect(a2,b) : recursion(a2,b, tam,ta1,tb0,tb1, depth_a-1,depth_b) 
+		elif depth_b>0  : 
+			b1,b2 = split(b,0.5)
+			if bez_bounds_intersect(a,b1) : recursion(a,b1, ta0,ta1,tb0,tbm, depth_a,depth_b-1) 
+			if bez_bounds_intersect(a,b2) : recursion(a,b2, ta0,ta1,tbm,tb1, depth_a,depth_b-1) 
+		else : # Both segments have been subdevided enougth. Let's get some intersections :).
+			intersction 
 	
 	
+def straight_segments_intersection(a,b) :
+	ax,bx,cx,dx ay,by,cy,dy = a[0][0],a[1][0],b[0][0],b[1][0], a[0][1],a[1][1],b[0][1],b[1][1] 
+	if (bx-ax)*(dy-cy)-(by-ay)(dx-cx)==0 :	# Lines are parallel
+		pass
 	# see http://bazaar.launchpad.net/~lib2geom-hackers/lib2geom/path2/annotate/head:/src/path-intersect.cpp
 	
 
