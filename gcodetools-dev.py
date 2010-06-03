@@ -168,24 +168,63 @@ def csp_simple_bound(csp):
 	return minx,miny,maxx,maxy		
 
 
-def csp_segments_bounds_intersect(sp1,sp2,sp3,sp4) :
-	return bounds_intersect(csp_segment_bound(sp1,sp2), csp_segment_bound(sp3,sp4))
+def bez_bounds_intersect(bez1, bez2) :
+	return bounds_intersect(bez_bound(bez2), bez_bound(bez1))
 
-def csp_segment_bound(sp1,sp2) :
+def bez_bound(bez) :
 	return [
-				min(sp1[1][0], sp1[2][0], sp2[0][0], sp2[1][0]),
-				min(sp1[1][1], sp1[2][1], sp2[0][1], sp2[1][1]),
-				max(sp1[1][0], sp1[2][0], sp2[0][0], sp2[1][0]),
-				max(sp1[1][1], sp1[2][1], sp2[0][1], sp2[1][1])
+				min(bez[0][0], bez[1][0], bez[2][0], bez[3][0]),
+				min(bez[0][1], bez[1][1], bez[2][1], bez[3][1]),
+				max(bez[0][0], bez[1][0], bez[2][0], bez[3][0]),
+				max(bez[0][1], bez[1][1], bez[2][1], bez[3][1]),
 			]
 
 def bounds_intersect(a, b) :
 	return not ( (a[0]>b[2]) or (b[0]>a[2]) or (a[1]>b[3]) or (b[1]>a[3]) )
 	
+def csp_segment_to_bez(sp1,sp2):
+	return sp1[1:]+sp2[:2]
 
+def bez_to_csp_segment(bez):
+	return [bez[0],bez[0],bez[1]], [bez[2],bez[3],bez[3]]
+
+def straight_segments_intersection (a,b,c,d) :
+	pass
 
 def csp_segments_intersection(sp1,sp2,sp3,sp4) :
-	pass 
+	a, b = csp_segment_to_bez(sp1,sp2), csp_segment_to_bez(sp3,sp4)
+
+	def tpoint( ((x1,x2),(y1,y2)) ,t) :
+		return [x1+(x2-x1)*t, y1+(y2-y1)*t]
+
+	def split(a,t=0.5):
+		 a1 = tpoint(a[0],a[1],t)
+		 at = tpoint(a[1],a[2],t)
+		 b2 = tpoint(a[2],a[3],t)
+		 a2 = tpoint(a1,at,t)
+		 b1 = tpoint(at,b2,t)
+		 a3 = tpoint(a2,b1,t)
+		 return [a[0],a1,a2,a3], [a3,b1,b2,a[3]]
+		 
+	def recursion(a,b,depth_a,depth_b) :
+		if depth_a<csp_intersection_max_depth and depth_b<csp_intersection_max_depth : 
+			a1,a2 = split(a,0.5)
+			b1,b2 = split(b,0.5)
+			if bez_bounds_intersect(a1,b1) : recursion(a1,b1,depth_a+1,depth_b+1) 
+			if bez_bounds_intersect(a2,b1) : recursion(a2,b1,depth_a+1,depth_b+1) 
+			if bez_bounds_intersect(a1,b2) : recursion(a1,b2,depth_a+1,depth_b+1) 
+			if bez_bounds_intersect(a2,b2) : recursion(a2,b2,depth_a+1,depth_b+1) 
+		elif depth_a<csp_intersection_max_depth  : 
+			a1,a2 = split(a,0.5)
+			if bez_bounds_intersect(a1,b) : recursion(a1,b,depth_a+1,depth_b) 
+			if bez_bounds_intersect(a2,b) : recursion(a2,b,depth_a+1,depth_b) 
+			
+		else : al= [a]	
+		if depth_b<csp_intersection_max_depth : 
+			bl = split(b,0.5)
+		else : bl= [b]
+			
+	
 	
 	# see http://bazaar.launchpad.net/~lib2geom-hackers/lib2geom/path2/annotate/head:/src/path-intersect.cpp
 	
