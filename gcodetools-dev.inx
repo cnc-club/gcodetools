@@ -184,6 +184,12 @@ Press Apply to create new tool.
 			</_param>
 	</page>
 <!-- Gcodetools: /tools_library block -->
+<!-- Gcodetools: offset block -->
+	<page name='offset' _gui-text='Offset'>	
+			
+	</page>
+<!-- Gcodetools: /offset block -->
+
 <!-- Gcodetools: footer block -->
 	</param>	
     <effect>

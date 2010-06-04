@@ -57,20 +57,6 @@ def bezierparameterize(((bx0,by0),(bx1,by1),(bx2,by2),(bx3,by3))):
 		cx=bx3-bx0
 		y0=by0
 		cy=by3-by0
-	elif (bx2,by2)==(bx3,by3) :
-	    x0=bx0
-	    cx = (bx1-bx0)*2
-	    bx = bx0-2*bx1+bx2
-	    y0=by0
-	    cy = (by1-by0)*2
-	    by = by0-2*by1+by2
-	elif (bx0,by0)==(bx1,by1) :
-	    x0=bx1
-	    cx = (bx2-bx1)*2
-	    bx = bx1-2*bx2+bx3
-	    y0=by1
-	    cy = (by2-by1)*2
-	    by = by1-2*by2+by3
 	else:
 		x0=bx0
 		y0=by0
@@ -82,6 +68,23 @@ def bezierparameterize(((bx0,by0),(bx1,by1),(bx2,by2),(bx3,by3))):
 		ay=by3-y0-cy-by
 	return ax,ay,bx,by,cx,cy,x0,y0
 bezmisc.bezierparameterize = bezierparameterize
+
+
+def bezierslopeatt(((bx0,by0),(bx1,by1),(bx2,by2),(bx3,by3)),t):
+	ax,ay,bx,by,cx,cy,x0,y0=bezierparameterize(((bx0,by0),(bx1,by1),(bx2,by2),(bx3,by3)))
+	dx=3*ax*(t**2)+2*bx*t+cx
+	dy=3*ay*(t**2)+2*by*t+cy
+	if dx==dy==0 : 
+		dx = 6*ax*t+2*bx
+		dy = 6*ay*t+2*by
+		if dx==dy==0 : 
+			dx = 6*ax
+			dy = 6*ay
+			if dx==dy==0 : 
+				print_("Slope error x = %s*t^3+%s*t^2+%s*t+%s, y = %s*t^3+%s*t^2+%s*t+%s,  t = %s, dx==dy==0" % (ax,bx,cx,dx,ay,by,cy,dy,t))
+				dx, dy = 1, 1
+	return dx,dy
+bezmisc.bezierslopeatt = bezierslopeatt
 
 ################################################################################
 ###
@@ -100,7 +103,8 @@ defaults = {
 		'footer': 'M5 \nG00 X0.0000 Y0.0000 \nM2 \n(end)\n%'
 }
 
-
+intersection_recursion_depth = 10
+intersection_tolerance = 0.00001
 
 styles = {
 		"loft_style" : {
@@ -194,10 +198,6 @@ def bez_to_csp_segment(bez):
 
 def csp_segments_intersection(sp1,sp2,sp3,sp4) :
 	a, b = csp_segment_to_bez(sp1,sp2), csp_segment_to_bez(sp3,sp4)
-
-	def tpoint( ((x1,x2),(y1,y2)) ,t) :
-		return [x1+(x2-x1)*t, y1+(y2-y1)*t]
-
 	def split(a,t=0.5):
 		 a1 = tpoint(a[0],a[1],t)
 		 at = tpoint(a[1],a[2],t)
@@ -206,6 +206,39 @@ def csp_segments_intersection(sp1,sp2,sp3,sp4) :
 		 b1 = tpoint(at,b2,t)
 		 a3 = tpoint(a2,b1,t)
 		 return [a[0],a1,a2,a3], [a3,b1,b2,a[3]]
+	
+	def polish_intersection(a,b,ta,tb, tolerance = intersection_tolerance) :
+		ax,ay,bx,by,cx,cy,dx,dy			= bezierparameterize(a)
+		ax1,ay1,bx1,by1,cx1,cy1,dx1,dy1	= bezierparameterize(b)
+		i = 0
+		F, F1 =  [.0,.0], [[.0,.0],[.0,.0]]
+		while i==0 or (abs(F[0])**2+abs(F[1])**2 > tolerance and i<10):
+			ta3, ta2, tb3, tb2 = ta**3, ta**2, tb**3, tb**2
+			F[0] = ax*ta3+bx*ta2+cx*ta+dx-ax1*tb3-bx1*tb2-cx1*tb-dx1
+			F[1] = ay*ta3+by*ta2+cy*ta+dy-ay1*tb3-by1*tb2-cy1*tb-dy1
+	
+			F1[0][0] =  3*ax *ta2 + 2*bx *ta + cx
+			F1[0][1] = -3*ax1*tb2 - 2*bx1*tb - cx1
+			F1[1][0] =  3*ay *ta2 + 2*by *ta + cy
+			F1[1][1] = -3*ay1*tb2 - 2*by1*tb - cy1	
+			
+			print_(("!",i,abs(F[0])**2,abs(F[1])**2,ta,tb ))
+			
+			det = F1[0][0]*F1[1][1] - F1[0][1]*F1[1][0]
+
+			if det!=0 :
+				F1 = [
+						[ F1[1][1]/det, -F1[0][1]/det],
+						[-F1[1][0]/det,  F1[0][0]/det]
+					 ]
+				ta = ta - ( F1[0][0]*F[0] + F1[0][1]*F[1] )
+				tb = tb - ( F1[1][0]*F[0] + F1[1][1]*F[1] )
+			else: break	
+			i += 1
+		print_(("!",i,abs(F[0]),abs(F[1]),ta,tb ))
+
+		return ta, tb 			
+		
 		 
 	def recursion(a,b, ta0,ta1,tb0,tb1, depth_a,depth_b) :
 		tam, tbm = (ta0+ta1)/2, (tb0+tb1)/2
@@ -225,14 +258,45 @@ def csp_segments_intersection(sp1,sp2,sp3,sp4) :
 			if bez_bounds_intersect(a,b1) : recursion(a,b1, ta0,ta1,tb0,tbm, depth_a,depth_b-1) 
 			if bez_bounds_intersect(a,b2) : recursion(a,b2, ta0,ta1,tbm,tb1, depth_a,depth_b-1) 
 		else : # Both segments have been subdevided enougth. Let's get some intersections :).
-			intersction 
+			intersection, t1, t2 =  straight_segments_intersection([a[0]]+[a[3]],[b[0]]+[b[3]])
+#			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "M %s,%s L %s,%s, %s,%s, %s,%s z" % (a[0][0],a[0][1],a[1][0],a[1][1],a[2][0],a[2][1],a[3][0],a[3][1]), "style":"fill:none;stroke:#f00;"} )
+#			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "M %s,%s L %s,%s, %s,%s, %s,%s z" % (b[0][0],b[0][1],b[1][0],b[1][1],b[2][0],b[2][1],b[3][0],b[3][1]), "style":"fill:none;stroke:#0f0;"} )
+			if intersection :
+				if intersection == "Overlap" :
+					t1 = ( max(0,min(1,t1[0]))+max(0,min(1,t1[1])) )/2
+					t2 = ( max(0,min(1,t2[0]))+max(0,min(1,t2[1])) )/2
+				global bezier_intersection_recursive_result
+				bezier_intersection_recursive_result += [[ta0+t1*(ta1-ta0),tb0+t2*(tb1-tb0)]]
+
+	global bezier_intersection_recursive_result
+	bezier_intersection_recursive_result = []
+	recursion(a,b,0.,1.,0.,1.,intersection_recursion_depth,intersection_recursion_depth)
+	intersections = bezier_intersection_recursive_result
+	print_(intersections)		
+	for i in range(len(intersections)) :			
+		x,y = bezmisc.bezierpointatt(a,intersections[i][0])		
+		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10" % (x,y), "style":"fill:none;stroke:#f00;"} )
+		x,y = bezmisc.bezierpointatt(b,intersections[i][1])		
+		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10" % (x,y), "style":"fill:none;stroke:#f0f;"} )
+		
+		intersections[i] = polish_intersection(a,b,intersections[i][0],intersections[i][1])
+	print_(intersections)		
+	return intersections
 	
-	
-def straight_segments_intersection(a,b) :
-	ax,bx,cx,dx ay,by,cy,dy = a[0][0],a[1][0],b[0][0],b[1][0], a[0][1],a[1][1],b[0][1],b[1][1] 
-	if (bx-ax)*(dy-cy)-(by-ay)(dx-cx)==0 :	# Lines are parallel
-		pass
-	# see http://bazaar.launchpad.net/~lib2geom-hackers/lib2geom/path2/annotate/head:/src/path-intersect.cpp
+def straight_segments_intersection(a,b, true_intersection = True) : # (True intersection means check ta and tb are in [0,1])
+ 	ax,bx,cx,dx, ay,by,cy,dy = a[0][0],a[1][0],b[0][0],b[1][0], a[0][1],a[1][1],b[0][1],b[1][1] 
+	if (ax==bx and ay==by) or (cx==dx and cy==dy) : return False, 0, 0
+	if (bx-ax)*(dy-cy)-(by-ay)*(dx-cx)==0 :	# Lines are parallel
+		ta = (ax-cx)/(dx-cx) if cx!=dx else (ay-cy)/(dy-cy)
+		tb = (bx-cx)/(dx-cx) if cx!=dx else (by-cy)/(dy-cy)
+		tc = (cx-ax)/(bx-ax) if ax!=bx else (cy-ay)/(by-ay)
+		td = (dx-ax)/(bx-ax) if ax!=bx else (dy-ay)/(by-ay)
+		return ("Overlap" if 0<=ta<=1 or 0<=tb<=1 or  0<=tc<=1 or  0<=td<=1 or not true_intersection else False), (ta,tb), (tc,td)
+	else :
+		ta = ( (ay-cy)*(dx-cx)-(ax-cx)*(dy-cy) ) / ( (bx-ax)*(dy-cy)-(by-ay)*(dx-cx) )
+		tb = ( ax-cx+ta*(bx-ax) ) / (dx-cx) if dx!=cx else ( ay-cy+ta*(by-ay) ) / (dy-cy)
+		return (0<=ta<=1 and 0<=tb<=1 or not true_intersection), ta, tb
+		
 	
 
 def isnan(x): return type(x) is float and x != x
@@ -2184,6 +2248,7 @@ G01 Z1 (going to cutting z)\n""",
 	def effect(self):
 		global options
 		options = self.options
+		options.doc_root = self.document.getroot()
 
 		# define print_ function 
 		global print_
@@ -2201,7 +2266,7 @@ G01 Z1 (going to cutting z)\n""",
 		if self.options.active_tab == '"help"' :
 			self.help()
 			return
-		elif self.options.active_tab not in ['"dxfpoints"','"path-to-gcode"', '"area"', '"area_artefacts"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"']:
+		elif self.options.active_tab not in ['"dxfpoints"','"path-to-gcode"', '"area"', '"area_artefacts"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"', '"offset"']:
 			self.error(_("Select one of the active tabs - Path to Gcode, Area, Engraving, DXF points, Orientation or Tools library."),"error")
 		else:
 			# Get all Gcodetools data from the scene.
@@ -2235,7 +2300,22 @@ G01 Z1 (going to cutting z)\n""",
 					self.check_tools_and_op()
 			elif self.options.active_tab == '"lathe"': 
 				self.lathe()
-					
+			elif self.options.active_tab == '"offset"': 
+				self.paths = self.paths.items()[0][1]
+				print_(self.paths)
+				a,b  = cubicsuperpath.parsePath(self.paths[0].get("d")), cubicsuperpath.parsePath(self.paths[1].get("d"))
+				a,b = a[0],b[0] 
+				for i in range(1,len(a)) :
+					for j in range(1,len(b)) :
+						print_((i,j))
+						print_((a[i-1],a[i],b[j-1],b[j]))
+						intersection = csp_segments_intersection(a[i-1],a[i],b[j-1],b[j])
+						for k in intersection :
+							x,y = csp_at_t(a[i-1],a[i],k[0])
+							x1,y1 = csp_at_t(b[j-1],b[j],k[1])
+							inkex.etree.SubElement( self.layers[min(1,len(self.layers)-1)], inkex.addNS('path','svg'), {"d": "m %s,%s l 5,5 , -5,0 z" %(x,y), "style":"stroke:#00ff00;"} )
+							inkex.etree.SubElement( self.layers[min(1,len(self.layers)-1)], inkex.addNS('path','svg'), {"d": "m %s,%s l 5,5 , -5,0 z" %(x1,y1), "style":"stroke:#0000ff;"})
+						
 e = Gcodetools()
 e.affect()					
 
