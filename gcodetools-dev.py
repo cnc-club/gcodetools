@@ -82,7 +82,9 @@ def bezierslopeatt(((bx0,by0),(bx1,by1),(bx2,by2),(bx3,by3)),t):
 			dy = 6*ay
 			if dx==dy==0 : 
 				print_("Slope error x = %s*t^3+%s*t^2+%s*t+%s, y = %s*t^3+%s*t^2+%s*t+%s,  t = %s, dx==dy==0" % (ax,bx,cx,dx,ay,by,cy,dy,t))
+				print_(((bx0,by0),(bx1,by1),(bx2,by2),(bx3,by3)))
 				dx, dy = 1, 1
+				
 	return dx,dy
 bezmisc.bezierslopeatt = bezierslopeatt
 
@@ -196,6 +198,15 @@ def bez_to_csp_segment(bez):
 	return [bez[0],bez[0],bez[1]], [bez[2],bez[3],bez[3]]
 
 
+################################################################################
+###
+### csp_segments_intersection(sp1,sp2,sp3,sp4)
+###
+### Returns array containig all intersections between two segmets of cubic super 
+### path. Results are [ta,tb], or [ta0, ta1, tb0, tb1, "Overlap"] where ta, tb 
+### are values of t for the intersection point.
+###
+################################################################################
 def csp_segments_intersection(sp1,sp2,sp3,sp4) :
 	a, b = csp_segment_to_bez(sp1,sp2), csp_segment_to_bez(sp3,sp4)
 	def split(a,t=0.5):
@@ -241,6 +252,10 @@ def csp_segments_intersection(sp1,sp2,sp3,sp4) :
 		
 		 
 	def recursion(a,b, ta0,ta1,tb0,tb1, depth_a,depth_b) :
+		global bezier_intersection_recursive_result
+		if a==b : 
+			bezier_intersection_recursive_result += [[ta0,tb0,ta1,tb1,"Overlap"]]
+			return 
 		tam, tbm = (ta0+ta1)/2, (tb0+tb1)/2
 		if depth_a>0 and depth_b>0 : 
 			a1,a2 = split(a,0.5)
@@ -265,23 +280,67 @@ def csp_segments_intersection(sp1,sp2,sp3,sp4) :
 				if intersection == "Overlap" :
 					t1 = ( max(0,min(1,t1[0]))+max(0,min(1,t1[1])) )/2
 					t2 = ( max(0,min(1,t2[0]))+max(0,min(1,t2[1])) )/2
-				global bezier_intersection_recursive_result
 				bezier_intersection_recursive_result += [[ta0+t1*(ta1-ta0),tb0+t2*(tb1-tb0)]]
-
 	global bezier_intersection_recursive_result
 	bezier_intersection_recursive_result = []
 	recursion(a,b,0.,1.,0.,1.,intersection_recursion_depth,intersection_recursion_depth)
 	intersections = bezier_intersection_recursive_result
 	print_(intersections)		
 	for i in range(len(intersections)) :			
-		x,y = bezmisc.bezierpointatt(a,intersections[i][0])		
-		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10" % (x,y), "style":"fill:none;stroke:#f00;"} )
-		x,y = bezmisc.bezierpointatt(b,intersections[i][1])		
-		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10" % (x,y), "style":"fill:none;stroke:#f0f;"} )
-		
-		intersections[i] = polish_intersection(a,b,intersections[i][0],intersections[i][1])
-	print_(intersections)		
+		if len(intersections[i])<5 or intersections[4] != "Overlap" :
+			intersections[i] = polish_intersection(a,b,intersections[i][0],intersections[i][1])
+			x,y = bezmisc.bezierpointatt(a,intersections[i][0])		
+			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10" % (x,y), "style":"fill:none;stroke:#f00;"} )
+			x,y = bezmisc.bezierpointatt(b,intersections[i][1])		
+			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10" % (x,y), "style":"fill:none;stroke:#f0f;"} )
 	return intersections
+
+
+def normalize((x,y)) :
+	l = math.sqrt(x**2+y**2)
+	if l == 0 : return [0.,0.]
+	else : 		return [x/l, y/l]
+
+def cross(a,b) :
+	return a[1] * b[0] - a[0] * b[1]
+	
+def csp_offset(csp, r) :
+	result = []
+	for i in xrange(len(csp)) :
+		for j in xrange(1,len(csp[i])) :
+			if csp[i][j-1] == csp[i][j] : 
+				del csp[i][j]
+	for subpath in csp :
+		result += [[]]
+		for i in xrange(0,len(subpath)) : 
+			sp1, sp2, sp3 = subpath[i-1], subpath[i], subpath[(i+1)%len(subpath)]
+			dsp1 = csp_slope(sp1,sp2,1)
+			dsp3 = csp_slope(sp2,sp3,0)
+			#rotate tangents to get normals and normalize them			
+			nsp1, nsp3 = [-dsp1[1], dsp1[0]], [-dsp3[1], dsp3[0]]
+			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l %s,%s" % (sp2[1][0], sp2[1][1], nsp1[0], nsp1[1]), "style":"fill:none;stroke:#00f;"} )
+			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l %s,%s" % (sp2[1][0], sp2[1][1], nsp3[0], nsp3[1]), "style":"fill:none;stroke:#f00;"} )
+			nsp1, nsp3 = normalize(nsp1), normalize(nsp3)
+
+			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l %s,%s" % (sp2[1][0], sp2[1][1], nsp1[0], nsp1[1]), "style":"fill:none;stroke:#000;"} )
+			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l %s,%s" % (sp2[1][0], sp2[1][1], nsp3[0], nsp3[1]), "style":"fill:none;stroke:#000;"} )
+
+			print_("i: %s"%i)
+			print_(("dsp",(dsp1,dsp3)))
+			print_((("nsp",nsp1,nsp3)))
+			print_("sp1,sp2",sp1,sp2)
+			print_("sp2,sp3",sp2,sp3)
+			
+			
+			result[-1] += [   [ [ sp2[j][0]+nsp1[0]*r, sp2[j][1]+nsp1[1]*r ]  for j in range(3)]   ]
+			result[-1] += [   [ [ sp2[j][0]+nsp3[0]*r, sp2[j][1]+nsp3[1]*r ]  for j in range(3)]   ]
+
+
+
+				
+	inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath(result), "style":"fill:none;stroke:#0f0;"} )
+
+
 	
 def straight_segments_intersection(a,b, true_intersection = True) : # (True intersection means check ta and tb are in [0,1])
  	ax,bx,cx,dx, ay,by,cy,dy = a[0][0],a[1][0],b[0][0],b[1][0], a[0][1],a[1][1],b[0][1],b[1][1] 
@@ -306,10 +365,11 @@ def isinf(x): inf = 1e5000; return x == inf or x == -inf
 ###		Just simple output function for better debugging
 ###
 
-def print_(s=''):
+def print_(*arg):
 	f = open(options.log_filename,"a")
-	s = str(unicode(s).encode('unicode_escape'))
-	f.write( s )
+	for s in arg :
+		s = str(unicode(s).encode('unicode_escape'))
+		f.write( s )
 	f.write("\n")
 	f.close()
 
@@ -2301,21 +2361,24 @@ G01 Z1 (going to cutting z)\n""",
 			elif self.options.active_tab == '"lathe"': 
 				self.lathe()
 			elif self.options.active_tab == '"offset"': 
-				self.paths = self.paths.items()[0][1]
-				print_(self.paths)
-				a,b  = cubicsuperpath.parsePath(self.paths[0].get("d")), cubicsuperpath.parsePath(self.paths[1].get("d"))
-				a,b = a[0],b[0] 
-				for i in range(1,len(a)) :
-					for j in range(1,len(b)) :
-						print_((i,j))
-						print_((a[i-1],a[i],b[j-1],b[j]))
-						intersection = csp_segments_intersection(a[i-1],a[i],b[j-1],b[j])
-						for k in intersection :
-							x,y = csp_at_t(a[i-1],a[i],k[0])
-							x1,y1 = csp_at_t(b[j-1],b[j],k[1])
-							inkex.etree.SubElement( self.layers[min(1,len(self.layers)-1)], inkex.addNS('path','svg'), {"d": "m %s,%s l 5,5 , -5,0 z" %(x,y), "style":"stroke:#00ff00;"} )
-							inkex.etree.SubElement( self.layers[min(1,len(self.layers)-1)], inkex.addNS('path','svg'), {"d": "m %s,%s l 5,5 , -5,0 z" %(x1,y1), "style":"stroke:#0000ff;"})
-						
+				for layer in self.selected_paths :
+					for path in self.selected_paths[layer] :
+						csp_offset(cubicsuperpath.parsePath(path.get("d")), 10)				
+#				self.paths = self.paths.items()[0][1]
+#				print_(self.paths)
+#				a,b  = cubicsuperpath.parsePath(self.paths[0].get("d")), cubicsuperpath.parsePath(self.paths[1].get("d"))
+#				a,b = a[0],b[0] 
+#				for i in range(1,len(a)) :
+#					for j in range(1,len(b)) :
+#						print_((i,j))
+#						print_((a[i-1],a[i],b[j-1],b[j]))
+#						intersection = csp_segments_intersection(a[i-1],a[i],b[j-1],b[j])
+#						for k in intersection :
+#							x,y = csp_at_t(a[i-1],a[i],k[0])
+#							x1,y1 = csp_at_t(b[j-1],b[j],k[1])
+#							inkex.etree.SubElement( self.layers[min(1,len(self.layers)-1)], inkex.addNS('path','svg'), {"d": "m %s,%s l 5,5 , -5,0 z" %(x,y), "style":"stroke:#00ff00;"} )
+#							inkex.etree.SubElement( self.layers[min(1,len(self.layers)-1)], inkex.addNS('path','svg'), {"d": "m %s,%s l 5,5 , -5,0 z" %(x1,y1), "style":"stroke:#0000ff;"})
+#						
 e = Gcodetools()
 e.affect()					
 
