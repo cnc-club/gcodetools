@@ -249,15 +249,18 @@ def csp_segments_intersection(sp1,sp2,sp3,sp4) :
 		print_(("!",i,abs(F[0]),abs(F[1]),ta,tb ))
 
 		return ta, tb 			
-		
-		 
+
+
 	def recursion(a,b, ta0,ta1,tb0,tb1, depth_a,depth_b) :
 		global bezier_intersection_recursive_result
 		if a==b : 
 			bezier_intersection_recursive_result += [[ta0,tb0,ta1,tb1,"Overlap"]]
 			return 
 		tam, tbm = (ta0+ta1)/2, (tb0+tb1)/2
-		if depth_a>0 and depth_b>0 : 
+		if a==b :
+			[ta0,tb0,ta1,tb1, "Overlap"]
+			return 
+		elif depth_a>0 and depth_b>0 : 
 			a1,a2 = split(a,0.5)
 			b1,b2 = split(b,0.5)
 			if bez_bounds_intersect(a1,b1) : recursion(a1,b1, ta0,tam,tb0,tbm, depth_a-1,depth_b-1) 
@@ -305,6 +308,58 @@ def cross(a,b) :
 	return a[1] * b[0] - a[0] * b[1]
 	
 def csp_offset(csp, r) :
+
+
+	def offset_segment_recursion(sp1,sp2,r, depth) :
+		offset_tolerance = 0.001
+		dsp1 = csp_slope(sp1,sp2,0)
+		dsp2 = csp_slope(sp1,sp2,1)
+		nsp1, nsp2 = [-dsp1[1], dsp1[0]], [-dsp2[1], dsp2[0]]
+#		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l %s,%s" % (sp2[1][0], sp2[1][1], nsp1[0], nsp1[1]), "style":"fill:none;stroke:#00f;"} )
+#		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l %s,%s" % (sp2[1][0], sp2[1][1], nsp3[0], nsp3[1]), "style":"fill:none;stroke:#f00;"} )
+		nsp1, nsp2 = normalize(nsp1), normalize(nsp2)
+		
+		dx_y =  [normalize(csp_slope(sp1,sp2,float(i)/3)) for i in range(4)]
+		points = [csp_at_t(sp1,sp2,float(i)/3) for i in range(4)]
+		offset_points = [ [points[i][0]-dx_y[i][1]*r, points[i][1]+dx_y[i][0]*r] for i in range(4)]
+		
+		for i in offset_points :
+			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10"% (i[0],i[1]), "style":"fill:none;stroke:#0f0;"} )
+
+#		[[x1,y1], [x2,y2], [x3,y3], [x4,y4]] = offset_points
+		
+		
+		F = [
+				[0.0, 0.0, 0.0, 1.0],
+				[0.037037037037037049, 0.222222222222, 0.444444444444, 0.29629629629629622],
+				[0.29629629629629639,  0.444444444444, 0.222222222222, 0.037037037037037028],
+				[1.0, 0.0, 0.0, 0.0], 
+				
+			]
+		a,b,c,d = numpy.linalg.solve( numpy.array(F), numpy.array(offset_points) ).tolist()
+		print_(a,b,c,d)
+		sp3,sp4 = [[],[],[]],[[],[],[]]
+		sp3[1], sp3[0] = d, d
+		sp3[2] = c 
+		sp4[0] = b
+		print_(a[0]*F[1][0]+b[0]*F[1][1]+c[0]*F[1][2]+d[0]*F[1][3])
+		print_(offset_points)
+		sp4[1], sp4[2] = a, a
+		
+		return [sp3,sp4]		
+	#	ax,bx,cx,ay,by =  
+
+		
+		
+	#	while :
+			
+			
+
+	
+#	inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l %s,%s" % (sp2[1][0], sp2[1][1], nsp1[0], nsp1[1]), "style":"fill:none;stroke:#000;"} )
+#	inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l %s,%s" % (sp2[1][0], sp2[1][1], nsp3[0], nsp3[1]), "style":"fill:none;stroke:#000;"} )
+
+
 	result = []
 	for i in xrange(len(csp)) :
 		for j in xrange(1,len(csp[i])) :
@@ -312,34 +367,24 @@ def csp_offset(csp, r) :
 				del csp[i][j]
 	for subpath in csp :
 		result += [[]]
-		for i in xrange(0,len(subpath)) : 
-			sp1, sp2, sp3 = subpath[i-1], subpath[i], subpath[(i+1)%len(subpath)]
-			dsp1 = csp_slope(sp1,sp2,1)
-			dsp3 = csp_slope(sp2,sp3,0)
+		for i in xrange(1,len(subpath)) : 
+			sp1, sp2 = subpath[i-1], subpath[i]
+			
+			result = offset_segment_recursion(sp1,sp2,r, 4)
 			#rotate tangents to get normals and normalize them			
-			nsp1, nsp3 = [-dsp1[1], dsp1[0]], [-dsp3[1], dsp3[0]]
-			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l %s,%s" % (sp2[1][0], sp2[1][1], nsp1[0], nsp1[1]), "style":"fill:none;stroke:#00f;"} )
-			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l %s,%s" % (sp2[1][0], sp2[1][1], nsp3[0], nsp3[1]), "style":"fill:none;stroke:#f00;"} )
-			nsp1, nsp3 = normalize(nsp1), normalize(nsp3)
 
-			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l %s,%s" % (sp2[1][0], sp2[1][1], nsp1[0], nsp1[1]), "style":"fill:none;stroke:#000;"} )
-			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l %s,%s" % (sp2[1][0], sp2[1][1], nsp3[0], nsp3[1]), "style":"fill:none;stroke:#000;"} )
-
-			print_("i: %s"%i)
-			print_(("dsp",(dsp1,dsp3)))
-			print_((("nsp",nsp1,nsp3)))
-			print_("sp1,sp2",sp1,sp2)
-			print_("sp2,sp3",sp2,sp3)
-			
-			
-			result[-1] += [   [ [ sp2[j][0]+nsp1[0]*r, sp2[j][1]+nsp1[1]*r ]  for j in range(3)]   ]
-			result[-1] += [   [ [ sp2[j][0]+nsp3[0]*r, sp2[j][1]+nsp3[1]*r ]  for j in range(3)]   ]
+#			print_("i: %s"%i)
+#			print_(("dsp",(dsp1,dsp3)))
+#			print_((("nsp",nsp1,nsp3)))
+#			print_("sp1,sp2",sp1,sp2)
+#			print_("sp2,sp3",sp2,sp3)
+			print_(result)	
+			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([ result ]), "style":"fill:none;stroke:#0f0;"} )
 
 
 
-				
-	inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath(result), "style":"fill:none;stroke:#0f0;"} )
 
+	
 
 	
 def straight_segments_intersection(a,b, true_intersection = True) : # (True intersection means check ta and tb are in [0,1])
@@ -577,13 +622,13 @@ def get_distance_from_csp_to_arc(sp1,sp2, arc1, arc2, tolerance = 0.01 ): # arc 
 def get_distance_from_point_to_csp(p,sp1,sp2, tolerance = 0.01 ): 
 	n, i = 10, 0
 	d, dl = [None,(0,0)],[0,(0,0)]
-	while i<2 or (abs(d[0]-dl[0])>tolerance and i<4):
+	while i<2 or (abs(d[0]-dl[0])>tolerance and i<6):
 		i += 1
 		dl = d[:]	
 		for j in range(n+1):
 			t = float(j)/n
 			cp = csp_at_t(sp1,sp2,t) 
-			d = min( [(P(cp)-P(p)).mag(),t], d) if d[0]!=None else [(P(cp)-P(p)).mag(),t]
+			d = min( [math.sqrt( (p[0]-cp[0])**2+(p[1]-cp[1])**2),t], d ) if d[0]!=None else [math.sqrt( (p[0]-cp[0])**2+(p[1]-cp[1])**2),t]
 		n=n*2
 	return d
 
@@ -2320,8 +2365,8 @@ G01 Z1 (going to cutting z)\n""",
 				f.write("%s tab is active.\n" % self.options.active_tab)
 				f.close()
 			except :
-				print_  = lambda x : None 
-		else : print_  = lambda x : None 
+				print_  = lambda *x : None 
+		else : print_  = lambda *x : None 
 	
 		if self.options.active_tab == '"help"' :
 			self.help()
@@ -2363,7 +2408,7 @@ G01 Z1 (going to cutting z)\n""",
 			elif self.options.active_tab == '"offset"': 
 				for layer in self.selected_paths :
 					for path in self.selected_paths[layer] :
-						csp_offset(cubicsuperpath.parsePath(path.get("d")), 10)				
+						csp_offset(cubicsuperpath.parsePath(path.get("d")), 10.)				
 #				self.paths = self.paths.items()[0][1]
 #				print_(self.paths)
 #				a,b  = cubicsuperpath.parsePath(self.paths[0].get("d")), cubicsuperpath.parsePath(self.paths[1].get("d"))
