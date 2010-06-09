@@ -319,12 +319,16 @@ def csp_offset(csp, r) :
 #		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l %s,%s" % (sp2[1][0], sp2[1][1], nsp3[0], nsp3[1]), "style":"fill:none;stroke:#f00;"} )
 		nsp1, nsp2 = normalize(nsp1), normalize(nsp2)
 		
+		dx_y =  [normalize(csp_slope(sp1,sp2,float(i)/19)) for i in range(20)]
+		points = [csp_at_t(sp1,sp2,float(i)/19) for i in range(20)]
+		offset_points = [ [points[i][0]-dx_y[i][1]*r, points[i][1]+dx_y[i][0]*r] for i in range(20)]
+		
+	#	for i in offset_points :
+	#		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10"% (i[0],i[1]), "style":"fill:none;stroke:#0fc;"} )
+
 		dx_y =  [normalize(csp_slope(sp1,sp2,float(i)/3)) for i in range(4)]
 		points = [csp_at_t(sp1,sp2,float(i)/3) for i in range(4)]
 		offset_points = [ [points[i][0]-dx_y[i][1]*r, points[i][1]+dx_y[i][0]*r] for i in range(4)]
-		
-		for i in offset_points :
-			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10"% (i[0],i[1]), "style":"fill:none;stroke:#0f0;"} )
 
 #		[[x1,y1], [x2,y2], [x3,y3], [x4,y4]] = offset_points
 		
@@ -345,6 +349,46 @@ def csp_offset(csp, r) :
 		print_(a[0]*F[1][0]+b[0]*F[1][1]+c[0]*F[1][2]+d[0]*F[1][3])
 		print_(offset_points)
 		sp4[1], sp4[2] = a, a
+		
+		
+		
+		ax,ay,bx,by,cx,cy,dx,dy = bezierparameterize(csp_segment_to_bez(sp1,sp2))
+		# curvature  = 3 * t**2 * (ay*bx-by*ax) + 3 * t * (ay*cx-ax*cy) + cx*by - cy*bx		
+		a,b,c = 3 * (ay*bx-by*ax), 3 * (ay*cx-ax*cy), cx*by - cy*bx
+		
+		if a==0 : 
+			if b!=0 : t = [-c/b]
+			else : t =  []
+		else :
+			b, c = b/a, c/a
+			descr = b**2 - 4*c
+			if descr==0 :
+				t = [-b/2]
+			elif descr>0 : t =  [(-b+math.sqrt(descr))/2, (-b-math.sqrt(descr))/2]
+			else : t = []
+		print_(a,b,c,"!!!")	
+		print_(t,"!!!")	
+
+		a,b,c = 3 * (ay*bx-by*ax), 3 * (ay*cx-ax*cy), cx*by - cy*bx -1/r
+		if a==0 : 
+			if b!=0 : t = [-c/b]
+			else : t =  []
+		else :
+			descr = b**2 - 4*a*c
+			if descr==0 :
+				t = [-b/(2*a)]
+			elif descr>0 : t =  [(-b+math.sqrt(descr))/(2*a), (-b-math.sqrt(descr))/(2*a)]
+			else : t = []
+		print_(a,b,c,"!!!")	
+		print_(t,"!!!")	
+		
+		
+#		for i in t :	
+#			x,y = csp_at_t(sp1,sp2,i)
+#			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10"% (x,y), "style":"fill:none;stroke:#0fc;"} )
+		for i in range(5) : 
+			x,y = csp_at_t(sp1,sp2,float(i)/4)
+			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10"% (x,y), "style":"fill:none;stroke:#0fc;"} )
 		
 		return [sp3,sp4]		
 	#	ax,bx,cx,ay,by =  
@@ -413,7 +457,7 @@ def isinf(x): inf = 1e5000; return x == inf or x == -inf
 def print_(*arg):
 	f = open(options.log_filename,"a")
 	for s in arg :
-		s = str(unicode(s).encode('unicode_escape'))
+		s = str(unicode(s).encode('unicode_escape'))+" "
 		f.write( s )
 	f.write("\n")
 	f.close()
