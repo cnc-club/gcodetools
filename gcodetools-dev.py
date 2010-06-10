@@ -207,8 +207,12 @@ def bez_to_csp_segment(bez):
 ### are values of t for the intersection point.
 ###
 ################################################################################
+
+
+
 def csp_segments_intersection(sp1,sp2,sp3,sp4) :
 	a, b = csp_segment_to_bez(sp1,sp2), csp_segment_to_bez(sp3,sp4)
+
 	def split(a,t=0.5):
 		 a1 = tpoint(a[0],a[1],t)
 		 at = tpoint(a[1],a[2],t)
@@ -232,9 +236,7 @@ def csp_segments_intersection(sp1,sp2,sp3,sp4) :
 			F1[0][1] = -3*ax1*tb2 - 2*bx1*tb - cx1
 			F1[1][0] =  3*ay *ta2 + 2*by *ta + cy
 			F1[1][1] = -3*ay1*tb2 - 2*by1*tb - cy1	
-			
-			print_(("!",i,abs(F[0])**2,abs(F[1])**2,ta,tb ))
-			
+		
 			det = F1[0][0]*F1[1][1] - F1[0][1]*F1[1][0]
 
 			if det!=0 :
@@ -246,7 +248,6 @@ def csp_segments_intersection(sp1,sp2,sp3,sp4) :
 				tb = tb - ( F1[1][0]*F[0] + F1[1][1]*F[1] )
 			else: break	
 			i += 1
-		print_(("!",i,abs(F[0]),abs(F[1]),ta,tb ))
 
 		return ta, tb 			
 
@@ -288,7 +289,6 @@ def csp_segments_intersection(sp1,sp2,sp3,sp4) :
 	bezier_intersection_recursive_result = []
 	recursion(a,b,0.,1.,0.,1.,intersection_recursion_depth,intersection_recursion_depth)
 	intersections = bezier_intersection_recursive_result
-	print_(intersections)		
 	for i in range(len(intersections)) :			
 		if len(intersections[i])<5 or intersections[4] != "Overlap" :
 			intersections[i] = polish_intersection(a,b,intersections[i][0],intersections[i][1])
@@ -306,103 +306,120 @@ def normalize((x,y)) :
 
 def cross(a,b) :
 	return a[1] * b[0] - a[0] * b[1]
+
+def dot(a,b) :
+	return a[0] * b[0] + a[1] * b[1]
 	
+def csp_curvature_at_t(t) :
+	ax,ay,bx,by,cx,cy,dx,dy = bezierparameterize(csp_segment_to_bez(sp1,sp2))
+	pointx, pointy = t*t*t*ax + t*t*bx + t*cx + dx, t*t*t*ay + t*t*by + t*cy + dy
+	der   = [3*t*t*ax + 2*t*bx + cx, 3*t*t*ay + 2*t*by + cy]
+	dder  = [6*t*ax + 2*bx, 6*t*ay + 2*by]
+	ddder = [6*ax, 6*ay]
+	l = math.sqrt(dot(der,der))
+	if l<=.0001 :
+		l_ = 0.
+		l = math.sqrt(dot(dder,dder))
+		if l<=.0001 :
+			l = math.sqrt(dot(ddder,ddder))
+			if l<=.0001 : return [der,dder,ddder,0,0,0]
+			rad = 100000000
+			tgt = [ddder[0]/l, ddder[1]/l]
+			return [der,dder,ddder, rad, tgt]
+		rad = -l * (dot(dder,dder)) / (cross(ddder,dder));
+		tgt = [dder[0]/l, dder[1]/l]
+		return [der,dder,ddder, rad, tgt]
+	rad = -l * (dot(der,der)) / (cross(dder,der))
+	tgt = [der[0]/l, der[1]/l]
+	return [der,dder,ddder, rad, tgt, l]
+
+
+def csp_curvature_radius_at_t(sp1,sp2,t) :
+	ax,ay,bx,by,cx,cy,dx,dy = bezierparameterize(csp_segment_to_bez(sp1,sp2))
+	der   = [3*t*t*ax + 2*t*bx + cx, 3*t*t*ay + 2*t*by + cy]
+	dder  = [6*t*ax + 2*bx, 6*t*ay + 2*by]
+	ddder = [6*ax, 6*ay]
+	l = math.sqrt(dot(der,der))
+	if l>.0001 :
+		return 	-l * (dot(der,der)) / (cross(dder,der))
+	else:	
+		l = math.sqrt(dot(dder,dder))
+		if l>.0001 :
+			return 	-l * (dot(dder,dder)) / (cross(ddder,dder))
+		else:
+			return 10000000
+
+################################################################################
+###
+### Offset function 
+###
+### This function offsets given cubic super path.  
+### It's based on src/livarot/PathOutline.cpp from Inkscape's source code.
+###
+###
+################################################################################
+
+def rotate_ccw(d) :
+	return [-d[1],d[0]]
+
+def vector_from_to_length(a,b):
+	return math.sqrt((a[0]-b[0])*(a[0]-b[0]) + (a[1]-b[1])*(a[1]-b[1]))
+
+
 def csp_offset(csp, r) :
 
-
-	def offset_segment_recursion(sp1,sp2,r, depth) :
-		offset_tolerance = 0.001
-		dsp1 = csp_slope(sp1,sp2,0)
-		dsp2 = csp_slope(sp1,sp2,1)
-		nsp1, nsp2 = [-dsp1[1], dsp1[0]], [-dsp2[1], dsp2[0]]
-#		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l %s,%s" % (sp2[1][0], sp2[1][1], nsp1[0], nsp1[1]), "style":"fill:none;stroke:#00f;"} )
-#		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l %s,%s" % (sp2[1][0], sp2[1][1], nsp3[0], nsp3[1]), "style":"fill:none;stroke:#f00;"} )
-		nsp1, nsp2 = normalize(nsp1), normalize(nsp2)
-		
-		dx_y =  [normalize(csp_slope(sp1,sp2,float(i)/19)) for i in range(20)]
-		points = [csp_at_t(sp1,sp2,float(i)/19) for i in range(20)]
-		offset_points = [ [points[i][0]-dx_y[i][1]*r, points[i][1]+dx_y[i][0]*r] for i in range(20)]
-		
-	#	for i in offset_points :
-	#		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10"% (i[0],i[1]), "style":"fill:none;stroke:#0fc;"} )
-
-		dx_y =  [normalize(csp_slope(sp1,sp2,float(i)/3)) for i in range(4)]
-		points = [csp_at_t(sp1,sp2,float(i)/3) for i in range(4)]
-		offset_points = [ [points[i][0]-dx_y[i][1]*r, points[i][1]+dx_y[i][0]*r] for i in range(4)]
-
-#		[[x1,y1], [x2,y2], [x3,y3], [x4,y4]] = offset_points
-		
-		
-		F = [
-				[0.0, 0.0, 0.0, 1.0],
-				[0.037037037037037049, 0.222222222222, 0.444444444444, 0.29629629629629622],
-				[0.29629629629629639,  0.444444444444, 0.222222222222, 0.037037037037037028],
-				[1.0, 0.0, 0.0, 0.0], 
-				
-			]
-		a,b,c,d = numpy.linalg.solve( numpy.array(F), numpy.array(offset_points) ).tolist()
-		print_(a,b,c,d)
-		sp3,sp4 = [[],[],[]],[[],[],[]]
-		sp3[1], sp3[0] = d, d
-		sp3[2] = c 
-		sp4[0] = b
-		print_(a[0]*F[1][0]+b[0]*F[1][1]+c[0]*F[1][2]+d[0]*F[1][3])
-		print_(offset_points)
-		sp4[1], sp4[2] = a, a
-		
-		
-		
-		ax,ay,bx,by,cx,cy,dx,dy = bezierparameterize(csp_segment_to_bez(sp1,sp2))
-		# curvature  = 3 * t**2 * (ay*bx-by*ax) + 3 * t * (ay*cx-ax*cy) + cx*by - cy*bx		
-		a,b,c = 3 * (ay*bx-by*ax), 3 * (ay*cx-ax*cy), cx*by - cy*bx
-		
-		if a==0 : 
-			if b!=0 : t = [-c/b]
-			else : t =  []
-		else :
-			b, c = b/a, c/a
-			descr = b**2 - 4*c
-			if descr==0 :
-				t = [-b/2]
-			elif descr>0 : t =  [(-b+math.sqrt(descr))/2, (-b-math.sqrt(descr))/2]
-			else : t = []
-		print_(a,b,c,"!!!")	
-		print_(t,"!!!")	
-
-		a,b,c = 3 * (ay*bx-by*ax), 3 * (ay*cx-ax*cy), cx*by - cy*bx -1/r
-		if a==0 : 
-			if b!=0 : t = [-c/b]
-			else : t =  []
-		else :
-			descr = b**2 - 4*a*c
-			if descr==0 :
-				t = [-b/(2*a)]
-			elif descr>0 : t =  [(-b+math.sqrt(descr))/(2*a), (-b-math.sqrt(descr))/(2*a)]
-			else : t = []
-		print_(a,b,c,"!!!")	
-		print_(t,"!!!")	
-		
-		
-#		for i in t :	
-#			x,y = csp_at_t(sp1,sp2,i)
-#			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10"% (x,y), "style":"fill:none;stroke:#0fc;"} )
-		for i in range(5) : 
-			x,y = csp_at_t(sp1,sp2,float(i)/4)
-			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10"% (x,y), "style":"fill:none;stroke:#0fc;"} )
-		
-		return [sp3,sp4]		
-	#	ax,bx,cx,ay,by =  
-
-		
-		
-	#	while :
-			
-			
-
+	def create_offset_segment(sp1,sp2,dstart,dend,nstart,nend,startGue,endGue,r):
 	
-#	inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l %s,%s" % (sp2[1][0], sp2[1][1], nsp1[0], nsp1[1]), "style":"fill:none;stroke:#000;"} )
-#	inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l %s,%s" % (sp2[1][0], sp2[1][1], nsp3[0], nsp3[1]), "style":"fill:none;stroke:#000;"} )
+		start = [sp1[1][0]+nstart[0]*r, sp1[1][1]+nstart[1]*r]
+		end   = [sp2[1][0]+nend[0]*r, sp2[1][1]+nend[1]*r]
+		dstart = [dstart[0]*startGue, dstart[1]*startGue]
+		dend   = [dend[0]*endGue, dend[1]*endGue]
+		a = start
+		d = end
+		c = [d[0]-dend[0]/3, d[1]-dend[1]/3]
+		b = [dstart[0]/3+a[0], dstart[1]/3+a[1]]
+				
+		return [[a,a,b],[c,d,d]]
 
+		
+	def offset_segment_recursion(sp1,sp2,r, depth, tolerance=0.01) :
+		
+		dstart = csp_slope(sp1,sp2,0.)
+		dend   = csp_slope(sp1,sp2,1.)
+		dmid   = csp_slope(sp1,sp2,.5)
+		
+		mid = csp_at_t(sp1,sp2,.5)
+		
+		dstart_l = math.sqrt(dot(dstart,dstart))
+		dend_l   = math.sqrt(dot(dend,dend))
+		dmid_l   = math.sqrt(dot(dmid,dmid))
+				
+		nstart, nend, nmid = normalize(rotate_ccw(dstart)), normalize(rotate_ccw(dend)), normalize(rotate_ccw(dmid))
+		rstart, rend, rmid = csp_curvature_radius_at_t(sp1,sp2,0.), csp_curvature_radius_at_t(sp1,sp2,1.), csp_curvature_radius_at_t(sp1,sp2,.5) 
+
+		# correction of the lengths of the tangent to the offset
+		# if you don't see why i wrote that, draw a little figure and everything will be clear		
+		# ( it was taken as is from PathOutline.cpp / Path::RecStdCubicTo )
+		
+		startGue = (1 + r/rstart) if abs(rstart) > 0.01 else 1
+		endGue   = (1 + r/rend)   if abs(rmid)   > 0.01 else 1
+		midGue   = (1 + r/rmid)   if abs(rend)   > 0.01 else 1
+		
+		req = [mid[0] + nmid[0]*r, mid[1] + nmid[1]*r]
+		sp1_r,sp2_r = create_offset_segment(sp1,sp2,dstart,dend,nstart,nend,startGue,endGue,r)
+		check = csp_at_t(sp1_r,sp2_r,.5)
+		err = vector_from_to_length(req,check)
+		if  err>tolerance and depth>0 :
+			sp3,sp4,sp5 = cspbezsplit(sp1,sp2,.5)
+			
+			r1 = offset_segment_recursion(sp3,sp4,r, depth-1, tolerance)
+			r2 = offset_segment_recursion(sp4,sp5,r, depth-1, tolerance)
+			return r1[:-1]+ [[r1[-1][0],r1[-1][1],r2[0][2]]] + r2[1:]
+		else :
+			return [sp1_r,sp2_r]
+		
+		
+		
 
 	result = []
 	for i in xrange(len(csp)) :
@@ -414,15 +431,8 @@ def csp_offset(csp, r) :
 		for i in xrange(1,len(subpath)) : 
 			sp1, sp2 = subpath[i-1], subpath[i]
 			
-			result = offset_segment_recursion(sp1,sp2,r, 4)
+			result = offset_segment_recursion(sp1,sp2,r, 4, 0.0025*16)
 			#rotate tangents to get normals and normalize them			
-
-#			print_("i: %s"%i)
-#			print_(("dsp",(dsp1,dsp3)))
-#			print_((("nsp",nsp1,nsp3)))
-#			print_("sp1,sp2",sp1,sp2)
-#			print_("sp2,sp3",sp2,sp3)
-			print_(result)	
 			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([ result ]), "style":"fill:none;stroke:#0f0;"} )
 
 
@@ -2450,9 +2460,11 @@ G01 Z1 (going to cutting z)\n""",
 			elif self.options.active_tab == '"lathe"': 
 				self.lathe()
 			elif self.options.active_tab == '"offset"': 
-				for layer in self.selected_paths :
-					for path in self.selected_paths[layer] :
-						csp_offset(cubicsuperpath.parsePath(path.get("d")), 10.)				
+
+				for offset in range(5,50,5) :
+					for layer in self.selected_paths :
+						for path in self.selected_paths[layer] :
+							csp_offset(cubicsuperpath.parsePath(path.get("d")), offset)				
 #				self.paths = self.paths.items()[0][1]
 #				print_(self.paths)
 #				a,b  = cubicsuperpath.parsePath(self.paths[0].get("d")), cubicsuperpath.parsePath(self.paths[1].get("d"))
