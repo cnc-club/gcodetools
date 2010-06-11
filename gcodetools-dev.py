@@ -431,7 +431,7 @@ def csp_offset(csp, r) :
 		for i in xrange(1,len(subpath)) : 
 			sp1, sp2 = subpath[i-1], subpath[i]
 			
-			result = offset_segment_recursion(sp1,sp2,r, 4, 0.0025*16)
+			result = offset_segment_recursion(sp1,sp2,r, 0, 0.0025*16)
 			#rotate tangents to get normals and normalize them			
 			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([ result ]), "style":"fill:none;stroke:#0f0;"} )
 
@@ -2461,10 +2461,11 @@ G01 Z1 (going to cutting z)\n""",
 				self.lathe()
 			elif self.options.active_tab == '"offset"': 
 
-				for offset in range(5,50,5) :
-					for layer in self.selected_paths :
-						for path in self.selected_paths[layer] :
-							csp_offset(cubicsuperpath.parsePath(path.get("d")), offset)				
+#				for offset in range(5,50,5) :
+				offset = 4					
+				for layer in self.selected_paths :
+					for path in self.selected_paths[layer] :
+						csp_offset(cubicsuperpath.parsePath(path.get("d")), offset)				
 #				self.paths = self.paths.items()[0][1]
 #				print_(self.paths)
 #				a,b  = cubicsuperpath.parsePath(self.paths[0].get("d")), cubicsuperpath.parsePath(self.paths[1].get("d"))
