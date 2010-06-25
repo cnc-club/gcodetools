@@ -155,8 +155,6 @@ styles = {
 ###
 ################################################################################
 
-def vectors_are_cw(a,b):
-	return a[0]*b[1]-a[1]*b[0] < 0
 
 def csp_simple_bound(csp):
 	minx,miny,maxx,maxy = None,None,None,None
@@ -201,6 +199,33 @@ def bez_split(a,t=0.5):
 	 b1 = tpoint(at,b2,t)
 	 a3 = tpoint(a2,b1,t)
 	 return [a[0],a1,a2,a3], [a3,b1,b2,a[3]]
+	 
+	 
+################################################################################
+###	Some vector functions
+################################################################################
+	
+def normalize((x,y)) :
+	l = math.sqrt(x**2+y**2)
+	if l == 0 : return [0.,0.]
+	else : 		return [x/l, y/l]
+
+def cross(a,b) :
+	return a[1] * b[0] - a[0] * b[1]
+
+def dot(a,b) :
+	return a[0] * b[0] + a[1] * b[1]
+
+def rotate_ccw(d) :
+	return [-d[1],d[0]]
+
+def vectors_ccw(a,b):
+	return a[0]*b[1]-b[0]*a[1] < 0
+
+def vector_from_to_length(a,b):
+	return math.sqrt((a[0]-b[0])*(a[0]-b[0]) + (a[1]-b[1])*(a[1]-b[1]))
+
+	 
 ################################################################################
 ###
 ### csp_segments_intersection(sp1,sp2,sp3,sp4)
@@ -245,7 +270,6 @@ def csp_segments_intersection(sp1,sp2,sp3,sp4) :
 
 		return ta, tb 			
 
-
 	def recursion(a,b, ta0,ta1,tb0,tb1, depth_a,depth_b) :
 		global bezier_intersection_recursive_result
 		if a==b : 
@@ -272,13 +296,12 @@ def csp_segments_intersection(sp1,sp2,sp3,sp4) :
 			if bez_bounds_intersect(a,b2) : recursion(a,b2, ta0,ta1,tbm,tb1, depth_a,depth_b-1) 
 		else : # Both segments have been subdevided enougth. Let's get some intersections :).
 			intersection, t1, t2 =  straight_segments_intersection([a[0]]+[a[3]],[b[0]]+[b[3]])
-#			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "M %s,%s L %s,%s, %s,%s, %s,%s z" % (a[0][0],a[0][1],a[1][0],a[1][1],a[2][0],a[2][1],a[3][0],a[3][1]), "style":"fill:none;stroke:#f00;"} )
-#			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "M %s,%s L %s,%s, %s,%s, %s,%s z" % (b[0][0],b[0][1],b[1][0],b[1][1],b[2][0],b[2][1],b[3][0],b[3][1]), "style":"fill:none;stroke:#0f0;"} )
 			if intersection :
 				if intersection == "Overlap" :
 					t1 = ( max(0,min(1,t1[0]))+max(0,min(1,t1[1])) )/2
 					t2 = ( max(0,min(1,t2[0]))+max(0,min(1,t2[1])) )/2
 				bezier_intersection_recursive_result += [[ta0+t1*(ta1-ta0),tb0+t2*(tb1-tb0)]]
+
 	global bezier_intersection_recursive_result
 	bezier_intersection_recursive_result = []
 	recursion(a,b,0.,1.,0.,1.,intersection_recursion_depth,intersection_recursion_depth)
@@ -286,48 +309,9 @@ def csp_segments_intersection(sp1,sp2,sp3,sp4) :
 	for i in range(len(intersections)) :			
 		if len(intersections[i])<5 or intersections[i][4] != "Overlap" :
 			intersections[i] = polish_intersection(a,b,intersections[i][0],intersections[i][1])
-#			x,y = bezmisc.bezierpointatt(a,intersections[i][0])		
-#			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10" % (x,y), "style":"fill:none;stroke:#f00;"} )
-#			x,y = bezmisc.bezierpointatt(b,intersections[i][1])		
-#			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10" % (x,y), "style":"fill:none;stroke:#f0f;"} )
 	return intersections
 
-
-def normalize((x,y)) :
-	l = math.sqrt(x**2+y**2)
-	if l == 0 : return [0.,0.]
-	else : 		return [x/l, y/l]
-
-def cross(a,b) :
-	return a[1] * b[0] - a[0] * b[1]
-
-def dot(a,b) :
-	return a[0] * b[0] + a[1] * b[1]
 	
-def csp_curvature_at_t(t) :
-	ax,ay,bx,by,cx,cy,dx,dy = bezierparameterize(csp_segment_to_bez(sp1,sp2))
-	pointx, pointy = t*t*t*ax + t*t*bx + t*cx + dx, t*t*t*ay + t*t*by + t*cy + dy
-	der   = [3*t*t*ax + 2*t*bx + cx, 3*t*t*ay + 2*t*by + cy]
-	dder  = [6*t*ax + 2*bx, 6*t*ay + 2*by]
-	ddder = [6*ax, 6*ay]
-	l = math.sqrt(dot(der,der))
-	if l<=.0001 :
-		l_ = 0.
-		l = math.sqrt(dot(dder,dder))
-		if l<=.0001 :
-			l = math.sqrt(dot(ddder,ddder))
-			if l<=.0001 : return [der,dder,ddder,0,0,0]
-			rad = 100000000
-			tgt = [ddder[0]/l, ddder[1]/l]
-			return [der,dder,ddder, rad, tgt]
-		rad = -l * (dot(dder,dder)) / (cross(ddder,dder));
-		tgt = [dder[0]/l, dder[1]/l]
-		return [der,dder,ddder, rad, tgt]
-	rad = -l * (dot(der,der)) / (cross(dder,der))
-	tgt = [der[0]/l, der[1]/l]
-	return [der,dder,ddder, rad, tgt, l]
-
-
 def csp_curvature_radius_at_t(sp1,sp2,t) :
 	ax,ay,bx,by,cx,cy,dx,dy = bezierparameterize(csp_segment_to_bez(sp1,sp2))
 	der   = [3*t*t*ax + 2*t*bx + cx, 3*t*t*ay + 2*t*by + cy]
@@ -345,6 +329,14 @@ def csp_curvature_radius_at_t(sp1,sp2,t) :
 		else:
 			return 10000000
 
+
+
+def small(a) :
+	global small_tolerance
+	return abs(a)<small_tolerance
+
+
+
 ################################################################################
 ###
 ### Offset function 
@@ -355,22 +347,10 @@ def csp_curvature_radius_at_t(sp1,sp2,t) :
 ###
 ################################################################################
 
-def rotate_ccw(d) :
-	return [-d[1],d[0]]
-
-def vectors_ccw(a,b):
-	return a[0]*b[1]-b[0]*a[1] < 0
-
-def vector_from_to_length(a,b):
-	return math.sqrt((a[0]-b[0])*(a[0]-b[0]) + (a[1]-b[1])*(a[1]-b[1]))
-
-
-def small(a) :
-	global small_tolerance
-	return abs(a)<small_tolerance
-
 def csp_offset(csp, r) :
-
+	time_ = time.time()
+	time_start  = time_
+	print_("Offset start at %s"% time_)
 	def create_offset_segment(sp1,sp2,dstart,dend,nstart,nend,startGue,endGue,r):
 		start = [sp1[1][0]+nstart[0]*r, sp1[1][1]+nstart[1]*r]
 		end   = [sp2[1][0]+nend[0]*r, sp2[1][1]+nend[1]*r]
@@ -380,7 +360,6 @@ def csp_offset(csp, r) :
 		d = end
 		c = [d[0]-dend[0]/3, d[1]-dend[1]/3]
 		b = [dstart[0]/3+a[0], dstart[1]/3+a[1]]
-				
 		return [[a,a,b],[c,d,d]]
 
 	def join_offsets(prev,next, center, r):
@@ -434,9 +413,11 @@ def csp_offset(csp, r) :
 			return [sp1_r,sp2_r]
 		
 
+	############################################################################
 	# Some small definitions
+	############################################################################
 	csp_len = len(csp)
-		
+
 	############################################################################
 	# Prepare the path
 	############################################################################
@@ -448,6 +429,11 @@ def csp_offset(csp, r) :
 		if cspseglength(csp[i][-1],csp[i][0])>0.001 : 
 			csp[i][-1][2] = csp[i][-1][1]
 			csp[i]+= [ [csp[i][0][1],csp[i][0][1],csp[i][0][1]] ]
+
+
+	print_("Offset prepared the path in %s"%(time.time()-time_))
+	print_("Path length = %s"% sum([len(i)for i in csp] ) )
+	time_ = time.time()
 
 	############################################################################
 	# Offset
@@ -482,6 +468,9 @@ def csp_offset(csp, r) :
 			unclipped_offset[i] += subpath_offset[j][1:]
 
 #	inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath(result), "style":"fill:none;stroke:#0f0;"} )	
+	print_("Offsetted path in %s"%(time.time()-time_))
+	time_ = time.time()
+
 	############################################################################
 	# Now to the clipping. 
 	############################################################################
@@ -523,6 +512,9 @@ def csp_offset(csp, r) :
 							elif len(t)==5 and t[4]=="Overlap":	
 								intersection[subpath_i] += [ [i,t[0]], [i,t[1]] ]
 								intersection[subpath_j] += [ [j,t[1]], [j,t[3]] ]
+
+	print_("Intersections found in %s"%(time.time()-time_))
+	time_ = time.time()
 								
 	########################################################################
 	# Split unclipped offset by intersection points into splitted_offset
@@ -557,6 +549,10 @@ def csp_offset(csp, r) :
 			splitted_offset += parts[:-1]
 		else :
 			splitted_offset += [subpath[:]]
+
+	print_("Splitted in %s"%(time.time()-time_))
+	time_ = time.time()
+
 			
 	########################################################################
 	# Dummy cliping: remove parts from splitted offset if their centers are 
@@ -577,19 +573,30 @@ def csp_offset(csp, r) :
 			if break_:
 				 break
 		
-		print_(dist, r - dist, break_)
+		#print_(dist, r - dist, break_)
 		if not break_ : 
-			if clipped_offset == [] or cspseglength(clipped_offset[-1][-1],subpath[0])>0.001 :
-				clipped_offset += [subpath]
-			else : 
-				clipped_offset[-1][-1][2] = subpath[0][2]
-				clipped_offset[-1] += subpath[1:]
-		else : 
-			style = "fill:none;stroke:#c00;stroke-width:0.5px;"
-			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath( [subpath] ), "style":style, "comment":str(dist)} )	
-	style = "fill:none;stroke:#000;stroke-width:2px;"
-	inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath( clipped_offset ), "style":style, "comment":str(dist)} )	
+			clipped_offset += [subpath]
+	#	else : 
+	#		style = "fill:none;stroke:#c00;stroke-width:0.5px;"
+	#		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath( [subpath] ), "style":style, "comment":str(dist)} )	
+			
+	print_("Clipped in %s"%(time.time()-time_))
+	print_("-----------------------------")
+	print_("Total offset time %s"%(time.time()-time_start))
+	print_()
+
 	
+	########################################################################
+	# Now try to join all clipped offsets together
+	########################################################################		
+	
+	#	clipped_offset[-1][-1][2] = subpath[0][2]
+	#	clipped_offset[-1] += subpath[1:]	
+		
+	#inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath( clipped_offset ), "style":"fill:none;stroke:#000;stroke-width:2px;", "comment":str(dist)} )		
+	return clipped_offset
+
+		
 def atan2(*arg):
 	return (math.pi/2 - atan2_(arg)) % math.pi2
 
@@ -1197,7 +1204,8 @@ class Gcodetools(inkex.Effect):
 																										  
 		self.OptionParser.add_option("",   "--help-language",				action="store", type="string", 		dest="help_language", default='http://www.cnc-club.ru/forum/viewtopic.php?f=33&t=35',	help="Open help page in webbrowser.")
 
-		self.OptionParser.add_option("",   "--offset-radius",				action="store", type="float", 		dest="offset_radius", default=10.,help="Offset radius")
+		self.OptionParser.add_option("",   "--offset-radius",				action="store", type="float", 		dest="offset_radius", default=10.,		help="Offset radius")
+		self.OptionParser.add_option("",   "--offset-step",					action="store", type="float", 		dest="offset_step", default=10.,		help="Offset step")
 
 		self.default_tool = {
 					"name": "Default tool",
@@ -2057,7 +2065,7 @@ class Gcodetools(inkex.Effect):
 							#print_("y = %s*t^3 + %s*t^2 + %s*t + %s." % (ay,by,cy,dy))
 							#print_("x' = %s*t^2 + %s*t + %s." % (3*ax,2*bx,cx))
 							#print_("y' = %s*t^2 + %s*t + %s." % (3*ay,2*by,cy))
-							print_("Starting segment's tangent's (%s,%s) ending segment's tangent's (%s,%s) vecrors are cw: %s."% (dx,dy,dx1,dy1,vectors_are_cw([dx,dy],[dx1,dy1])) ) 
+							print_("Starting segment's tangent's (%s,%s) ending segment's tangent's (%s,%s) vecrors are cw: %s."% (dx,dy,dx1,dy1,vectors_cw([dx,dy],[dx1,dy1])) ) 
 
 							if dx*dy1-dx1*dy<0 or (dx*dy1-dx1*dy==0 and dx>0) :
 								for i in range(len(csp)):
@@ -2700,8 +2708,8 @@ G01 Z1 (going to cutting z)\n""",
 		# define print_ function 
 		global print_
 		
-		self.options.log_create_log = True 
-		self.options.log_filename = "/home/nick/output.txt"
+#		self.options.log_create_log = True 
+#		self.options.log_filename = "/home/nick/output.txt"
 		
 		if self.options.log_create_log :
 			try :
@@ -2752,34 +2760,27 @@ G01 Z1 (going to cutting z)\n""",
 			elif self.options.active_tab == '"lathe"': 
 				self.lathe()
 			elif self.options.active_tab == '"offset"': 
-
-<<<<<<< TREE
-				#for offset in range(140,170,10) :
-				offset = self.options.offset_radius
+				if self.options.offset_step == 0 : self.options.offset_step = self.options.offset_radius
+				if self.options.offset_step*self.options.offset_radius <0 : self.options.offset_step *= -1
+				time_ = time.time()
 				for layer in self.selected_paths :
 					for path in self.selected_paths[layer] :
-						csp_offset(cubicsuperpath.parsePath(path.get("d")), offset)				
-=======
-#				for offset in range(5,50,5) :
-				offset = 4					
-				for layer in self.selected_paths :
-					for path in self.selected_paths[layer] :
-						csp_offset(cubicsuperpath.parsePath(path.get("d")), offset)				
->>>>>>> MERGE-SOURCE
-#				self.paths = self.paths.items()[0][1]
-#				print_(self.paths)
-#				a,b  = cubicsuperpath.parsePath(self.paths[0].get("d")), cubicsuperpath.parsePath(self.paths[1].get("d"))
-#				a,b = a[0],b[0] 
-#				for i in range(1,len(a)) :
-#					for j in range(1,len(b)) :
-#						print_((i,j))
-#						print_((a[i-1],a[i],b[j-1],b[j]))
-#						intersection = csp_segments_intersection(a[i-1],a[i],b[j-1],b[j])
-#						for k in intersection :
-#							x,y = csp_at_t(a[i-1],a[i],k[0])
-#							x1,y1 = csp_at_t(b[j-1],b[j],k[1])
-#							inkex.etree.SubElement( self.layers[min(1,len(self.layers)-1)], inkex.addNS('path','svg'), {"d": "m %s,%s l 5,5 , -5,0 z" %(x,y), "style":"stroke:#00ff00;"} )
-#							inkex.etree.SubElement( self.layers[min(1,len(self.layers)-1)], inkex.addNS('path','svg'), {"d": "m %s,%s l 5,5 , -5,0 z" %(x1,y1), "style":"stroke:#0000ff;"})
+						offset = self.options.offset_step
+						while abs(offset) <= abs(self.options.offset_radius) :
+							offset_ = csp_offset(cubicsuperpath.parsePath(path.get("d")), offset)				
+							if offset_ != [] : 
+								inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath( offset_ ), "style":"fill:none;stroke:#000;stroke-width:2px;"} )	
+								print_(offset_)
+							else :
+								print_("------------Reached empty offset at radius %s"% offset )
+								break
+							offset += self.options.offset_step
+				print_()
+				print_("-----------------------------------------------------------------------------------")				
+				print_("-----------------------------------------------------------------------------------")				
+				print_("-----------------------------------------------------------------------------------")				
+				print_()
+				print_("Done in %s"%(time.time()-time_))				
 #						
 e = Gcodetools()
 e.affect()					
