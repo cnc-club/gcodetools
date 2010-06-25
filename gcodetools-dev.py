@@ -155,10 +155,6 @@ styles = {
 ###
 ################################################################################
 
-def atan2(x,y):
-	return (math.pi/2 - math.atan2(x,y))%math.pi2
-	
-
 def vectors_are_cw(a,b):
 	return a[0]*b[1]-a[1]*b[0] < 0
 
@@ -197,7 +193,14 @@ def csp_segment_to_bez(sp1,sp2):
 def bez_to_csp_segment(bez):
 	return [bez[0],bez[0],bez[1]], [bez[2],bez[3],bez[3]]
 
-
+def bez_split(a,t=0.5):
+	 a1 = tpoint(a[0],a[1],t)
+	 at = tpoint(a[1],a[2],t)
+	 b2 = tpoint(a[2],a[3],t)
+	 a2 = tpoint(a1,at,t)
+	 b1 = tpoint(at,b2,t)
+	 a3 = tpoint(a2,b1,t)
+	 return [a[0],a1,a2,a3], [a3,b1,b2,a[3]]
 ################################################################################
 ###
 ### csp_segments_intersection(sp1,sp2,sp3,sp4)
@@ -213,15 +216,6 @@ def bez_to_csp_segment(bez):
 def csp_segments_intersection(sp1,sp2,sp3,sp4) :
 	a, b = csp_segment_to_bez(sp1,sp2), csp_segment_to_bez(sp3,sp4)
 
-	def split(a,t=0.5):
-		 a1 = tpoint(a[0],a[1],t)
-		 at = tpoint(a[1],a[2],t)
-		 b2 = tpoint(a[2],a[3],t)
-		 a2 = tpoint(a1,at,t)
-		 b1 = tpoint(at,b2,t)
-		 a3 = tpoint(a2,b1,t)
-		 return [a[0],a1,a2,a3], [a3,b1,b2,a[3]]
-	
 	def polish_intersection(a,b,ta,tb, tolerance = intersection_tolerance) :
 		ax,ay,bx,by,cx,cy,dx,dy			= bezierparameterize(a)
 		ax1,ay1,bx1,by1,cx1,cy1,dx1,dy1	= bezierparameterize(b)
@@ -262,18 +256,18 @@ def csp_segments_intersection(sp1,sp2,sp3,sp4) :
 			[ta0,tb0,ta1,tb1, "Overlap"]
 			return 
 		elif depth_a>0 and depth_b>0 : 
-			a1,a2 = split(a,0.5)
-			b1,b2 = split(b,0.5)
+			a1,a2 = bez_split(a,0.5)
+			b1,b2 = bez_split(b,0.5)
 			if bez_bounds_intersect(a1,b1) : recursion(a1,b1, ta0,tam,tb0,tbm, depth_a-1,depth_b-1) 
 			if bez_bounds_intersect(a2,b1) : recursion(a2,b1, tam,ta1,tb0,tbm, depth_a-1,depth_b-1) 
 			if bez_bounds_intersect(a1,b2) : recursion(a1,b2, ta0,tam,tbm,tb1, depth_a-1,depth_b-1) 
 			if bez_bounds_intersect(a2,b2) : recursion(a2,b2, tam,ta1,tbm,tb1, depth_a-1,depth_b-1) 
 		elif depth_a>0  : 
-			a1,a2 = split(a,0.5)
+			a1,a2 = bez_split(a,0.5)
 			if bez_bounds_intersect(a1,b) : recursion(a1,b, ta0,tam,tb0,tb1, depth_a-1,depth_b) 
 			if bez_bounds_intersect(a2,b) : recursion(a2,b, tam,ta1,tb0,tb1, depth_a-1,depth_b) 
 		elif depth_b>0  : 
-			b1,b2 = split(b,0.5)
+			b1,b2 = bez_split(b,0.5)
 			if bez_bounds_intersect(a,b1) : recursion(a,b1, ta0,ta1,tb0,tbm, depth_a,depth_b-1) 
 			if bez_bounds_intersect(a,b2) : recursion(a,b2, ta0,ta1,tbm,tb1, depth_a,depth_b-1) 
 		else : # Both segments have been subdevided enougth. Let's get some intersections :).
@@ -290,12 +284,12 @@ def csp_segments_intersection(sp1,sp2,sp3,sp4) :
 	recursion(a,b,0.,1.,0.,1.,intersection_recursion_depth,intersection_recursion_depth)
 	intersections = bezier_intersection_recursive_result
 	for i in range(len(intersections)) :			
-		if len(intersections[i])<5 or intersections[4] != "Overlap" :
+		if len(intersections[i])<5 or intersections[i][4] != "Overlap" :
 			intersections[i] = polish_intersection(a,b,intersections[i][0],intersections[i][1])
-			x,y = bezmisc.bezierpointatt(a,intersections[i][0])		
-			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10" % (x,y), "style":"fill:none;stroke:#f00;"} )
-			x,y = bezmisc.bezierpointatt(b,intersections[i][1])		
-			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10" % (x,y), "style":"fill:none;stroke:#f0f;"} )
+#			x,y = bezmisc.bezierpointatt(a,intersections[i][0])		
+#			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10" % (x,y), "style":"fill:none;stroke:#f00;"} )
+#			x,y = bezmisc.bezierpointatt(b,intersections[i][1])		
+#			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10" % (x,y), "style":"fill:none;stroke:#f0f;"} )
 	return intersections
 
 
@@ -339,6 +333,8 @@ def csp_curvature_radius_at_t(sp1,sp2,t) :
 	der   = [3*t*t*ax + 2*t*bx + cx, 3*t*t*ay + 2*t*by + cy]
 	dder  = [6*t*ax + 2*bx, 6*t*ay + 2*by]
 	ddder = [6*ax, 6*ay]
+	if dot(dder,dder) == 0 :
+		return 10000000 
 	l = math.sqrt(dot(der,der))
 	if l>.0001 :
 		return 	-l * (dot(der,der)) / (cross(dder,der))
@@ -362,14 +358,20 @@ def csp_curvature_radius_at_t(sp1,sp2,t) :
 def rotate_ccw(d) :
 	return [-d[1],d[0]]
 
+def vectors_ccw(a,b):
+	return a[0]*b[1]-b[0]*a[1] < 0
+
 def vector_from_to_length(a,b):
 	return math.sqrt((a[0]-b[0])*(a[0]-b[0]) + (a[1]-b[1])*(a[1]-b[1]))
 
 
+def small(a) :
+	global small_tolerance
+	return abs(a)<small_tolerance
+
 def csp_offset(csp, r) :
 
 	def create_offset_segment(sp1,sp2,dstart,dend,nstart,nend,startGue,endGue,r):
-	
 		start = [sp1[1][0]+nstart[0]*r, sp1[1][1]+nstart[1]*r]
 		end   = [sp2[1][0]+nend[0]*r, sp2[1][1]+nend[1]*r]
 		dstart = [dstart[0]*startGue, dstart[1]*startGue]
@@ -381,9 +383,22 @@ def csp_offset(csp, r) :
 				
 		return [[a,a,b],[c,d,d]]
 
+	def join_offsets(prev,next, center, r):
+		for i in xrange(1,len(prev)) :
+			for j in xrange(len(next)-1,0,-1) :
+				intersection = csp_segments_intersection(prev[i-1],prev[i],next[j-1],next[j])
+				if len(intersection)>0 :
+					t = min(intersection)
+					sp1,sp2,sp3 = cspbezsplit(prev[i-1],prev[i],t[0])
+					sp3,sp4,sp5 = cspbezsplit(next[j-1],next[j],t[1 if len(t)==2 else 3])
+					return prev[:i-1] + [ [prev[i-1][0],prev[i-1][1],sp1[2]], sp2 ] , [], [sp4,[ sp5[0],sp5[1],next[j][2] ] ] + next[j+1:]
+		prev_slope = csp_slope(prev[-2],prev[-1],1.)
+		next_slope = csp_slope(next[0],next[1],0.)
+		ccw = vectors_ccw(prev_slope,next_slope)
+		arc = arc_to_csp(prev[-1][1], next[0][1], center, r, ccw)
+		return prev,arc,next
 		
 	def offset_segment_recursion(sp1,sp2,r, depth, tolerance=0.01) :
-		
 		dstart = csp_slope(sp1,sp2,0.)
 		dend   = csp_slope(sp1,sp2,1.)
 		dmid   = csp_slope(sp1,sp2,.5)
@@ -393,13 +408,13 @@ def csp_offset(csp, r) :
 		dstart_l = math.sqrt(dot(dstart,dstart))
 		dend_l   = math.sqrt(dot(dend,dend))
 		dmid_l   = math.sqrt(dot(dmid,dmid))
-				
+
 		nstart, nend, nmid = normalize(rotate_ccw(dstart)), normalize(rotate_ccw(dend)), normalize(rotate_ccw(dmid))
 		rstart, rend, rmid = csp_curvature_radius_at_t(sp1,sp2,0.), csp_curvature_radius_at_t(sp1,sp2,1.), csp_curvature_radius_at_t(sp1,sp2,.5) 
 
 		# correction of the lengths of the tangent to the offset
 		# if you don't see why i wrote that, draw a little figure and everything will be clear		
-		# ( it was taken as is from PathOutline.cpp / Path::RecStdCubicTo )
+		# ( it was taken as is from Inkscape's source / PathOutline.cpp / Path::RecStdCubicTo )
 		
 		startGue = (1 + r/rstart) if abs(rstart) > 0.01 else 1
 		endGue   = (1 + r/rend)   if abs(rmid)   > 0.01 else 1
@@ -418,27 +433,217 @@ def csp_offset(csp, r) :
 		else :
 			return [sp1_r,sp2_r]
 		
-		
-		
 
-	result = []
+	# Some small definitions
+	csp_len = len(csp)
+		
+	############################################################################
+	# Prepare the path
+	############################################################################
+	# Remove all small segments (segment length < 0.001)
 	for i in xrange(len(csp)) :
 		for j in xrange(1,len(csp[i])) :
-			if csp[i][j-1] == csp[i][j] : 
-				del csp[i][j]
-	for subpath in csp :
-		result += [[]]
-		for i in xrange(1,len(subpath)) : 
-			sp1, sp2 = subpath[i-1], subpath[i]
+			if cspseglength(csp[i][j-1], csp[i][j])<0.001 : 
+				csp[i] = csp[i][:j] + csp[i][j+1:]
+		if cspseglength(csp[i][-1],csp[i][0])>0.001 : 
+			csp[i][-1][2] = csp[i][-1][1]
+			csp[i]+= [ [csp[i][0][1],csp[i][0][1],csp[i][0][1]] ]
+
+	############################################################################
+	# Offset
+	############################################################################
+	# Create offsets for all segments in the path. And join them together inside each subpath. 		
+	unclipped_offset = [[] for i in xrange(csp_len)]
+	for i in xrange(csp_len) :
+		subpath = csp[i]
+		subpath_offset = []
+		for j in xrange(1,len(subpath)) : 
+			sp1, sp2 = subpath[j-1], subpath[j]
+			offset = offset_segment_recursion(sp1,sp2,r, 4, 0.0025*16) 
+			#inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([offset]), "style":"fill:none;stroke:#f00;stroke-width:3px;"} )	
+
+			if len(subpath_offset)>0 : 
+				prev, arc, next = join_offsets(subpath_offset[-1], offset, sp1[1],  r)
+				subpath_offset[-1] = prev[:]
+				subpath_offset += [arc, next] if arc!=[] else [next]
+			else :
+				subpath_offset += [offset[:]]
+		# Join last and first offsets togother to close the curve
+		prev, arc, next = join_offsets(subpath_offset[-1], subpath_offset[0], subpath[0][1], r)
+		if arc!=[] :
+			subpath_offset += [arc]
+		else:
+			subpath_offset[0] = next  
+			subpath_offset[-1] = prev 
+		# Join subpath's offset and save it to unclipped offset list. 	
+		unclipped_offset[i] = subpath_offset[0]	
+		for j in xrange(1,len(subpath_offset)) :
+			unclipped_offset[i][-1][2] = subpath_offset[j][0][2]
+			unclipped_offset[i] += subpath_offset[j][1:]
+
+#	inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath(result), "style":"fill:none;stroke:#0f0;"} )	
+	############################################################################
+	# Now to the clipping. 
+	############################################################################
+	# First of all find all intersection's between all segments of all offseted subpaths, including self intersections.
+
+	#TODO define offset tolerance here
+	global small_tolerance
+	small_tolerance = 0.01
+	intersection = [[] for i in xrange(csp_len)]
+
+	for subpath_i in xrange(csp_len) :
+		for subpath_j in xrange(subpath_i,csp_len) :
+			subpath = unclipped_offset[subpath_i]
+			subpath1 = unclipped_offset[subpath_j]
+			for i in xrange(1,len(subpath)) :
+				# If subpath_i==subpath_j we are looking for self intersections, so 
+				# we'll need top search intersections only for xrange(i,len(subpath1))
+				for j in ( xrange(i,len(subpath1)) if subpath_i==subpath_j else xrange(len(subpath1))) :
+					if subpath_i==subpath_j and j==i :
+						# Find self intersections of a segment
+						sp1,sp2,sp3 = cspbezsplit(subpath[i-1],subpath[i],.5)
+						intersections = csp_segments_intersection(sp1,sp2,sp2,sp3)
+						for t in intersections :
+							if not ( small(t[0]-1) and small(t[1]) ) and 0<=t[0]<=1 and 0<=t[1]<=1 :
+								intersection[subpath_i] += [ [i,t[0]/2],[j,t[1]/2+.5] ]
+					else :
+						intersections = csp_segments_intersection(subpath[i-1],subpath[i],subpath1[j-1],subpath1[j])
+						for t in intersections :
+							#TODO tolerance dependence to cpsp_length(t)
+							if len(t) == 2 and 0<=t[0]<=1 and 0<=t[1]<=1 and not (
+									subpath_i==subpath_j and (
+									(j-i-1) % (len(subpath)-1) == 0 and small(t[0]-1) and small(t[1]) or 
+									(i-j-1) % (len(subpath)-1) == 0 and small(t[1]-1) and small(t[0]) )  ) :
+								intersection[subpath_i] += [ [i,t[0]] ]
+								intersection[subpath_j] += [ [j,t[1]] ]	
+								#draw_pointer(csp_at_t(subpath[i-1],subpath[i],t[0]),"#f00")
+								#print_(t)
+								#print_(i,j)
+							elif len(t)==5 and t[4]=="Overlap":	
+								intersection[subpath_i] += [ [i,t[0]], [i,t[1]] ]
+								intersection[subpath_j] += [ [j,t[1]], [j,t[3]] ]
+								
+	########################################################################
+	# Split unclipped offset by intersection points into splitted_offset
+	########################################################################
+	splitted_offset = []
+	for i in xrange(csp_len) :
+		subpath = unclipped_offset[i]
+		if len(intersection[i]) > 0 :
+			intersection[i].sort()
+			intersection[i] = [[1,0]] + intersection[i] + [[len(subpath)-1,1]]
+			parts = []
+			for j in range(1,len(intersection[i])) : 
+				int1, int2 = intersection[i][j-1], intersection[i][j]
+				if int1==int2 :
+					continue
+				if int1[0] == 0 and int2[0]==len(subpath)-1:# and small(int1[1]) and small(int2[1]-1) :
+					continue
+				if int1[0]==int2[0] :
+					sp1,sp2,sp3 = cspbezsplit(subpath[int1[0]-1],subpath[int1[0]],int1[1])
+					sp1,sp2,sp3 = cspbezsplit(sp2,sp3, (int2[1]-int1[1])/(1-int1[1]) )
+					parts += [   [sp1,sp2]     ]
+				else :
+					sp4,sp1,sp2 = cspbezsplit(subpath[int1[0]-1],subpath[int1[0]],int1[1])
+					sp3,sp4,sp5 = cspbezsplit(subpath[int2[0]-1],subpath[int2[0]],int2[1])
+					if int1[0]==int2[0]-1 :
+						parts += [	[sp1, [sp2[0],sp2[1],sp3[2]], sp4]  ]
+					else :
+						parts += [  [sp1,sp2]+subpath[int1[0]+1:int2[0]-1]+[sp3,sp4]  ]
+			# Close	parts list to close path (The first and the last parts are joined together)		
+			parts[0][0][0] = parts[-1][-1][0]
+			parts[0] = parts[-1][:-1] + parts[0] 			
+			splitted_offset += parts[:-1]
+		else :
+			splitted_offset += [subpath[:]]
 			
-			result = offset_segment_recursion(sp1,sp2,r, 0, 0.0025*16)
-			#rotate tangents to get normals and normalize them			
-			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([ result ]), "style":"fill:none;stroke:#0f0;"} )
-
-
-
-
+	########################################################################
+	# Dummy cliping: remove parts from splitted offset if their centers are 
+	# closer to the original path than offset radius. 
+	########################################################################		
+	clipped_offset = []	 	
+	for subpath in splitted_offset :
+		break_ = False
+		for i in xrange(1,len(subpath)) :
+			for csp_subpath in csp :
+				for j in xrange(1,len(csp_subpath)) :
+					dist = point_to_bez_distance(csp_at_t(subpath[i-1],subpath[i],.5),csp_segment_to_bez(csp_subpath[j-1],csp_subpath[j]), [abs(r)-1,abs(r)+1] )
+					if dist<abs(r)-.1 :
+						break_ = True
+						break
+				if break_:
+					 break
+			if break_:
+				 break
+		
+		print_(dist, r - dist, break_)
+		if not break_ : 
+			if clipped_offset == [] or cspseglength(clipped_offset[-1][-1],subpath[0])>0.001 :
+				clipped_offset += [subpath]
+			else : 
+				clipped_offset[-1][-1][2] = subpath[0][2]
+				clipped_offset[-1] += subpath[1:]
+		else : 
+			style = "fill:none;stroke:#c00;stroke-width:0.5px;"
+			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath( [subpath] ), "style":style, "comment":str(dist)} )	
+	style = "fill:none;stroke:#000;stroke-width:2px;"
+	inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath( clipped_offset ), "style":style, "comment":str(dist)} )	
 	
+def atan2(*arg):
+	return (math.pi/2 - atan2_(arg)) % math.pi2
+
+					
+def atan2_(*arg):	
+	if len(arg)==1 and ( type(arg[0]) == type([0.,0.]) or type(arg[0])==type((0.,0.)) ) :
+		return math.atan2(arg[0][0], arg[0][1])
+	elif len(arg)==2 :
+		return math.atan2(arg[0],arg[1])
+	else :
+		raise ValueError, "Bad argumets for atan! (%s)" % arg  
+#def round_join(start, end) :
+
+def draw_pointer(x,color = "#f00", figure = "cross" ) :
+	if figure ==  "line" :
+		s = ""
+		for i in range(1,len(x)/2) :
+			s+= " %s, %s " %(x[i*2],x[i*2+1])
+		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "M %s,%s L %s"%(x[0],x[1],s), "style":"fill:none;stroke:%s;"%color} )
+	else :
+		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10 -20,-20 10,10 -10,10, 20,-20"%(x[0],x[1]), "style":"fill:none;stroke:%s;"%color} )
+
+
+		
+def arc_to_csp(start, end, center, r, ccw) : 
+	r = abs(r)
+	alpha = (atan2(end[0]-center[0],end[1]-center[1]) - atan2(start[0]-center[0],start[1]-center[1])) 
+	if alpha >  math.pi : alpha = alpha - math.pi2
+	if alpha < -math.pi : alpha = alpha + math.pi2
+	if abs(alpha*r)<0.001 : 
+		return [] 
+	sectors = int(abs(alpha)*2/math.pi)+1
+	alpha_start = atan2(start[0]-center[0],start[1]-center[1])
+	dalpha = alpha/sectors
+	result = []
+	k = 4.*math.tan(dalpha/4.)/3.
+	for i in range(sectors+1) :
+		cos_,sin_ = math.cos(alpha_start + alpha*i/sectors), math.sin(alpha_start + alpha*i/sectors)
+		sp = [ [], [center[0] + cos_*r, center[1] + sin_*r], [] ]
+		#if i == 0 :
+		#	draw_pointer(sp[1],"#f00")
+		#	draw_pointer(start,"#ff0")
+		#	draw_pointer(center,"#00f")
+		sp[0] = [sp[1][0] + sin_*k*r, sp[1][1] - cos_*k*r ]
+		sp[2] = [sp[1][0] - sin_*k*r, sp[1][1] + cos_*k*r ]
+		result += [sp]
+	result[0][0] = result[0][1][:]
+	result[-1][2] = result[-1][1]
+	#if alpha>0 : 
+	#	inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([result]), "style":"fill:none;stroke:#0f0;stroke-width:3px;"} )	
+	#else:
+	#	inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([result]), "style":"fill:none;stroke:#00f;stroke-width:3px;"} )	
+		
+	return result
 
 	
 def straight_segments_intersection(a,b, true_intersection = True) : # (True intersection means check ta and tb are in [0,1])
@@ -460,9 +665,9 @@ def straight_segments_intersection(a,b, true_intersection = True) : # (True inte
 def isnan(x): return type(x) is float and x != x
 def isinf(x): inf = 1e5000; return x == inf or x == -inf
 
-###
-###		Just simple output function for better debugging
-###
+################################################################################
+###		print_ prints any arguments into specified log file
+################################################################################
 
 def print_(*arg):
 	f = open(options.log_filename,"a")
@@ -512,6 +717,56 @@ class P:
 ###
 ###		Functions to operate with CubicSuperPath
 ###
+
+
+def csp_subpath_ccw(subpath):
+	# Remove all zerro length segments
+	path = [subpath[0]]
+	for i in xrange(1,len(subpath)) :
+		 if not subpath[i][1]==path[-1][1]==subpath[i][0]==path[-1][0] :
+		 	path += [ subpath[i] ]
+	# Close the path and remove last point to avoid zerro length last segment
+	if path[-1][1]!=path[0][1] : 
+		path[-1][2] = path[-1][1]
+		path[0][0] = path[0][1]
+	else :
+		path[0][0] = path[-1][0]
+		del path[-1]
+	
+	# Finding top most point in path (min y value)
+	# We start from segments -1 and 0 because of secific path closure
+	miny = (None, 0,0,0)
+	for i in xrange(len(path)):
+		sp1, sp2 = path[i-1], path[i]
+		if sp1[1][1]<miny[0] and sp1[2][1]<miny[0] and sp2[0][1]<miny[0] and sp2[1][1]<miny[0] :
+			continue
+		
+		ax,ay,bx,by,cx,cy,dx,dy = bezmisc.bezierparameterize((sp1[1],sp1[2],sp2[0],sp2[1]))
+		if ay == 0 :
+			roots = [ -cy/(2*by) ] if by !=0 else []
+		else:
+			det = (2.0*by)**2 - 4.0*(3*ay*cy)
+			roots = [ (-2*by+math.sqrt(det))/(6*ay), (-2*by+math.sqrt(det))/(6*ay) ] if det>=0 else []
+		roots += [1,0]	
+		for t in roots :
+			if 0<=t<=1:
+				y = ay*(t**3)+by*(t**2)+cy*t+dy  
+				x = ax*(t**3)+bx*(t**2)+cx*t+dx  
+				if miny[0]>y or miny[0] == None : 
+					miny = (y,i,t,x)
+				elif miny[0]==y and x<miny[3] : 
+					miny = (y,i,t,x)
+	i, t = miny[1], miny[2]
+	print_(csp_slope(path[i-1],path[i],t))
+	if 0<t<1 : 
+		d = csp_slope(path[i-1],path[i],t)
+		return atan2(d)<0
+	else :
+		if t==1 :
+			return atan2(csp_slope(path[i-1], path[i],1)) > atan2(csp_slope(path[i], path[(i+1)%len(path)],0))
+		else :
+			return atan2(csp_slope(path[i-1], path[i],0)) < atan2(csp_slope(path[i-2], path[i-1],1))
+
 
 def point_to_csp_simple_bound_dist(p, csp):
 	minx,miny,maxx,maxy = None,None,None,None
@@ -603,7 +858,7 @@ def csp_segments(csp):
 		seg = [seg[i]/l for i in xrange(len(seg))]
 	return seg,l
 
-# rebuild_csp Adds to csp control points makin it's segments looks like segs
+# rebuild_csp Adds to csp control points making it's segments looks like segs
 
 def rebuild_csp (csp, segs, s=None):
 	if s==None : s, l = csp_segments(csp)
@@ -673,6 +928,36 @@ def get_distance_from_csp_to_arc(sp1,sp2, arc1, arc2, tolerance = 0.01 ): # arc 
 		n=n*2
 	return d1[0]
 
+def point_to_bez_distance_recurcion(p, bez, depth, needed_dist_bounds, tolerance):
+	minx,miny,maxx,maxy = bez_bound(bez)
+
+	min_dist = max(minx-p[0],p[0]-maxx,0)**2+max(miny-p[1],p[1]-maxy,0)**2
+	max_dist = min(minx-p[0],p[0]-maxx,0)**2+min(miny-p[1],p[1]-maxy,0)**2
+
+	global point_to_bez_distance_intermediate_result
+	if max_dist<needed_dist_bounds[0] : 
+		point_to_bez_distance_intermediate_result = min(max_dist, point_to_bez_distance_intermediate_result)
+		return
+	if min_dist>needed_dist_bounds[1] : 
+		point_to_bez_distance_intermediate_result = min(min_dist, point_to_bez_distance_intermediate_result)
+		return
+		
+	if max_dist<point_to_bez_distance_intermediate_result :
+		point_to_bez_distance_intermediate_result = max_dist
+	if min_dist<=point_to_bez_distance_intermediate_result :
+		if depth>0 and max_dist-min_dist>tolerance :
+			bez1, bez2 = bez_split(bez,0.5)
+			point_to_bez_distance_recurcion(p, bez1, depth-1,  needed_dist_bounds, tolerance)
+			point_to_bez_distance_recurcion(p, bez2, depth-1,  needed_dist_bounds, tolerance)
+		else :
+			point_to_bez_distance_intermediate_result = (max_dist+min_dist)/2
+			
+def point_to_bez_distance(p, bez, needed_dist_bounds = [0.,1e100], tolerance=.001):
+	global point_to_bez_distance_intermediate_result
+	point_to_bez_distance_intermediate_result = float("inf")
+	point_to_bez_distance_recurcion(p, bez, 10, [needed_dist_bounds[0]**2,needed_dist_bounds[1]**2] , tolerance)
+	return math.sqrt(point_to_bez_distance_intermediate_result)
+	
 def get_distance_from_point_to_csp(p,sp1,sp2, tolerance = 0.01 ): 
 	n, i = 10, 0
 	d, dl = [None,(0,0)],[0,(0,0)]
@@ -685,6 +970,8 @@ def get_distance_from_point_to_csp(p,sp1,sp2, tolerance = 0.01 ):
 			d = min( [math.sqrt( (p[0]-cp[0])**2+(p[1]-cp[1])**2),t], d ) if d[0]!=None else [math.sqrt( (p[0]-cp[0])**2+(p[1]-cp[1])**2),t]
 		n=n*2
 	return d
+
+
 
 def reverce_csp (csp):
 	for i in range(len(csp)):
@@ -907,9 +1194,10 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--tools-library-type",			action="store", type="string", 		dest="tools_library_type", default='cylinder cutter',	help="Create tools defention")
 
 		self.OptionParser.add_option("",   "--dxfpoints-action",			action="store", type="string", 		dest="dxfpoints_action", default='replace',			help="dxfpoint sign toggle")
-                                                                                                          
+																										  
 		self.OptionParser.add_option("",   "--help-language",				action="store", type="string", 		dest="help_language", default='http://www.cnc-club.ru/forum/viewtopic.php?f=33&t=35',	help="Open help page in webbrowser.")
 
+		self.OptionParser.add_option("",   "--offset-radius",				action="store", type="float", 		dest="offset_radius", default=10.,help="Offset radius")
 
 		self.default_tool = {
 					"name": "Default tool",
@@ -969,12 +1257,12 @@ class Gcodetools(inkex.Effect):
 				dist = None
 				for i in range(len(k)):
 					start = p[k[i]][0][1]
-					dist = max(   ( -( ( end[0]-start[0])**2+(end[1]-start[1])**2 ) ,i)    ,   dist )
+					dist = max(   ( -( ( end[0]-start[0])**2+(end[1]-start[1])**2 ) ,i)	,   dist )
 				keys += [k[dist[1]]]
 				del k[dist[1]]
 			for k in keys:
 				subpath = p[k]
-				c += [ [    [subpath[0][1][0],subpath[0][1][1]]   , 'move', 0, 0] ]
+				c += [ [	[subpath[0][1][0],subpath[0][1][1]]   , 'move', 0, 0] ]
 				for i in range(1,len(subpath)):
 					sp1 = [  [subpath[i-1][j][0], subpath[i-1][j][1]] for j in range(3)]
 					sp2 = [  [subpath[i  ][j][0], subpath[i  ][j][1]] for j in range(3)]
@@ -2341,7 +2629,7 @@ G01 Z1 (going to cutting z)\n""",
 ###		TODO Launch browser on help tab
 ################################################################################
 	def help(self):
-		self.error(_("""Tutorials, manuals and support can be found at\nEnglish support forum:\n    http://www.cnc-club.ru/gcodetools\nand Russian support forum:\n    http://www.cnc-club.ru/gcodetoolsru"""),"warning")
+		self.error(_("""Tutorials, manuals and support can be found at\nEnglish support forum:\n	http://www.cnc-club.ru/gcodetools\nand Russian support forum:\n	http://www.cnc-club.ru/gcodetoolsru"""),"warning")
 		return
 
 ################################################################################
@@ -2411,6 +2699,10 @@ G01 Z1 (going to cutting z)\n""",
 
 		# define print_ function 
 		global print_
+		
+		self.options.log_create_log = True 
+		self.options.log_filename = "/home/nick/output.txt"
+		
 		if self.options.log_create_log :
 			try :
 				if os.path.isfile(self.options.log_filename) : os.remove(self.options.log_filename)
@@ -2461,11 +2753,19 @@ G01 Z1 (going to cutting z)\n""",
 				self.lathe()
 			elif self.options.active_tab == '"offset"': 
 
+<<<<<<< TREE
+				#for offset in range(140,170,10) :
+				offset = self.options.offset_radius
+				for layer in self.selected_paths :
+					for path in self.selected_paths[layer] :
+						csp_offset(cubicsuperpath.parsePath(path.get("d")), offset)				
+=======
 #				for offset in range(5,50,5) :
 				offset = 4					
 				for layer in self.selected_paths :
 					for path in self.selected_paths[layer] :
 						csp_offset(cubicsuperpath.parsePath(path.get("d")), offset)				
+>>>>>>> MERGE-SOURCE
 #				self.paths = self.paths.items()[0][1]
 #				print_(self.paths)
 #				a,b  = cubicsuperpath.parsePath(self.paths[0].get("d")), cubicsuperpath.parsePath(self.paths[1].get("d"))
