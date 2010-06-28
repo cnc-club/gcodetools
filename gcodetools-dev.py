@@ -320,16 +320,30 @@ def csp_curvature_radius_at_t(sp1,sp2,t) :
 	if dot(dder,dder) == 0 :
 		return 10000000 
 	l = math.sqrt(dot(der,der))
-	if l>.0001 :
+	if l>.0001 and cross(dder,der)!=0:
 		return 	-l * (dot(der,der)) / (cross(dder,der))
 	else:	
 		l = math.sqrt(dot(dder,dder))
-		if l>.0001 :
+		if l>.0001 and cross(ddder,dder)!=0 :
 			return 	-l * (dot(dder,dder)) / (cross(ddder,dder))
 		else:
 			return 10000000
 
-
+def csp_special_points(sp1,sp2) :
+	# special points = curvature == 0
+	ax,ay,bx,by,cx,cy,dx,dy = bezmisc.bezierparameterize((sp1[1],sp1[2],sp2[0],sp2[1]))	
+	a = 3*ax*by-3*ay*bx
+	b = 3*ax*cy-3*cx*ay
+	c = bx*cy-cx*by
+	roots = cubic_solver(0, a, b, c)	
+	res = []
+	for i in roots :
+		if type(i) is complex and i.imag==0:
+			i = i.real
+		if type(i) is not complex and 0<=i<=1:
+			res.append(i)
+	return res
+	
 
 def small(a) :
 	global small_tolerance
@@ -430,7 +444,44 @@ def csp_offset(csp, r) :
 			csp[i][-1][2] = csp[i][-1][1]
 			csp[i]+= [ [csp[i][0][1],csp[i][0][1],csp[i][0][1]] ]
 
+	# Get special points (curvature = 0) and split the path at them.	
+	for j in range(len(csp)) : 
+		subpath = csp[j]
+		new_subpath = []
+		i = 0
+		while i <len(csp[j]) :
+			sp1,sp2 = csp[j][i-1], csp[j][i]
+			points = csp_special_points(sp1,sp2)	
+			points.sort()
+			res, being_split = [], False
+			tl = 0
+			print_(csp[j])
+			
+			for t in points : 	
+					draw_pointer(csp_at_t(sp1,sp2,t))
 
+			if len(points)>1:
+
+				sp1,sp2,sp3 = cspbezsplit(sp1,sp2,points[0])
+			 
+			for t in points : 	
+				if 0.0001<t<0.9999 :
+					print_(t)
+					sp3,sp1,sp2 = cspbezsplit(sp1,sp2,t*(1-tl))
+					
+					tl = t
+					res+=[sp3]
+					being_split = True
+			if being_split :
+				print_("!!!!!")
+				print_(res)
+				csp[j] = csp[j][:i-1]+res+[sp1,sp2]+csp[j][i+1:]
+				i += len(res)+1
+				print_(csp[j])
+			i+=1
+	inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath( csp ), } )	
+				
+					
 	print_("Offset prepared the path in %s"%(time.time()-time_))
 	print_("Path length = %s"% sum([len(i)for i in csp] ) )
 	time_ = time.time()
@@ -532,7 +583,7 @@ def csp_offset(csp, r) :
 					continue
 				if int1[0] == 0 and int2[0]==len(subpath)-1:# and small(int1[1]) and small(int2[1]-1) :
 					continue
-				if int1[0]==int2[0] :
+				if int1[0]==int2[0] :	# self intersection
 					sp1,sp2,sp3 = cspbezsplit(subpath[int1[0]-1],subpath[int1[0]],int1[1])
 					sp1,sp2,sp3 = cspbezsplit(sp2,sp3, (int2[1]-int1[1])/(1-int1[1]) )
 					parts += [   [sp1,sp2]     ]
@@ -562,23 +613,27 @@ def csp_offset(csp, r) :
 	for subpath in splitted_offset :
 		break_ = False
 		for i in xrange(1,len(subpath)) :
+			dist = float("inf")
 			for csp_subpath in csp :
 				for j in xrange(1,len(csp_subpath)) :
-					dist = point_to_bez_distance(csp_at_t(subpath[i-1],subpath[i],.5),csp_segment_to_bez(csp_subpath[j-1],csp_subpath[j]), [abs(r)-1,abs(r)+1] )
-					if dist<abs(r)-.1 :
+					r1,r2 = abs(r)-min(abs(r)/5,1),abs(r)+min(abs(r)/5,1)
+					dist = min(dist, point_to_bez_distance(csp_at_t(subpath[i-1],subpath[i],.5),csp_segment_to_bez(csp_subpath[j-1],csp_subpath[j]), [r1,r2] ))
+					if dist<r1 :
 						break_ = True
 						break
 				if break_:
 					 break
+			if dist>r2:
+				break_ = True
 			if break_:
 				 break
 		
 		#print_(dist, r - dist, break_)
 		if not break_ : 
 			clipped_offset += [subpath]
-	#	else : 
-	#		style = "fill:none;stroke:#c00;stroke-width:0.5px;"
-	#		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath( [subpath] ), "style":style, "comment":str(dist)} )	
+		else : 
+			style = "fill:none;stroke:#c00;stroke-width:0.5px;"
+			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath( [subpath] ), "style":style, "comment":str(dist)} )	
 			
 	print_("Clipped in %s"%(time.time()-time_))
 	print_("-----------------------------")
@@ -890,9 +945,6 @@ def rebuild_csp (csp, segs, s=None):
 
 
 
-###
-###		Distance calculattion from point to arc
-###
 
 def csp_slope(sp1,sp2,t):
 	bez = (sp1[1][:],sp1[2][:],sp2[0][:],sp2[1][:])
@@ -902,6 +954,7 @@ def between(c,x,y):
 		return x-straight_tolerance<=c<=y+straight_tolerance or y-straight_tolerance<=c<=x+straight_tolerance
 
 def distance_from_point_to_arc(p, arc):
+	###		Distance calculattion from point to arc
 	P0,P2,c,a = arc
 	dist = None
 	p = P(p)
@@ -935,7 +988,7 @@ def get_distance_from_csp_to_arc(sp1,sp2, arc1, arc2, tolerance = 0.01 ): # arc 
 		n=n*2
 	return d1[0]
 
-def point_to_bez_distance_recurcion(p, bez, depth, needed_dist_bounds, tolerance):
+def point_to_bez_distance_recurcion(p, bez, depth, needed_dist_bounds, tolerance, ts, te):
 	minx,miny,maxx,maxy = bez_bound(bez)
 
 	min_dist = max(minx-p[0],p[0]-maxx,0)**2+max(miny-p[1],p[1]-maxy,0)**2
@@ -943,27 +996,49 @@ def point_to_bez_distance_recurcion(p, bez, depth, needed_dist_bounds, tolerance
 
 	global point_to_bez_distance_intermediate_result
 	if max_dist<needed_dist_bounds[0] : 
-		point_to_bez_distance_intermediate_result = min(max_dist, point_to_bez_distance_intermediate_result)
+		point_to_bez_distance_intermediate_result = min(point_to_bez_distance_intermediate_result, [max_dist, ts, te])
 		return
 	if min_dist>needed_dist_bounds[1] : 
-		point_to_bez_distance_intermediate_result = min(min_dist, point_to_bez_distance_intermediate_result)
+		point_to_bez_distance_intermediate_result = min(point_to_bez_distance_intermediate_result, [min_dist, ts, te])
 		return
 		
-	if max_dist<point_to_bez_distance_intermediate_result :
-		point_to_bez_distance_intermediate_result = max_dist
-	if min_dist<=point_to_bez_distance_intermediate_result :
+	if max_dist<point_to_bez_distance_intermediate_result[0] :
+		point_to_bez_distance_intermediate_result = [max_dist, ts, te]
+	if min_dist<=point_to_bez_distance_intermediate_result[0] :
 		if depth>0 and max_dist-min_dist>tolerance :
 			bez1, bez2 = bez_split(bez,0.5)
-			point_to_bez_distance_recurcion(p, bez1, depth-1,  needed_dist_bounds, tolerance)
-			point_to_bez_distance_recurcion(p, bez2, depth-1,  needed_dist_bounds, tolerance)
+			point_to_bez_distance_recurcion(p, bez1, depth-1,  needed_dist_bounds, tolerance, ts,(ts+te)/2)
+			point_to_bez_distance_recurcion(p, bez2, depth-1,  needed_dist_bounds, tolerance, (ts+te)/2, te)
 		else :
-			point_to_bez_distance_intermediate_result = (max_dist+min_dist)/2
+			point_to_bez_distance_intermediate_result = [(max_dist+min_dist)/2, ts, te]
 			
 def point_to_bez_distance(p, bez, needed_dist_bounds = [0.,1e100], tolerance=.001):
 	global point_to_bez_distance_intermediate_result
-	point_to_bez_distance_intermediate_result = float("inf")
-	point_to_bez_distance_recurcion(p, bez, 10, [needed_dist_bounds[0]**2,needed_dist_bounds[1]**2] , tolerance)
-	return math.sqrt(point_to_bez_distance_intermediate_result)
+	point_to_bez_distance_intermediate_result = [float("inf"),0,1]
+	needed_dist_bounds = [needed_dist_bounds[0]**2,needed_dist_bounds[1]**2]
+	point_to_bez_distance_recurcion(p, bez, 5, needed_dist_bounds, tolerance,0.,1.)
+	# now polish the root, min distance reached where der*OP == 0
+	# (axt^3+bxt^2+cxt+dx-x0)*(3axt^2+2bxt+cx) + (ayt^3+byt^2+cyt+dy-y0)*(3ayt^2+2byt+cy) == 0
+	print_(point_to_bez_distance_intermediate_result)
+	if needed_dist_bounds[0]<=point_to_bez_distance_intermediate_result[0]<=needed_dist_bounds[1]:
+		ax,ay,bx,by,cx,cy,dx,dy=bezmisc.bezierparameterize(bez)
+		t = (point_to_bez_distance_intermediate_result[1]+point_to_bez_distance_intermediate_result[2])/2
+		dx, dy = dx-p[0], dy-p[1]
+		i = 0 
+		while i==0 or abs(f)>0.000001 and i<10 : 
+			t2,t3 = t**2,t**3
+			f = (ax*t3+bx*t2+cx*t+dx)*(3*ax*t2+2*bx*t+cx) + (ay*t3+by*t2+cy*t+dy)*(3*ay*t2+2*by*t+cy)
+			df = (6*ax*t+2*bx)*(ax*t3+bx*t2+cx*t+dx) + (3*ax*t2+2*bx*t+cx)**2 + (6*ay*t+2*by)*(ay*t3+by*t2+cy*t+dy) + (3*ay*t2+2*by*t+cy)**2
+			if df!=0 :
+				t = t - f/df
+			else :	
+				break
+			i += 1	
+		if 0<t<1 : 
+			p1 = bezmisc.bezierpointatt(bez,t)
+			point_to_bez_distance_intermediate_result[0] = (p1[0]-p[0])**2 + (p1[1]-p[1])**2 
+			print_(point_to_bez_distance_intermediate_result[0], t)
+	return math.sqrt(point_to_bez_distance_intermediate_result[0])
 	
 def get_distance_from_point_to_csp(p,sp1,sp2, tolerance = 0.01 ): 
 	n, i = 10, 0
