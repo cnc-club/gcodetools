@@ -1140,13 +1140,20 @@ def cubic_solver(a,b,c,d):
 	if a!=0:
 		#	Monics formula see http://en.wikipedia.org/wiki/Cubic_function#Monic_formula_of_roots
 		a,b,c = (b/a, c/a, d/a)
+		print_("x3 + %s*x2 + %s*x + %s = 0" %(a,b,c))
 		m = 2*a**3 - 9*a*b + 27*c
 		k = a**2 - 3*b
 		n = m**2 - 4*k**3
 		w1 = -.5 + .5*cmath.sqrt(3)*1j
 		w2 = -.5 - .5*cmath.sqrt(3)*1j
-		m1 = pow(complex((m+cmath.sqrt(n))/2),1./3)
-		n1 = pow(complex((m-cmath.sqrt(n))/2),1./3)
+		if n>=0 :
+			t = m+math.sqrt(n)
+			m1 = pow((m+math.sqrt(n))/2,1./3) if t>=0 else -pow(-(m+math.sqrt(n))/2,1./3)
+			t = m+math.sqrt(n)
+			n1 = pow((m-math.sqrt(n))/2,1./3) if t>=0 else -pow(-(m-math.sqrt(n))/2,1./3)
+		else :
+			m1 = pow(complex((m+cmath.sqrt(n))/2),1./3)
+			n1 = pow(complex((m-cmath.sqrt(n))/2),1./3)
 		x1 = -1./3 * (a + m1 + n1)
 		x2 = -1./3 * (a + w1*m1 + w2*n1)
 		x3 = -1./3 * (a + w2*m1 + w1*n1)
@@ -1182,8 +1189,12 @@ def csp_line_intersection(l1,l2,sp1,sp2):
 	c=coef1*cy-coef2*cx
 	d=coef1*(y0-bb)-coef2*(x0-dd)
 	roots = cubic_solver(a,b,c,d)
+	print_("%s*x3 + %s*x2 + %s*x + %s = 0" %(a,b,c,d))
+#	print_("%s*y3 + %s*y2 + %s*y + %s = 0"%(ay,by,cy,y0))
 	retval = []
+	print_()
 	for i in roots :
+		print_("root:",i)
 		if type(i) is complex and i.imag==0:
 			i = i.real
 		if type(i) is not complex and 0<=i<=1:
@@ -2850,33 +2861,38 @@ G01 Z1 (going to cutting z)\n""",
 						width = max(0, self.options.lathe_width - max(0, bound[1]) )
 						step = tool['depth step']
 						steps = int(math.ceil(width/step))
-						for i in range(steps,-1,-1):
+						for i in range(steps-2,1,-1):
 							rect = [ [[bound[0],i*step]]*3, [[bound[2],i*step]]*3, [[bound[2],(i+1)*step]]*3, [[bound[0],(i+1)*step]]*3, [[bound[0],i*step]]*3 ]
 							print_("!!!",rect)
-							inkex.etree.SubElement( layer, inkex.addNS("path","svg"), 
-							{	"d": cubicsuperpath.formatPath(self.transform_csp([rect],layer, True) ),
-								"style": "fill:none;stroke-width:1;stroke:#00ffff;"	} )
+#							inkex.etree.SubElement( layer, inkex.addNS("path","svg"), 
+#							{	"d": cubicsuperpath.formatPath(self.transform_csp([rect],layer, True) ),
+#								"style": "fill:none;stroke-width:1;stroke:#00ffff;"	} )
 							#csp_bool = ([subpath], rect, "intersect")
 							intersections = []
+							print_(len(subpath))
 							for j in range(1,len(subpath)) :
 								sp1,sp2 = subpath[j-1], subpath[j]
-								intersections += [[j,k] for k in csp_line_intersection([bound[0],i*step], [bound[2],i*step], sp1, sp2)]
-								intersections += [[j,k] for k in csp_line_intersection([bound[0],(i+1)*step], [bound[2],(i+1)*step], sp1, sp2)]
-							#draw_pointer(self.transform([bound[2],(i-1)*step],layer,True),"#00ff00")
+								print_(j)
+								intersections += [[j,k] for k in csp_line_intersection([bound[0]-10,i*step], [bound[2]+10,i*step], sp1, sp2)]
+			#					intersections += [[j,k] for k in csp_line_intersection([bound[0]-10,(i+1)*step], [bound[2]+10,(i+1)*step], sp1, sp2)]
+						
+							for (j,t) in intersections :
+								draw_pointer(self.transform(csp_at_t(subpath[j-1],subpath[j],t),layer,True),"#00ff00")
+								print_(j,t)
 							c = self.transform_csp([subpath],layer,True)
 							intersections.sort()
 							parts = []
 							# split curve by intersection points
-							intersections = intersections
 							parts = subpath_split_by_points(subpath,intersections)
 							color = ["red","blue","green"]
 							for part in parts :
 								minx,miny,maxx,maxy = csp_true_bounds([part])
+								y = (maxy[1]+miny[1])/2
 #								draw_pointer(self.transform([x,y],layer,True),"#0000ff")
 								print_(i*step-10**-10 , miny[1] , maxy[1] ,(i+1)*step+10**-10)
-								if  maxy[1] > (i+1)*step :
+								if  y > (i+1)*step :
 									color = "blue"
-								elif i*step-10**-10 <= miny[1] <= maxy[1] <= (i+1)*step+10**-10 :
+								elif i*step <= y <= (i+1)*step :
 									color = "green"
 									inkex.etree.SubElement( layer, inkex.addNS("path","svg"), 
 									{	"d": cubicsuperpath.formatPath(self.transform_csp([part],layer, True) ),
