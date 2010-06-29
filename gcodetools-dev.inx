@@ -184,9 +184,17 @@ Press Apply to create new tool.
 			</_param>
 	</page>
 <!-- Gcodetools: /tools_library block -->
+
+<!-- Gcodetools: lathe block -->
+	<page name='lathe' _gui-text='Lathe'>	
+		<param name="lathe-width" type="float" precision="5" min="0" max="1000" _gui-text="Lathe width">10</param>
+	</page>
+<!-- Gcodetools: /lathe block -->
+
+
 <!-- Gcodetools: offset block -->
 	<page name='offset' _gui-text='Offset'>	
-		<param name="offset-radius" type="float" precision="5" min="0" max="1000" _gui-text="Offset radius">10</param>
+		<param name="offset-radius" type="float" precision="5" min="-1000" max="1000" _gui-text="Offset radius">10</param>
 		<param name="offset-step" type="float" precision="5" min="0" max="1000" _gui-text="Offset step">10</param>
 	</page>
 <!-- Gcodetools: /offset block -->
