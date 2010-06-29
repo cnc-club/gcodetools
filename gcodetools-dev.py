@@ -645,18 +645,18 @@ def csp_offset(csp, r) :
 	return clipped_offset
 
 		
-def atan2(*arg):
-	return (math.pi/2 - atan2_(arg)) % math.pi2
 
 					
-def atan2_(*arg):	
+def atan2(*arg):	
 	if len(arg)==1 and ( type(arg[0]) == type([0.,0.]) or type(arg[0])==type((0.,0.)) ) :
-		return math.atan2(arg[0][0], arg[0][1])
+		return (math.pi/2 - math.atan2(arg[0][0], arg[0][1]) ) % math.pi2
 	elif len(arg)==2 :
-		return math.atan2(arg[0],arg[1])
+		
+		return (math.pi/2 - math.atan2(arg[0],arg[1]) ) % math.pi2
 	else :
 		raise ValueError, "Bad argumets for atan! (%s)" % arg  
-#def round_join(start, end) :
+
+
 
 def draw_pointer(x,color = "#f00", figure = "cross" ) :
 	if figure ==  "line" :
@@ -1204,8 +1204,57 @@ def biarc(sp1, sp2, z1, z2, depth=0):
 		return [	[ sp1[1], 'arc', [R1.x,R1.y], a1, [P2.x,P2.y], [z1,zm] ], [ [P2.x,P2.y], 'arc', [R2.x,R2.y], a2, [P4.x,P4.y], [zm,z2] ]		]
 
 
+def biarc_curve_segment_length(seg):
+	if seg[1] == "arc" :
+		return math.sqrt((seg[0][0]-seg[2][0])**2+(seg[0][1]-seg[2][1])**2)*seg[3]
+	elif seg[1] == "line" :	
+		return math.sqrt((seg[0][0]-seg[4][0])**2+(seg[0][1]-seg[4][1])**2)
+	else: 
+		return 0	
 
+def biarc_curve_clip_at_l(curve, l, clip_type = "strict") :
 
+	# get first subcurve and ceck it's length  
+	subcurve, subcurve_l, moved = [], 0, False
+	for seg in curve:
+		if seg[1] == "move" and moved or seg[1] == "end" :	
+			break
+		if seg[1] == "move" : moved = True 
+		subcurve_l += biarc_curve_segment_length(seg)
+		if seg[1] == "arc" or seg[1] == "line" : 
+			subcurve += [seg]
+
+	if subcurve_l < l and clip_type == "strict" : return []	
+	lc = 0
+	if (subcurve[-1][4][0]-subcurve[0][0][0])**2 + (subcurve[-1][4][1]-subcurve[0][0][1])**2 < 10**-7 : subcurve_closed = True
+	i = 0
+	reverse = False
+	while lc<l :
+		seg = subcurve[i]
+		if reverce :  
+			if seg[1] == "line" :
+				seg = [seg[4], "line", 0 , 0, seg[0], seg[5]] # Hmmm... Do we have to swap seg[5][0] and seg[5][1] (zstart and zend) or not?
+			elif seg[1] == "arc" :
+				seg = [seg[4], "arc", seg[2] , -seg[3], seg[0], seg[5]] # Hmmm... Do we have to swap seg[5][0] and seg[5][1] (zstart and zend) or not?
+		ls = biarc_curve_segment_length(seg)
+		if ls != 0 :
+			if l-lc>ls :
+				res += [seg]
+			else :
+				if seg[1] == "arc" :
+					r  = math.sqrt((seg[0][0]-seg[2][0])**2+(seg[0][1]-seg[2][1])**2)
+					x,y = seg[0][0]-seg[2][0], seg[0][1]-seg[2][1]
+					a = seg[3]/ls*(l-lc)
+					x,y = x*math.cos(a) - y*math.sin(a),  x*math.sin(a) + y*math.cos(a)
+					x,y = x+seg[2][0], y+seg[2][1]
+					res += [[ seg[0], "arc",  seg[2], a, [x,y], [seg[5][0],seg[5][1]/ls*(l-lc)]  ]]
+				if seg[1] == "line" :
+					res += [[ seg[0], "line",  0, 0, [(seg[4][0]-seg[0][0])/ls*(l-lc),(seg[4][1]-seg[0][1])/ls*(l-lc)], [seg[5][0],seg[5][1]/ls*(l-lc)]  ]]
+		i += 1 
+		if i >= len(subcurve) and not subcurve_closed: 
+			reverse = not reverce
+		i = i%len(subcurve)
+	return res	
 
 				
 ################################################################################
