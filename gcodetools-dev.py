@@ -1909,7 +1909,7 @@ class Gcodetools(inkex.Effect):
 		else : return None
 
 	def get_tool(self, g):
-		tool = self.default_tool
+		tool = self.default_tool.copy()
 		tool["self_group"] = g 
 		for i in g:
 			#	Get parameters
@@ -2651,6 +2651,7 @@ class Gcodetools(inkex.Effect):
 ###
 ################################################################################
 	def tools_library(self, layer=None) :
+		# Add a tool to the drawing
 		if layer == None :
 			layer = self.current_layer if self.current_layer is not None else self.document.getroot()
 		if layer in self.tools:
@@ -2710,9 +2711,7 @@ G01 Z1 (going to cutting z)\n""",
 			tool = self.default_tool
 			
 		
-		tool_num = 0
-		for i in self.tools:
-			tool_num += len(self.tools[i])
+		tool_num = sum([len(self.tools[i]) for i in self.tools])
 		colors = ["00ff00","0000ff","ff0000","fefe00","00fefe", "fe00fe", "fe7e00", "7efe00", "00fe7e", "007efe", "7e00fe", "fe007e"]
 		
 		tools_group = inkex.etree.SubElement(layer, inkex.addNS('g','svg'), {'gcodetools': "Gcodetools tool defenition"})
@@ -2724,7 +2723,7 @@ G01 Z1 (going to cutting z)\n""",
 		for key in self.tools_field_order:
 			if key in tool: keys += [key]
 		for key in tool:
-			if key not in self.tools_field_order: keys += [key]
+			if key not in keys: keys += [key]
 		for key in keys :
 			g = inkex.etree.SubElement(tools_group, inkex.addNS('g','svg'), {'gcodetools': "Gcodetools tool parameter"})
 		
@@ -2759,7 +2758,7 @@ G01 Z1 (going to cutting z)\n""",
 		bg.set('d',"m -20,-20 l 400,0 0,%f -400,0 z " % (y+50))
 		tool = []
 		tools_group.set("transform", simpletransform.formatTransform([ [1,0,self.view_center[0]-150 ], [0,1,self.view_center[1]] ] ))
-		
+		print_
 
 
 
