@@ -607,6 +607,9 @@ def csp_normalized_normal(sp1,sp2,t) :
 	nx,ny = csp_normalized_slope(sp1,sp2,t)
 	return -ny, nx
 
+def csp_parameterize(sp1,sp2):
+	return bezmisc.bezierparameterize(csp_segment_to_bez(sp1,sp2))
+	
 ################################################################################
 ###		Bezier additional functions
 ################################################################################
@@ -726,6 +729,38 @@ def vector_from_to_length(a,b):
 ################################################################################
 ###	Common functions
 ################################################################################
+
+def matrix_mul(a,b) :
+	return [ [ sum([a[i][k]*b[k][j] for k in range(len(a[0])) ])   for j in range(len(b[0]))]   for i in range(len(a))] 
+	try :
+		return [ [ sum([a[i][k]*b[k][j] for k in range(a[0]) ])   for j in range(len(b[0]))]   for i in range(len(a))] 
+	except :
+		return None
+
+
+def transpose(a) :
+	return [ [ a[i][j] for i in range(len(a)) ] for j in range(len(a[0])) ]
+	try :
+		return [ [ a[i][j] for i in range(a) ] for j in range(a[0]) ]
+	except :
+		return None
+
+		
+
+def det_3x3(a):
+	return  float(
+		a[0][0]*a[1][1]*a[2][2] + a[0][1]*a[1][2]*a[2][0] + a[1][0]*a[2][1]*a[0][2]
+		- a[0][2]*a[1][1]*a[2][0] - a[0][0]*a[2][1]*a[1][2] - a[0][1]*a[2][2]*a[1][0]
+		)
+
+def inv_3x3(a): # invert matrix 3x3
+	det = det_3x3(a)
+	if det==0: return None
+	return	[  
+		[  (a[1][1]*a[2][2] - a[2][1]*a[1][2])/det,  -(a[0][1]*a[2][2] - a[2][1]*a[0][2])/det,  (a[0][1]*a[1][2] - a[1][1]*a[0][2])/det ], 
+		[ -(a[1][0]*a[2][2] - a[2][0]*a[1][2])/det,   (a[0][0]*a[2][2] - a[2][0]*a[0][2])/det, -(a[0][0]*a[1][2] - a[1][0]*a[0][2])/det ], 
+		[  (a[1][0]*a[2][1] - a[2][0]*a[1][1])/det,  -(a[0][0]*a[2][1] - a[2][0]*a[0][1])/det,  (a[0][0]*a[1][1] - a[1][0]*a[0][1])/det ]
+	]
 
 
 def small(a) :
@@ -868,6 +903,63 @@ def csp_offset(csp, r) :
 	time_ = time.time()
 	time_start  = time_
 	print_("Offset start at %s"% time_)
+	
+	def polish_offset(sp1,sp2,sp1_r,sp2_r,r) :
+		p0,p1,p2,p3 = sp1[1],sp1[2],sp2[0],sp2[1]
+		s0 = [p1[0]-p0[0],p1[1]-p0[1]]
+		s3 = [p3[0]-p2[0],p3[1]-p2[1]]
+		ax,ay,bx,by,cx,cy,dx,dy = csp_parameterize(sp1,sp2)
+		dpx, dpy = 3/4*ax+bx+cx, 3/4*ay+by+cy 
+		n = csp_normalized_normal(sp1,sp2,.5)
+		pc = csp_at_t(sp1,sp2,.5)
+		rc = [pc[0]+n[0]*r, pc[1]+n[1]*r]
+		qc = csp_at_t(sp1_r,sp2_r,.5)
+		ax,ay,bx,by,cx,cy,dx,dy = csp_parameterize(sp1_r,sp2_r)
+		dqx, dqy = 3/4*ax+bx+cx, 3/4*ay+by+cy 
+		A = [
+			[s0[0],					-s3[0],					8/3*dpx],
+			[s0[1],					-s3[1],					8/3*dpy],
+			[s0[0]*n[0]+s0[1]*n[1], s3[0]*n[0]+s3[1]*n[1],	4*((s0[0]-s3[0])*n[0]+(s0[1]-s3[1])*n[1]) ]
+		]
+		y = [ 8/3*(rc[0]-qc[0]), 8/3*(rc[1]-qc[1]), 4/3*(-dqx*dpy+dqy*dpx) ]
+
+		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([[ sp1_r,sp2_r]]), "style":"fill:none;stroke:#0f0;stroke-width:.1px;"} )	
+
+		A1 = inv_3x3(A)
+		if A1!=None:
+			x0 = A1[0][0]*y[0] + A1[0][1]*y[1] + A1[0][2]*y[2]
+			x1 = A1[1][0]*y[0] + A1[1][1]*y[1] + A1[1][2]*y[2]
+			x2 = A1[2][0]*y[0] + A1[2][1]*y[1] + A1[2][2]*y[2]
+			print_(x0,x1,x2)
+			if abs(x0)<0.9 or  abs(x1)<0.9 :
+				if abs(x0)<0.9 :
+					sp1_r[2] = [sp1_r[1][0]+(1+x0)*s0[0], sp1_r[1][1]+(1+x0)*s0[1]]
+				if  abs(x1)<0.9 :
+					sp2_r[0] = [sp2_r[1][0]-(1+x1)*s3[0], sp2_r[1][1]-(1+x1)*s3[1]]
+			else :
+				A +=  [ [0.1,     0.,    0.],
+						[   0.,  0.1,    0.],
+						[   0.,    0.,  0.1]	]
+
+				
+				B = matrix_mul(transpose(A),A)
+				b = transpose(A)
+				a = numpy.matrix(A).transpose()
+				y += [0.,0.,0.]
+				y = transpose([y])
+				y = matrix_mul(transpose(A),y)
+				print_(y)
+				B = inv_3x3(B)
+				[x0,x1,x2] = transpose(matrix_mul(B,y))[0]
+				if abs(x0)<0.9 and abs(x1)<0.9 :
+					sp1_r[2] = [sp1_r[1][0]+(1+x0)*s0[0], sp1_r[1][1]+(1+x0)*s0[1]]
+					sp2_r[0] = [sp2_r[1][0]-(1+x1)*s3[0], sp2_r[1][1]-(1+x1)*s3[1]]
+				print_(x0,x1,x2)
+		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([[ sp1_r,sp2_r]]), "style":"fill:none;stroke:#00f;stroke-width:.1px;"} )	
+			
+	
+	
+	
 	def create_offset_segment(sp1,sp2,dstart,dend,nstart,nend,startGue,endGue,r):
 		start = [sp1[1][0]+nstart[0]*r, sp1[1][1]+nstart[1]*r]
 		end   = [sp2[1][0]+nend[0]*r, sp2[1][1]+nend[1]*r]
@@ -877,6 +969,8 @@ def csp_offset(csp, r) :
 		d = end
 		c = [d[0]-dend[0]/3, d[1]-dend[1]/3]
 		b = [dstart[0]/3+a[0], dstart[1]/3+a[1]]
+		
+		polish_offset(sp1,sp2,[a,a,b],[c,d,d],r)
 		return [[a,a,b],[c,d,d]]
 
 	def join_offsets(prev,next, center, r):
@@ -918,6 +1012,7 @@ def csp_offset(csp, r) :
 		
 		req = [mid[0] + nmid[0]*r, mid[1] + nmid[1]*r]
 		sp1_r,sp2_r = create_offset_segment(sp1,sp2,dstart,dend,nstart,nend,startGue,endGue,r)
+		
 		check = csp_at_t(sp1_r,sp2_r,.5)
 		err = vector_from_to_length(req,check)
 		if  err>tolerance and depth>0 :
@@ -946,7 +1041,10 @@ def csp_offset(csp, r) :
 		if cspseglength(csp[i][-1],csp[i][0])>0.001 : 
 			csp[i][-1][2] = csp[i][-1][1]
 			csp[i]+= [ [csp[i][0][1],csp[i][0][1],csp[i][0][1]] ]
+	
+	# Get rid of self intersections.
 
+	
 	# Get special points (curvature = 0) and split the path at them.	
 	for j in range(len(csp)) : 
 		subpath = csp[j]
@@ -983,7 +1081,7 @@ def csp_offset(csp, r) :
 		subpath_offset = []
 		for j in xrange(1,len(subpath)) : 
 			sp1, sp2 = subpath[j-1], subpath[j]
-			offset = offset_segment_recursion(sp1,sp2,r, 4, 0.0025*16) 
+			offset = offset_segment_recursion(sp1,sp2,r, 0, 0.0025*16) 
 			#inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([offset]), "style":"fill:none;stroke:#f00;stroke-width:3px;"} )	
 
 			if len(subpath_offset)>0 : 
@@ -2232,17 +2330,6 @@ class Gcodetools(inkex.Effect):
 		if not self.check_dir() : return
 		gcode = ''
 
-		def inv(a): # invert matrix 3x3
-			det = float(a[0][0]*a[1][1]*a[2][2] + a[0][1]*a[1][2]*a[2][0] + a[1][0]*a[2][1]*a[0][2] - a[0][2]*a[1][1]*a[2][0] - a[0][0]*a[2][1]*a[1][2] - a[0][1]*a[2][2]*a[1][0])
-			if det==0: return None
-			return	[  
-				[  (a[1][1]*a[2][2] - a[2][1]*a[1][2])/det,  -(a[0][1]*a[2][2] - a[2][1]*a[0][2])/det,  (a[0][1]*a[1][2] - a[1][1]*a[0][2])/det ], 
-				[ -(a[1][0]*a[2][2] - a[2][0]*a[1][2])/det,   (a[0][0]*a[2][2] - a[2][0]*a[0][2])/det, -(a[0][0]*a[1][2] - a[1][0]*a[0][2])/det ], 
-				[  (a[1][0]*a[2][1] - a[2][0]*a[1][1])/det,  -(a[0][0]*a[2][1] - a[2][0]*a[0][1])/det,  (a[0][0]*a[1][1] - a[1][0]*a[0][1])/det ]
-			]
-
-
-
 		def find_cutter_center((x1,y1),(nx1,ny1), sp1,sp2, tool, t3 = .5):
 
 			####################################################################
@@ -2293,7 +2380,7 @@ class Gcodetools(inkex.Effect):
 				F1[2][1] = 0
 				F1[2][2] = -2*f1x*tx -2*f1y*ty
 
-				F1 = inv(F1)
+				F1 = inv_3x3(F1)
 			
 				if (	 isnan(F[0]) or isnan(F[1]) or isnan(F[2]) or 
 						 isinf(F[0]) or isinf(F[1]) or  isinf(F[2]) ):
