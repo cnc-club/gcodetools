@@ -196,6 +196,8 @@ Press Apply to create new tool.
 	<page name='offset' _gui-text='Offset'>	
 		<param name="offset-radius" type="float" precision="5" min="-1000" max="1000" _gui-text="Offset radius">10</param>
 		<param name="offset-step" type="float" precision="5" min="0" max="1000" _gui-text="Offset step">10</param>
+		<param name="offset-draw-clippend-path" type="boolean" precision="5" min="0" max="1000" _gui-text="Draw clipped path">false</param>
+		
 	</page>
 <!-- Gcodetools: /offset block -->
 

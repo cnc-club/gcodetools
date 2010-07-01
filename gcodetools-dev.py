@@ -148,6 +148,132 @@ def csp_simple_bound(csp):
 def csp_segment_to_bez(sp1,sp2) :
 	return sp1[1:]+sp2[:2]
 
+def point_to_line_segment_distance_2(p1, p2,p3) :
+	# p1 - point, p2,p3 - line segment
+	n = [p2[1]-p3[1],p3[0]-p2[0]]
+	intersection, ta, tb = straight_segments_intersection([p2,p3], [p1, [p1[0]-n[0],p1[1]-n[1]]] )
+	if 1<=ta<=1 :
+		return (p1[0] - p2[0]*(1-ta) - p3[0]*ta)**2 + (p1[1] - p2[1]*(1-ta) - p3[1]*ta)**2 
+	else :
+		return min( (p1[0]-p2[0])**2+(p1[1]-p2[1])**2, (p1[0]-p3[0])**2+(p1[1]-p3[1])**2  )	
+	
+def line_to_line_min_max_distance_2(p1,p2,p3,p4):
+	min_dist = 1e100
+	max_dist = 0.
+	if (p1[0]-p2[0])**2+(p1[1]-p2[1])**2 == 0 or (p3[0]-p4[0])**2+(p3[1]-p4[1])**2 == 0 :
+		return 0., 1e100
+	if straight_segments_intersection([p1,p2],[p3,p4],True) : min_dist = 0.
+	d = point_to_line_segment_distance_2(p1,p3,p4)
+	print_(d)
+	min_dist = min(d,min_dist)		
+	max_dist = max(d,max_dist)		
+	d = point_to_line_segment_distance_2(p2,p3,p4)
+	min_dist = min(d,min_dist)		
+	max_dist = max(d,max_dist)		
+	d = point_to_line_segment_distance_2(p3,p1,p2)
+	min_dist = min(d,min_dist)		
+	max_dist = max(d,max_dist)		
+	d = point_to_line_segment_distance_2(p4,p1,p2)
+	min_dist = min(d,min_dist)		
+	max_dist = max(d,max_dist)		
+	print_("_to_bound", min_dist, max_dist)
+	return min_dist, max_dist
+
+def bound_to_bound_distance(sp1,sp2,sp3,sp4) :
+	min_dist = 1e100
+	max_dist = 0
+	points1 = csp_segment_to_bez(sp1,sp2)
+	points2 = csp_segment_to_bez(sp3,sp4)
+	for i in range(4) :
+		for j in range(4) :
+			min_, max_ = line_to_line_min_max_distance_2(points1[i-1], points1[i], points2[j-1], points2[j])
+			min_dist = min(min_dist,min_)
+			max_dist = max(max_dist,max_)
+			print_("bound_to_bound", min_dist, max_dist)
+	return min_dist, max_dist
+		
+def csp_seg_to_csp_seg_distance_recursion (sp1,sp2,sp3,sp4, depth, ts, te, ts1, te1, needed_dist_bounds, tolerance):
+	global csp_seg_to_csp_seg_distance_recursion_result
+
+	min_dist, max_dist = bound_to_bound_distance(sp1,sp2,sp3,sp4) 	
+	print_(min_dist, max_dist)
+	if max_dist<needed_dist_bounds[0] : 
+		csp_seg_to_csp_seg_distance_recursion_result = [[min_dist, max_dist, ts, te, ts1, te1]]
+		return True
+	if min_dist>needed_dist_bounds[1] : 
+		return False
+	if depth>0 and max_dist-min_dist>tolerance :
+		sp1,sp2,sp5 = csp_split(sp1,sp2,.5)
+		sp3,sp4,sp6 = csp_split(sp3,sp4,.5)
+		if csp_seg_to_csp_seg_distance_recursion(sp1,sp2, sp3,sp4, depth-1,  ts,(ts+te)/2, ts1,(ts1+te1)/2,  needed_dist_bounds, tolerance) : return True
+		if csp_seg_to_csp_seg_distance_recursion(sp2,sp5, sp3,sp4, depth-1,  (ts+te)/2,te, ts1,(ts1+te1)/2,  needed_dist_bounds, tolerance) : return True
+		if csp_seg_to_csp_seg_distance_recursion(sp1,sp2, sp4,sp6, depth-1,  ts,(ts+te)/2, (ts1+te1)/2,te1,  needed_dist_bounds, tolerance) : return True
+		if csp_seg_to_csp_seg_distance_recursion(sp2,sp5, sp4,sp6, depth-1,  (ts+te)/2,te, (ts1+te1)/2,te1,  needed_dist_bounds, tolerance) : return True
+	else :
+		csp_seg_to_csp_seg_distance_recursion_result += [[min_dist, max_dist, ts, te, ts1, te1]]
+		return False
+
+
+def csp_to_csp_distance(sp1,sp2,sp3,sp4, sample_points = 5, tolerance=.01) : 
+	sample_points = max(2,sample_points)
+	points = [float(i)/(sample_points-1) for i in range(sample_points)]
+	ax,ay,bx,by,cx,cy,dx,dy = csp_parameterize(sp1,sp2)
+	ax1,ay1,bx1,by1,cx1,cy1,dx1,dy1 = csp_parameterize(sp3,sp4)
+	F1, F2, F = [0,0], [[0,0],[0,0]], 1e100
+	p1,p2,p3,p4 = P(csp_at_t(sp1,sp2,0.)), P(csp_at_t(sp1,sp2,1.)), P(csp_at_t(sp3,sp4,0.)), P(csp_at_t(sp3,sp4,1.))
+	dist = min( [(p1-p3).mag(),0.,0.], [(p1-p4).mag(),0.,1.], [(p2-p3).mag(),1.,0.], [(p2-p4).mag(),1.,1.]  )
+
+	for k in range(sample_points) :
+		for j in range(sample_points) : 
+			print_(i)
+			t1,t2 = float(k)/(sample_points-1), float(j)/(sample_points-1)
+			i = 0
+			print_()
+			while i<2 or abs(F-Flast)>tolerance and i<10 :
+				p1 = csp_at_t(sp1,sp2,t1)
+				p2 = csp_at_t(sp3,sp4,t2)
+				f1x = 3*ax*t1**2+2*bx*t1+cx
+				f1y = 3*ay*t1**2+2*by*t1+cy
+				f2x = 3*ax1*t2**2+2*bx1*t2+cx1
+				f2y = 3*ay1*t2**2+2*by1*t2+cy1
+				Flast = F
+				F = (p1[0]-p2[0])**2+(p1[1]-p2[1])**2
+				
+				F1[0] = 2*f1x*(p1[0]-p2[0]) +  2*f1y*(p1[1]-p2[1]) 
+				F1[1] = -2*f2x*(p1[0]-p2[0]) -  2*f2y*(p1[1]-p2[1]) 
+				print_(t1,t2,F, F1)												
+				
+				F2[0][0] = 2*(6*ax*t1+2*bx)*(p1[0]-p2[0]) + 2*f1x**2 + 2*(6*ay*t1+2*by)*(p1[1]-p2[1]) +2*f1y**2
+				F2[0][1] = -2*f1x*f2x - 2*f1y*f2y
+				F2[1][0] = -2*(6*ax1*t2+2*bx1)*(p1[0]-p2[0]) + 2*f2x**2 - 2*(6*ay1*t2+2*by1)*(p1[1]-p2[1]) + 2*f2y**2
+				F2[1][1] = -2*f2x*f1x - 2*f2y*f1y 
+				
+				F2 = inv_2x2(F2)
+				
+				if F2!=None and F1[1]!=0 :
+					t1 -= F2[0][0]*F1[0] + F2[0][1]*F1[1]
+					t2 -= F2[1][0]*F1[0] + F2[1][1]*F1[1]
+				else : 
+					break
+				i += 1
+			if 0<=t1<=1 and 0<=t2<=1 :
+				dist = min(dist, [F,t1,t2])
+	t1,t2 = dist[1:]			
+	draw_pointer( list(csp_at_t(sp1,sp2,t1))+ list(csp_at_t(sp3,sp4,t2)), "#057","line")
+			
+
+
+
+#	global csp_seg_to_csp_seg_distance_recursion_result
+#	csp_seg_to_csp_seg_distance_recursion_result = []
+#	csp_seg_to_csp_seg_distance_recursion (sp1,sp2,sp3,sp4, 5, 0., 1., 0., 1., needed_dist_bounds, tolerance)
+#	res = csp_seg_to_csp_seg_distance_recursion_result
+#	for r in res:
+#		ts,te,ts1,te1 = r[2:]
+#		draw_pointer( list(csp_at_t(sp1,sp2,ts)) + list(csp_at_t(sp1,sp2,te)) + list(csp_at_t(sp3,sp4,ts1)) + list(csp_at_t(sp3,sp4,te1)), "#f0f","line")
+	
+	
+
 def csp_split(sp1,sp2,t=.5) :
 	[x1,y1],[x2,y2],[x3,y3],[x4,y4] = sp1[1], sp1[2], sp2[0], sp2[1] 
 	x12 = x1+(x2-x1)*t
@@ -268,6 +394,36 @@ def csp_segments_intersection(sp1,sp2,sp3,sp4) :
 		if len(intersections[i])<5 or intersections[i][4] != "Overlap" :
 			intersections[i] = polish_intersection(a,b,intersections[i][0],intersections[i][1])
 	return intersections
+
+def csp_max_curvature(sp1,sp2):
+	ax,ay,bx,by,cx,cy,dx,dy = csp_parameterize(sp1,sp2)
+	tolerance = .0001
+	F = 0.
+	i = 0
+	while i<2 or F-Flast<tolerance and i<10 :
+		t = .5
+		f1x = 3*ax*t**2 + 2*bx*t + cx
+		f1y = 3*ay*t**2 + 2*by*t + cy
+		f2x = 6*ax*t + 2*bx
+		f2y = 6*ay*t + 2*by
+		f3x = 6*ax
+		f3y = 6*ay
+		d = pow(f1x**2+f1y**2,1.5)
+		if d != 0 :
+			Flast = F
+			F = (f1x*f2y-f1y*f2x)/d
+			F1 = 	(
+						 (	d*(f1x*f3y-f3x*f1y) - (f1x*f2y-f2x*f1y)*3.*(f2x*f1x+f2y*f1y)*pow(f1x**2+f1y**2,.5) )	/ 
+				 				(f1x**2+f1y**2)**3
+					)
+			i+=1	
+			if F1!=0:
+				t += F/F1
+			else:
+				break
+		else: break
+	return t			
+	
 	 	
 def csp_curvature_radius_at_t(sp1,sp2,t) :
 	ax,ay,bx,by,cx,cy,dx,dy = bezmisc.bezierparameterize(csp_segment_to_bez(sp1,sp2))
@@ -609,7 +765,8 @@ def csp_normalized_normal(sp1,sp2,t) :
 
 def csp_parameterize(sp1,sp2):
 	return bezmisc.bezierparameterize(csp_segment_to_bez(sp1,sp2))
-	
+
+
 ################################################################################
 ###		Bezier additional functions
 ################################################################################
@@ -733,15 +890,14 @@ def vector_from_to_length(a,b):
 def matrix_mul(a,b) :
 	return [ [ sum([a[i][k]*b[k][j] for k in range(len(a[0])) ])   for j in range(len(b[0]))]   for i in range(len(a))] 
 	try :
-		return [ [ sum([a[i][k]*b[k][j] for k in range(a[0]) ])   for j in range(len(b[0]))]   for i in range(len(a))] 
+		return [ [ sum([a[i][k]*b[k][j] for k in range(len(a[0])) ])   for j in range(len(b[0]))]   for i in range(len(a))] 
 	except :
 		return None
 
 
 def transpose(a) :
-	return [ [ a[i][j] for i in range(len(a)) ] for j in range(len(a[0])) ]
 	try :
-		return [ [ a[i][j] for i in range(a) ] for j in range(a[0]) ]
+		return [ [ a[i][j] for i in range(len(a)) ] for j in range(len(a[0])) ]
 	except :
 		return None
 
@@ -761,6 +917,15 @@ def inv_3x3(a): # invert matrix 3x3
 		[ -(a[1][0]*a[2][2] - a[2][0]*a[1][2])/det,   (a[0][0]*a[2][2] - a[2][0]*a[0][2])/det, -(a[0][0]*a[1][2] - a[1][0]*a[0][2])/det ], 
 		[  (a[1][0]*a[2][1] - a[2][0]*a[1][1])/det,  -(a[0][0]*a[2][1] - a[2][0]*a[0][1])/det,  (a[0][0]*a[1][1] - a[1][0]*a[0][1])/det ]
 	]
+
+
+def inv_2x2(a): # invert matrix 2x2
+	det = a[0][0]*a[1][1] - a[1][0]*a[0][1]
+	if det==0: return 0
+	return [
+			[a[1][1]/det, -a[0][1]/det],
+			[-a[1][0]/det, a[0][0]/det]
+			]
 
 
 def small(a) :
@@ -887,8 +1052,8 @@ class P:
 	def __repr__(self): return '%f,%f' % (self.x, self.y)
 	def pr(self): return "%.2f,%.2f" % (self.x, self.y)
 	def to_list(self): return [self.x, self.y]	
-
-
+	def ccw(self): return P(-self.y,self.x)
+	def l2(self): return self.x*self.x + self.y*self.y
 ################################################################################
 ###
 ### Offset function 
@@ -900,79 +1065,62 @@ class P:
 ################################################################################
 
 def csp_offset(csp, r) :
+
+	sp1,sp2 = csp[0][0:2]
+	sp3,sp4 = csp[1][0:2]
+
+	csp_to_csp_distance(sp1,sp2,sp3,sp4)
+	return [[]]
+
 	time_ = time.time()
 	time_start  = time_
 	print_("Offset start at %s"% time_)
 	
-	def polish_offset(sp1,sp2,sp1_r,sp2_r,r) :
-		p0,p1,p2,p3 = sp1[1],sp1[2],sp2[0],sp2[1]
-		s0 = [p1[0]-p0[0],p1[1]-p0[1]]
-		s3 = [p3[0]-p2[0],p3[1]-p2[1]]
-		ax,ay,bx,by,cx,cy,dx,dy = csp_parameterize(sp1,sp2)
-		dpx, dpy = 3/4*ax+bx+cx, 3/4*ay+by+cy 
-		n = csp_normalized_normal(sp1,sp2,.5)
-		pc = csp_at_t(sp1,sp2,.5)
-		rc = [pc[0]+n[0]*r, pc[1]+n[1]*r]
-		qc = csp_at_t(sp1_r,sp2_r,.5)
-		ax,ay,bx,by,cx,cy,dx,dy = csp_parameterize(sp1_r,sp2_r)
-		dqx, dqy = 3/4*ax+bx+cx, 3/4*ay+by+cy 
-		A = [
-			[s0[0],					-s3[0],					8/3*dpx],
-			[s0[1],					-s3[1],					8/3*dpy],
-			[s0[0]*n[0]+s0[1]*n[1], s3[0]*n[0]+s3[1]*n[1],	4*((s0[0]-s3[0])*n[0]+(s0[1]-s3[1])*n[1]) ]
-		]
-		y = [ 8/3*(rc[0]-qc[0]), 8/3*(rc[1]-qc[1]), 4/3*(-dqx*dpy+dqy*dpx) ]
-
-		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([[ sp1_r,sp2_r]]), "style":"fill:none;stroke:#0f0;stroke-width:.1px;"} )	
-
-		A1 = inv_3x3(A)
+	def create_offset_segment(sp1,sp2,r) :
+		# See	Gernot Hoffmann "Bezier Curves"  p.34 -> 7.1 Bezier Offset Curves
+		p0,p1,p2,p3 = P(sp1[1]),P(sp1[2]),P(sp2[0]),P(sp2[1])
+		s0,s3 = p1-p0,p3-p2
+		a,b,c = 3*s0+3*s3-2*(p3-p0), -6*s0-3*s3+3*(p3-p0), 3*s0
+		n0 = s0.ccw().unit() if s0.l2()!=0 else P(csp_normalized_normal(sp1,sp2,0))
+		n3 = s3.ccw().unit() if s3.l2()!=0 else P(csp_normalized_normal(sp1,sp2,1))
+		q0,q1,q2,q3 = p0+r*n0, p1+r*n0, p2+r*n3, p3+r*n3
+		A,B,C = 3*s0+3*s3-2*(q3-q0), -6*s0-3*s3+3*(q3-q0), 3*s0
+		pc = a/8+b/4+c/2+p0
+		qc = A/8+B/4+C/2+q0
+		dp = 3./4*a+b+c
+		dq = 3./4*A+B+C
+		nc = dp.ccw().unit()
+		rc = pc+r*nc
+		A_ = [
+				[s0.x,-s3.x,8./3*dp.x],
+				[s0.y,-s3.y,8./3*dp.y],
+				[s0*nc,s3*nc,4*(s0-s3)*nc]
+			]
+		y = [8./3*(rc.x-qc.x), 8./3*(rc.y-qc.y), 4./3*dq*nc]
+		
+		A1 = inv_3x3(A_)
 		if A1!=None:
-			x0 = A1[0][0]*y[0] + A1[0][1]*y[1] + A1[0][2]*y[2]
-			x1 = A1[1][0]*y[0] + A1[1][1]*y[1] + A1[1][2]*y[2]
-			x2 = A1[2][0]*y[0] + A1[2][1]*y[1] + A1[2][2]*y[2]
-			print_(x0,x1,x2)
-			if abs(x0)<0.9 or  abs(x1)<0.9 :
-				if abs(x0)<0.9 :
-					sp1_r[2] = [sp1_r[1][0]+(1+x0)*s0[0], sp1_r[1][1]+(1+x0)*s0[1]]
-				if  abs(x1)<0.9 :
-					sp2_r[0] = [sp2_r[1][0]-(1+x1)*s3[0], sp2_r[1][1]-(1+x1)*s3[1]]
+			[[x0],[x1],[x2]] = matrix_mul(A1,transpose([y]))
+			#print_(x0,x1,x2)	
+			if abs(x0)<0.9 and abs(x1)<0.9 :
+					q1 = q0+(1+x0)*s0
+					q2 = q3-(1+x1)*s3
 			else :
-				A +=  [ [0.1,     0.,    0.],
+				
+				A_ += [ [0.1,     0.,    0.],
 						[   0.,  0.1,    0.],
 						[   0.,    0.,  0.1]	]
-
-				
-				B = matrix_mul(transpose(A),A)
-				b = transpose(A)
-				a = numpy.matrix(A).transpose()
+				B = matrix_mul(transpose(A_),A_)
 				y += [0.,0.,0.]
 				y = transpose([y])
-				y = matrix_mul(transpose(A),y)
-				print_(y)
+				y = matrix_mul(transpose(A_),y)
 				B = inv_3x3(B)
 				[x0,x1,x2] = transpose(matrix_mul(B,y))[0]
-				if abs(x0)<0.9 and abs(x1)<0.9 :
-					sp1_r[2] = [sp1_r[1][0]+(1+x0)*s0[0], sp1_r[1][1]+(1+x0)*s0[1]]
-					sp2_r[0] = [sp2_r[1][0]-(1+x1)*s3[0], sp2_r[1][1]-(1+x1)*s3[1]]
-				print_(x0,x1,x2)
-		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([[ sp1_r,sp2_r]]), "style":"fill:none;stroke:#00f;stroke-width:.1px;"} )	
-			
+				q1 = q0+(1+x0)*s0
+				q2 = q3-(1+x1)*s3
+				#print_(x0,x1,x2)	
+		return [[q0.to_list(), q0.to_list(), q1.to_list()],[q2.to_list(), q3.to_list(), q3.to_list()]]
 	
-	
-	
-	def create_offset_segment(sp1,sp2,dstart,dend,nstart,nend,startGue,endGue,r):
-		start = [sp1[1][0]+nstart[0]*r, sp1[1][1]+nstart[1]*r]
-		end   = [sp2[1][0]+nend[0]*r, sp2[1][1]+nend[1]*r]
-		dstart = [dstart[0]*startGue, dstart[1]*startGue]
-		dend   = [dend[0]*endGue, dend[1]*endGue]
-		a = start
-		d = end
-		c = [d[0]-dend[0]/3, d[1]-dend[1]/3]
-		b = [dstart[0]/3+a[0], dstart[1]/3+a[1]]
-		
-		polish_offset(sp1,sp2,[a,a,b],[c,d,d],r)
-		return [[a,a,b],[c,d,d]]
-
 	def join_offsets(prev,next, center, r):
 		for i in xrange(1,len(prev)) :
 			for j in xrange(len(next)-1,0,-1) :
@@ -988,36 +1136,18 @@ def csp_offset(csp, r) :
 		arc = csp_from_arc(prev[-1][1], next[0][1], center, r, ccw)
 		return prev,arc,next
 		
-	def offset_segment_recursion(sp1,sp2,r, depth, tolerance=0.01) :
-		dstart = csp_slope(sp1,sp2,0.)
-		dend   = csp_slope(sp1,sp2,1.)
-		dmid   = csp_slope(sp1,sp2,.5)
-		
-		mid = csp_at_t(sp1,sp2,.5)
-		
-		dstart_l = math.sqrt(dot(dstart,dstart))
-		dend_l   = math.sqrt(dot(dend,dend))
-		dmid_l   = math.sqrt(dot(dmid,dmid))
-
-		nstart, nend, nmid = normalize(rotate_ccw(dstart)), normalize(rotate_ccw(dend)), normalize(rotate_ccw(dmid))
-		rstart, rend, rmid = csp_curvature_radius_at_t(sp1,sp2,0.), csp_curvature_radius_at_t(sp1,sp2,1.), csp_curvature_radius_at_t(sp1,sp2,.5) 
-
-		# correction of the lengths of the tangent to the offset
-		# if you don't see why i wrote that, draw a little figure and everything will be clear		
-		# ( it was taken as is from Inkscape's source / PathOutline.cpp / Path::RecStdCubicTo )
-		
-		startGue = (1 + r/rstart) if abs(rstart) > 0.01 else 1
-		endGue   = (1 + r/rend)   if abs(rmid)   > 0.01 else 1
-		midGue   = (1 + r/rmid)   if abs(rend)   > 0.01 else 1
-		
-		req = [mid[0] + nmid[0]*r, mid[1] + nmid[1]*r]
-		sp1_r,sp2_r = create_offset_segment(sp1,sp2,dstart,dend,nstart,nend,startGue,endGue,r)
-		
-		check = csp_at_t(sp1_r,sp2_r,.5)
-		err = vector_from_to_length(req,check)
-		if  err>tolerance and depth>0 :
-			sp3,sp4,sp5 = csp_split(sp1,sp2,.5)
-			
+	def offset_segment_recursion(sp1,sp2,r, depth, tolerance=0.5) :
+		sp1_r,sp2_r = create_offset_segment(sp1,sp2,r)
+		err = max(
+				(P(csp_at_t(sp1_r,sp2_r,.25)) - P(csp_at_t(sp1,sp2,.25)) - P(csp_normalized_normal(sp1,sp2,.25))*r).mag(),
+				(P(csp_at_t(sp1_r,sp2_r,.75)) - P(csp_at_t(sp1,sp2,.75)) - P(csp_normalized_normal(sp1,sp2,.75))*r).mag())
+		print_("err",err)
+		if  err>tolerance and depth>0:
+			t = csp_max_curvature(sp1,sp2)
+			t = max(.1+min(depth,3)*.1,min(.9 -min(depth,3)*.1,t))
+			sp3,sp4,sp5 = csp_split(sp1,sp2,t)
+			#inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([[sp3,sp4]]), "style":"fill:none;stroke:#00f;stroke-width:.1px;"} )					
+			#inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([[sp4,sp5]]), "style":"fill:none;stroke:#00f;stroke-width:.1px;"} )					
 			r1 = offset_segment_recursion(sp3,sp4,r, depth-1, tolerance)
 			r2 = offset_segment_recursion(sp4,sp5,r, depth-1, tolerance)
 			return r1[:-1]+ [[r1[-1][0],r1[-1][1],r2[0][2]]] + r2[1:]
@@ -1066,7 +1196,7 @@ def csp_offset(csp, r) :
 				i += len(res)
 			i += 1
 				
-					
+	#inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath(csp), "style":"fill:none;stroke:#00f;stroke-width:.1px;"} )					
 	print_("Offset prepared the path in %s"%(time.time()-time_))
 	print_("Path length = %s"% sum([len(i)for i in csp] ) )
 	time_ = time.time()
@@ -1081,7 +1211,7 @@ def csp_offset(csp, r) :
 		subpath_offset = []
 		for j in xrange(1,len(subpath)) : 
 			sp1, sp2 = subpath[j-1], subpath[j]
-			offset = offset_segment_recursion(sp1,sp2,r, 0, 0.0025*16) 
+			offset = offset_segment_recursion(sp1,sp2,r, 3) 
 			#inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([offset]), "style":"fill:none;stroke:#f00;stroke-width:3px;"} )	
 
 			if len(subpath_offset)>0 : 
@@ -1189,7 +1319,7 @@ def csp_offset(csp, r) :
 			dist = float("inf")
 			for csp_subpath in csp :
 				for j in xrange(1,len(csp_subpath)) :
-					r1,r2 = abs(r)-min(abs(r)/10,.1),abs(r)+min(abs(r)/10,.1)
+					r1,r2 = abs(r)-min(abs(r)/5,.5),abs(r)+min(abs(r)/5,.5)
 					d,t = csp_to_point_distance(csp_subpath[j-1],csp_subpath[j], csp_at_t(subpath[i-1],subpath[i],.5), [r1,r2] )
 					dist = min(dist, d)
 					if dist<r1 :
@@ -1205,8 +1335,8 @@ def csp_offset(csp, r) :
 		#print_(dist, r - dist, break_)
 		if not break_ : 
 			clipped_offset += [subpath]
-		else : 
-			style = "fill:none;stroke:#c00;stroke-width:0.5px;"
+		elif options.offset_draw_clippend_path : 
+			style = "fill:none;stroke:#c00;stroke-width:0.1px;"
 			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath( [subpath] ), "style":style, "comment":str(dist)} )	
 			
 	print_("Clipped in %s"%(time.time()-time_))
@@ -1437,6 +1567,7 @@ class Gcodetools(inkex.Effect):
 
 		self.OptionParser.add_option("",   "--offset-radius",				action="store", type="float", 		dest="offset_radius", default=10.,		help="Offset radius")
 		self.OptionParser.add_option("",   "--offset-step",					action="store", type="float", 		dest="offset_step", default=10.,		help="Offset step")
+		self.OptionParser.add_option("",   "--offset-draw-clippend-path",	action="store", type="inkbool",		dest="offset_draw_clippend_path", default=False,		help="Draw clipped path")		
 
 		self.default_tool = {
 					"name": "Default tool",
@@ -2986,7 +3117,7 @@ G01 Z1 (going to cutting z)\n""",
 						while abs(offset) <= abs(self.options.offset_radius) :
 							offset_ = csp_offset(cubicsuperpath.parsePath(path.get("d")), offset)				
 							if offset_ != [] : 
-								inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath( offset_ ), "style":"fill:none;stroke:#000;stroke-width:2px;"} )	
+								inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath( offset_ ), "style":"fill:none;stroke:#000;stroke-width:.2px;"} )	
 								print_(offset_)
 							else :
 								print_("------------Reached empty offset at radius %s"% offset )
