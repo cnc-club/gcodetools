@@ -149,37 +149,6 @@ def csp_segment_to_bez(sp1,sp2) :
 	return sp1[1:]+sp2[:2]
 
 
-def point_to_line_segment_distance_2(p1, p2,p3) :
-	# p1 - point, p2,p3 - line segment
-	n = [p2[1]-p3[1],p3[0]-p2[0]]
-	intersection, ta, tb = straight_segments_intersection([p2,p3], [p1, [p1[0]-n[0],p1[1]-n[1]]] )
-	if 1<=ta<=1 :
-		return (p1[0] - p2[0]*(1-ta) - p3[0]*ta)**2 + (p1[1] - p2[1]*(1-ta) - p3[1]*ta)**2 
-	else :
-		return min( (p1[0]-p2[0])**2+(p1[1]-p2[1])**2, (p1[0]-p3[0])**2+(p1[1]-p3[1])**2  )	
-	
-def line_to_line_min_max_distance_2(p1,p2,p3,p4):
-	min_dist = 1e100
-	max_dist = 0.
-	if (p1[0]-p2[0])**2+(p1[1]-p2[1])**2 == 0 or (p3[0]-p4[0])**2+(p3[1]-p4[1])**2 == 0 :
-		return 0., 1e100
-	if straight_segments_intersection([p1,p2],[p3,p4],True) : min_dist = 0.
-	d = point_to_line_segment_distance_2(p1,p3,p4)
-	print_(d)
-	min_dist = min(d,min_dist)		
-	max_dist = max(d,max_dist)		
-	d = point_to_line_segment_distance_2(p2,p3,p4)
-	min_dist = min(d,min_dist)		
-	max_dist = max(d,max_dist)		
-	d = point_to_line_segment_distance_2(p3,p1,p2)
-	min_dist = min(d,min_dist)		
-	max_dist = max(d,max_dist)		
-	d = point_to_line_segment_distance_2(p4,p1,p2)
-	min_dist = min(d,min_dist)		
-	max_dist = max(d,max_dist)		
-	print_("_to_bound", min_dist, max_dist)
-	return min_dist, max_dist
-
 def bound_to_bound_distance(sp1,sp2,sp3,sp4) :
 	min_dist = 1e100
 	max_dist = 0
@@ -193,8 +162,20 @@ def bound_to_bound_distance(sp1,sp2,sp3,sp4) :
 			print_("bound_to_bound", min_dist, max_dist)
 	return min_dist, max_dist
 	
-	
-def csp_to_point_distance(sp1,sp2,p,sample_points = 5, tolerance = .01) :
+def csp_to_point_distance(csp, p, dist_bounds = [0,1e100], tolerance=.01) :
+	min_dist = [1e100,0,0,0]
+	for j in range(len(csp)) :
+		for i in range(1,len(csp[j])) :
+			d = csp_seg_to_point_distance(csp[j][i-1],csp[j][i],p,sample_points = 5, tolerance = .01)
+			if d[0] < dist_bounds[0] : 
+#				draw_pointer( list(csp_at_t(subpath[dist[2]-1],subpath[dist[2]],dist[3]))
+#					+list(csp_at_t(csp[dist[4]][dist[5]-1],csp[dist[4]][dist[5]],dist[6])),"red","line", comment = math.sqrt(dist[0]))
+				return [d[0],j,i,d[1]]
+			else : 
+				if d[0] < min_dist[0] : min_dist = [d[0],j,i,d[1]]
+	return min_dist
+			
+def csp_seg_to_point_distance(sp1,sp2,p,sample_points = 5, tolerance = .01) :
 	ax,ay,bx,by,cx,cy,dx,dy = csp_parameterize(sp1,sp2)
 	dx, dy = dx-p[0], dy-p[1]
 	if sample_points < 2 : sample_points = 2
@@ -202,7 +183,7 @@ def csp_to_point_distance(sp1,sp2,p,sample_points = 5, tolerance = .01) :
 	for k in range(sample_points) :
 		t = float(k)/(sample_points-1)
 		i = 0
-		while i==0 or abs(f)>0.000001 and i<10 : 
+		while i==0 or abs(f)>0.000001 and i<20 : 
 			t2,t3 = t**2,t**3
 			f = (ax*t3+bx*t2+cx*t+dx)*(3*ax*t2+2*bx*t+cx) + (ay*t3+by*t2+cy*t+dy)*(3*ay*t2+2*by*t+cy)
 			df = (6*ax*t+2*bx)*(ax*t3+bx*t2+cx*t+dx) + (3*ax*t2+2*bx*t+cx)**2 + (6*ay*t+2*by)*(ay*t3+by*t2+cy*t+dy) + (3*ay*t2+2*by*t+cy)**2
@@ -221,18 +202,18 @@ def csp_to_point_distance(sp1,sp2,p,sample_points = 5, tolerance = .01) :
 
 def csp_seg_to_csp_seg_distance(sp1,sp2,sp3,sp4, dist_bounds = [0,1e100], sample_points = 5, tolerance=.01) : 
 	# check the ending points first
-	dist =	csp_to_point_distance(sp1,sp2,sp3[1],sample_points, tolerance)
+	dist =	csp_seg_to_point_distance(sp1,sp2,sp3[1],sample_points, tolerance)
 	dist += [0.]
 	if dist[0] <= dist_bounds[0] : return dist
-	d = csp_to_point_distance(sp1,sp2,sp4[1],sample_points, tolerance)
+	d = csp_seg_to_point_distance(sp1,sp2,sp4[1],sample_points, tolerance)
 	if d[0]<dist[0] :
 		dist = d+[1.]
 		if dist[0] <= dist_bounds[0] : return dist
-	d =	csp_to_point_distance(sp3,sp4,sp1[1],sample_points, tolerance),
+	d =	csp_seg_to_point_distance(sp3,sp4,sp1[1],sample_points, tolerance),
 	if d[0]<dist[0] :
 		dist = [d[0],0.,d[1]]
 		if dist[0] <= dist_bounds[0] : return dist
-	d =	csp_to_point_distance(sp3,sp4,sp2[1],sample_points, tolerance)
+	d =	csp_seg_to_point_distance(sp3,sp4,sp2[1],sample_points, tolerance)
 	if d[0]<dist[0] :
 		dist = [d[0],1.,d[1]]
 		if dist[0] <= dist_bounds[0] : return dist
@@ -273,10 +254,6 @@ def csp_seg_to_csp_seg_distance(sp1,sp2,sp3,sp4, dist_bounds = [0,1e100], sample
 			if F < dist[0] and 0<=t1<=1 and 0<=t2<=1:
 				dist = [F,t1,t2]
 				if dist[0] <= dist_bounds[0] : 
-					print_()
-					print_((P(csp_at_t(sp1,sp2,t1))- P(csp_at_t(sp3,sp4,t2))).mag())
-					print_("real:",(P(csp_at_t(sp1,sp2,t1))- P(csp_at_t(sp3,sp4,t2))))
-					print_("x,y:",x,y,)
 					return dist
 	return dist			
 
@@ -286,15 +263,15 @@ def csp_to_csp_distance(csp1,csp2, dist_bounds = [0,1e100], tolerance=.01) :
 		for j1 in range(1,len(csp1[i1])) :
 			for i2 in range(len(csp2)) :
 				for j2 in range(1,len(csp2[i2])) :
+					d = csp_seg_bound_to_csp_seg_bound_max_min_distance(csp1[i1][j1-1],csp1[i1][j1],csp2[i2][j2-1],csp2[i2][j2])
+					if d[0] >= dist_bounds[1] : continue
+					if  d[1] < dist_bounds[0] : return [d[1],i1,j1,1,i2,j2,1]
 					d = csp_seg_to_csp_seg_distance(csp1[i1][j1-1],csp1[i1][j1],csp2[i2][j2-1],csp2[i2][j2], dist_bounds, tolerance=tolerance)
 					if d[0] < dist[0] :
 						dist = [d[0], i1,j1,d[1], i2,j2,d[2]]
 					if dist[0] <= dist_bounds[0] :	
-						print_("min!", dist)
-						print_(dist_bounds)
 						return dist
 			if dist[0] >= dist_bounds[1] :	
-				print_("max!", dist)
 				return dist
 	return dist
 #	draw_pointer( list(csp_at_t(csp1[dist[1]][dist[2]-1],csp1[dist[1]][dist[2]],dist[3]))
@@ -525,7 +502,7 @@ def csp_at_t(sp1,sp2,t):
 	x5,y5 = x2+(x3-x2)*t, y2+(y3-y2)*t 
 	
 	x,y = x4+(x5-x4)*t, y4+(y5-y4)*t 
-	return x,y
+	return [x,y]
 
 
 def csp_splitatlength(sp1, sp2, l = 0.5, tolerance = 0.01):
@@ -623,15 +600,21 @@ def csp_subpath_split_by_points(subpath, points) :
 	parts = []
 	for j in range(1,len(points)) : 
 		int1, int2 = points[j-1], points[j]
+		if int1[1] == 1. :
+			int1[0] += 1
+			int1[1] = 0.
+		if int2[1] == 0. :
+			int2[0] -= 1
+			int2[1] = 1.
 		if int1==int2 :
 			continue
 		if int1[0] == 0 and int2[0]==len(subpath)-1:# and small(int1[1]) and small(int2[1]-1) :
 			continue
 		if int1[0]==int2[0] :	# same segment
-			if int1[1] == 0 :	
+			if int1[1] == 0. :	
 				sp1,sp2,sp3 = csp_split(subpath[int1[0]-1],subpath[int1[0]],int2[1])
 				parts += [ [sp1,sp2] ]
-			elif int2[1] == 1 : 
+			elif int2[1] == 1. : 
 				sp1,sp2,sp3 = csp_split(subpath[int1[0]-1],subpath[int1[0]],int1[1])
 				parts += [ [sp2,sp3] ]
 			else:
@@ -718,44 +701,66 @@ def csp_simple_bound_to_point_distance(p, csp):
 				maxy = max(maxy,p_[1]) if maxy!=None else p_[1]
 	return math.sqrt(max(minx-p[0],p[0]-maxx,0)**2+max(miny-p[1],p[1]-maxy,0)**2)
 
-def csp_bound_to_point_distance(p, sp1, sp2 , max_needed_distance):
-	d = csp_simple_bound_to_point_distance(p, [[ sp1,sp2]] )
-	if max_needed_distance<=d :
-		return d 
-	sp = sp1[1:]+sp2[:2]
-	d = None
-	int_count = 0
-	for i in xrange(4):
-		x1, y1, dx, dy = sp[i-1][0],sp[i-1][1], sp[i][0]-sp[i-1][0], sp[i][1]-sp[i-1][1]
-		if (dx**2+dy**2)>0 :
-			d1 = min( (p[0]-x1)**2 + (p[1]-y1)**2, (p[0]-sp[i][0])**2 + (p[1]-sp[i][1])**2 )
-			if 0<=((p[1]-y1)*dy+(p[0]-x1)*dx)/(dx**2+dy**2)<=1:
-				d1 = min( d1, ((p[0]-x1)*dy+(y1-p[1])*dx)**2/(dx**2+dy**2) )
-		else :
-			d1 = (p[0]-x1)**2 + (p[1]-y1)**2
-		d = min(d,d1) if d!=None else d1
-		# Get intersections with horisontal or vertical lines that goes throught p and x
-		if dx!=0 and 0<=(p[0]-x1)/dx<1 and (p[0]-x1)/dx*dy+y1>=p[1] :
-			if p[0]-x1/dx*dy+y1==p[1]:
-				return 0
-			int_count +=1 
-		 
-		elif x1==p[0] : 
-			if y1<=p[1]<=sp[i][1] or sp[i][1]<=p[1]<=y1:
-				return 0
-			elif y1<=p[1]: 
-				x2, y2, dx2, dy2 = sp[i-1][0],sp[i-1][1], sp[i][0]-sp[i-1][0], sp[i][1]-sp[i-1][1]
-				if dx2!=0 and dy!=0: 
-					t1 = (x1-x2)/dx2
-					if not (0<=t1<=1 and 0<=(y2-y1+t1*dy2)/dy<=1):
-						int_count +=1 
-				elif x1!=x2:
-					int_count +=1 
-	if int_count%2 == 0 :
-		return math.sqrt(d) 
-	else:
-		return -math.sqrt(d)
-		
+def csp_bound_to_point_distance(sp1, sp2, p):
+	bez = csp_segment_to_bez(sp1,sp2)
+	min_dist = 1e100
+	for i in range(0,4):
+		d = point_to_line_segment_distance_2(p, bez[i-1],bez[i])
+		if d <= min_dist : min_dist = d
+	return min_dist 
+
+def line_line_intersect(p1,p2,p3,p4) : # Return only true intersection. 
+	if (p1[0]==p2[0] and p1[1]==p2[1]) or (p3[0]==p4[0] and p3[1]==p4[1]) : return False
+	x = (p2[0]-p1[0])*(p4[1]-p3[1]) - (p2[1]-p1[1])*(p4[0]-p3[0])
+	if x==0 : # Lines are parallel
+		if p3[0]!=p4[0] :
+			t11 = (p1[0]-p3[0])/(p4[0]-p3[0]) 
+			t12 = (p2[0]-p3[0])/(p4[0]-p3[0]) 
+			t21 = (p3[0]-p1[0])/(p2[0]-p1[0])
+			t22 = (p4[0]-p1[0])/(p2[0]-p1[0])
+		else:
+			t11 = (p1[1]-p3[1])/(p4[1]-p3[1]) 
+			t12 = (p2[1]-p3[1])/(p4[1]-p3[1]) 
+			t21 = (p3[1]-p1[1])/(p2[1]-p1[1])
+			t22 = (p4[1]-p1[1])/(p2[1]-p1[1])
+		return ("Overlap" if (0<=t11<=1 or 0<=t12<=1) and (0<=t21<=1 or  0<=t22<=1) else False)
+	else :
+		return (
+					0<=((p4[0]-p3[0])*(p1[1]-p3[1]) - (p4[1]-p3[1])*(p1[0]-p3[0]))/x<=1 and
+					0<=((p2[0]-p1[0])*(p1[1]-p3[1]) - (p2[1]-p1[1])*(p1[0]-p3[0]))/x<=1 )
+
+def point_to_line_segment_distance_2(p1, p2,p3) :
+	# p1 - point, p2,p3 - line segment
+	w0 = [p1[0]-p2[0], p1[1]-p2[1]]
+	v = [p2[0]-p1[0], p2[1]-p1[1]]
+	c1 = w0[0]*v[0] + w0[1]*v[0]
+	if c1 <= 0 :
+		return w0[0]*w0[0]+w0[1]*w0[1]
+	c2 = v[0]*v[0] + v[1]*v[1]
+	if c2 <= c1 :
+		return  (p1[0]-p3[0])**2 + (p1[1]-p3[1])**2
+	return (p1[0]- p2[0]-v[0]*c1/c2)**2 + (p1[1]- p2[1]*c1/c2)
+
+def line_to_line_distance_2(p1,p2,p3,p4):
+	if line_line_intersect(p1,p2,p3,p4) : return 0
+	return min(
+			point_to_line_segment_distance_2(p1,p3,p4),
+			point_to_line_segment_distance_2(p2,p3,p4),
+			point_to_line_segment_distance_2(p3,p1,p2),
+			point_to_line_segment_distance_2(p4,p1,p2))
+
+def csp_seg_bound_to_csp_seg_bound_max_min_distance(sp1,sp2,sp3,sp4) :
+	bez1 = csp_segment_to_bez(sp1,sp2)
+	bez2 = csp_segment_to_bez(sp3,sp4) 
+	min_dist = 1e100
+	max_dist = 0.
+	for i in range(0,4) : 
+		for j in range(0,4) : 
+			d = line_to_line_distance_2(bez1[i-1],bez1[i],bez2[j-1],bez2[j])
+			if d < min_dist : min_dist = d
+			d = (bez2[j][0]-bez1[i][0])**2 + (bez2[j][1]-bez1[i][1])**2 
+			if max_dist < d  : max_dist = d
+	return min_dist, max_dist
 
 def csp_reverce(csp) :
 	for i in range(len(csp)) :
@@ -1089,6 +1094,7 @@ def csp_offset(csp, r) :
 				q1 = q0+(1+x0)*s0
 				q2 = q3-(1+x1)*s3
 				#print_(x0,x1,x2)	
+		draw_pointer(sp1[1]+q0.to_list(),"#057","line")
 		return [[q0.to_list(), q0.to_list(), q1.to_list()],[q2.to_list(), q3.to_list(), q3.to_list()]]
 	
 	def join_offsets(prev,next, center, r):
@@ -1141,7 +1147,7 @@ def csp_offset(csp, r) :
 			csp[i][-1][2] = csp[i][-1][1]
 			csp[i]+= [ [csp[i][0][1],csp[i][0][1],csp[i][0][1]] ]
 	
-	# Get rid of self intersections.
+	# TODO Get rid of self intersections.
 
 	
 	# Get special points (curvature = 0) and split the path at them.	
@@ -1175,9 +1181,12 @@ def csp_offset(csp, r) :
 	############################################################################
 	# Create offsets for all segments in the path. And join them together inside each subpath. 		
 	unclipped_offset = [[] for i in xrange(csp_len)]
+	join_points = [[] for i in xrange(csp_len)]
+	intersection = [[] for i in xrange(csp_len)]
 	for i in xrange(csp_len) :
 		subpath = csp[i]
 		subpath_offset = []
+		clipped_corners = []
 		for j in xrange(1,len(subpath)) : 
 			sp1, sp2 = subpath[j-1], subpath[j]
 			offset = offset_segment_recursion(sp1,sp2,r, 3) 
@@ -1186,6 +1195,9 @@ def csp_offset(csp, r) :
 			if len(subpath_offset)>0 : 
 				prev, arc, next = join_offsets(subpath_offset[-1], offset, sp1[1],  r)
 				subpath_offset[-1] = prev[:]
+				if arc ==[] : 
+					clipped_corners += [len(subpath_offset)] # if the corner is clipped we'll have to split a path by it later
+					draw_pointer(next[0][1],"green")
 				subpath_offset += [arc, next] if arc!=[] else [next]
 			else :
 				subpath_offset += [offset[:]]
@@ -1198,10 +1210,16 @@ def csp_offset(csp, r) :
 			subpath_offset[-1] = prev 
 		# Join subpath's offset and save it to unclipped offset list. 	
 		unclipped_offset[i] = subpath_offset[0]	
+		k = 0
 		for j in xrange(1,len(subpath_offset)) :
 			unclipped_offset[i][-1][2] = subpath_offset[j][0][2]
 			unclipped_offset[i] += subpath_offset[j][1:]
-
+			k += len(subpath_offset[j])-1
+			if j-1 in clipped_corners :
+				intersection[i] += [ [k,1.] ]
+		for k,t in intersection[i] :
+			draw_pointer(csp_at_t(unclipped_offset[i][k-1],unclipped_offset[i][k],1.))
+			
 #	inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath(result), "style":"fill:none;stroke:#0f0;"} )	
 	print_("Offsetted path in %s"%(time.time()-time_))
 	time_ = time.time()
@@ -1214,7 +1232,6 @@ def csp_offset(csp, r) :
 	#TODO define offset tolerance here
 	global small_tolerance
 	small_tolerance = 0.01
-	intersection = [[] for i in xrange(csp_len)]
 	summ = 0
 	summ1 = 0 	 
 	for subpath_i in xrange(csp_len) :
@@ -1265,6 +1282,7 @@ def csp_offset(csp, r) :
 	for i in xrange(csp_len) :
 		subpath = unclipped_offset[i]
 		if len(intersection[i]) > 0 :
+
 			parts = csp_subpath_split_by_points(subpath, intersection[i])
 			# Close	parts list to close path (The first and the last parts are joined together)		
 			parts[0][0][0] = parts[-1][-1][0]
@@ -1283,19 +1301,38 @@ def csp_offset(csp, r) :
 	########################################################################		
 	clipped_offset = []	 	
 	for subpath in splitted_offset :
-		r1,r2 = (0.99*r)**2, (1.01*r)**2
-		dist = csp_to_csp_distance([subpath],csp,[r1,r2])
-		print_(dist)
-#		print_(r1,r2)
-		if r1<dist[0]<r2 : 
-		
+	
+		# first check distance between offset's start/end points and original path. 
+		# there's no need to check first and last points because they formed by intersection
+		# and could be less accureate. All control points are calculeated very accurate, so 
+		# distance tolerance can be smaller.
+		clip = True
+		r1,r2 = (0.9999*r)**2, (1.0001*r)**2
+		for sp in subpath[1:-1]:
+			print_([i,j,sp])
+			dist = csp_to_point_distance(csp, sp[1], dist_bounds = [r1,r2], tolerance = .0001)
+			print_(dist)
+			if not (r1 < dist[0] < r2) :
+				break
+			#check further
+		if r1 < dist[0] < r2 or len(subpath)<3 :
+			r1,r2 = (0.99*r)**2, (1.01*r)**2
+			print_(len(subpath))
+			dist = csp_to_csp_distance([subpath],csp,[r1,r2])
+			print_(dist, len(subpath))
+			clip = not (r1 < dist[0] < r2)
+		if not clip :
 			clipped_offset += [subpath]
 		elif options.offset_draw_clippend_path : 
-			print_("!!!")
+			print_(r1,dist[0],r2)
+			if len(dist) == 4 :
+				draw_pointer(csp_at_t(csp[dist[1]][dist[2]-1],csp[dist[1]][dist[2]],dist[3])+sp[1],"blue", "line", comment = [math.sqrt(dist[0]),i,j,sp]  )
+			else :	
+				print_(dist, len(subpath))
+				draw_pointer( csp_at_t(subpath[dist[2]-1],subpath[dist[2]],dist[3])
+					+csp_at_t(csp[dist[4]][dist[5]-1],csp[dist[4]][dist[5]],dist[6]),"red","line", comment = math.sqrt(dist[0]))
 			style = "fill:none;stroke:#c00;stroke-width:0.1px;"
 			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath( [subpath] ), "style":style, "comment":str(math.sqrt(dist[0]))} )
-			draw_pointer( list(csp_at_t(subpath[dist[2]-1],subpath[dist[2]],dist[3]))
-					+list(csp_at_t(csp[dist[4]][dist[5]-1],csp[dist[4]][dist[5]],dist[6])),"red","line", comment = math.sqrt(dist[0]))
 	print_("Clipped in %s"%(time.time()-time_))
 	print_("-----------------------------")
 	print_("Total offset time %s"%(time.time()-time_start))
@@ -1310,7 +1347,7 @@ def csp_offset(csp, r) :
 	#	clipped_offset[-1] += subpath[1:]	
 		
 	#inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath( clipped_offset ), "style":"fill:none;stroke:#000;stroke-width:2px;", "comment":str(dist)} )		
-	print_(clipped_offset)
+	#print_(clipped_offset)
 	return clipped_offset
 
 		
@@ -2570,9 +2607,9 @@ class Gcodetools(inkex.Effect):
 									else :
 										for j in xrange(0,len(cspi)):
 											for i in xrange(1,len(cspi[j])):
-												d = csp_bound_to_point_distance([x1,y1], cspi[j][i-1], cspi[j][i], self.options.engraving_max_dist*2)
-												if d>=self.options.engraving_max_dist*2 :
-													r = min(d/2,r) 
+												d = csp_bound_to_point_distance(cspi[j][i-1], cspi[j][i], [x1,y1])
+												if d >= self.options.engraving_max_dist*2 :
+													r = min(math.sqrt(d/2),r) 
 													continue
 												for n1 in xrange(self.options.engraving_newton_iterations):
 							 						t = find_cutter_center((x1,y1),(nx,ny), cspi[j][i-1], cspi[j][i], self.tools[layer][0], float(n1)/(self.options.engraving_newton_iterations-1))
