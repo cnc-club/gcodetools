@@ -225,15 +225,16 @@ def csp_seg_to_csp_seg_distance(sp1,sp2,sp3,sp4, dist_bounds = [0,1e100], sample
 	for k in range(sample_points) :
 		for j in range(sample_points) : 
 			t1,t2 = float(k+1)/(sample_points+1), float(j)/(sample_points+1)
+			t12, t13, t22, t23 = t1*t1, t1*t1*t1, t2*t2, t2*t2*t2
 			i = 0
 			F1, F2, F = [0,0], [[0,0],[0,0]], 1e100
-			x,y   = ax1*t1*t1*t1+bx1*t1*t1+cx1*t1+dx1 - (ax2*t2*t2*t2+bx2*t2*t2+cx2*t2+dx2), ay1*t1*t1*t1+by1*t1*t1+cy1*t1+dy1 - (ay2*t2*t2*t2+by2*t2*t2+cy2*t2+dy2)			
+			x,y   = ax1*t13+bx1*t12+cx1*t1+dx1 - (ax2*t23+bx2*t22+cx2*t2+dx2), ay1*t13+by1*t12+cy1*t1+dy1 - (ay2*t23+by2*t22+cy2*t2+dy2)			
 			while i<2 or abs(F-Flast)>tolerance and i<30 :
 				#draw_pointer(csp_at_t(sp1,sp2,t1))
-				f1x = 3*ax1*t1*t1+2*bx1*t1+cx1
-				f1y = 3*ay1*t1*t1+2*by1*t1+cy1
-				f2x = 3*ax2*t2*t2+2*bx2*t2+cx2
-				f2y = 3*ay2*t2*t2+2*by2*t2+cy2
+				f1x = 3*ax1*t12+2*bx1*t1+cx1
+				f1y = 3*ay1*t12+2*by1*t1+cy1
+				f2x = 3*ax2*t22+2*bx2*t2+cx2
+				f2y = 3*ay2*t22+2*by2*t2+cy2
 				F1[0] = 2*f1x*x +  2*f1y*y
 				F1[1] = -2*f2x*x -  2*f2y*y
 				F2[0][0] =  2*(6*ax1*t1+2*bx1)*x + 2*f1x*f1x + 2*(6*ay1*t1+2*by1)*y +2*f1y*f1y
@@ -244,7 +245,8 @@ def csp_seg_to_csp_seg_distance(sp1,sp2,sp3,sp4, dist_bounds = [0,1e100], sample
 				if F2!=None :
 					t1 -= ( F2[0][0]*F1[0] + F2[0][1]*F1[1] )
 					t2 -= ( F2[1][0]*F1[0] + F2[1][1]*F1[1] )
-					x,y   = ax1*t1*t1*t1+bx1*t1*t1+cx1*t1+dx1 - (ax2*t2*t2*t2+bx2*t2*t2+cx2*t2+dx2), ay1*t1*t1*t1+by1*t1*t1+cy1*t1+dy1 - (ay2*t2*t2*t2+by2*t2*t2+cy2*t2+dy2)
+					t12, t13, t22, t23 = t1*t1, t1*t1*t1, t2*t2, t2*t2*t2
+					x,y   = ax1*t13+bx1*t12+cx1*t1+dx1 - (ax2*t23+bx2*t22+cx2*t2+dx2), ay1*t13+by1*t12+cy1*t1+dy1 - (ay2*t23+by2*t22+cy2*t2+dy2)
 					Flast = F
 					F = x*x+y*y
 				else : 
@@ -1068,16 +1070,22 @@ def csp_offset(csp, r) :
 		n3 = s3.ccw().unit() if s3.l2()!=0 else P(csp_normalized_normal(sp1,sp2,1))
 		q0,q1,q2,q3 = p0+r*n0, p1+r*n0, p2+r*n3, p3+r*n3
 		#inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([[[q0.to_list(), q0.to_list(), q1.to_list()],[q2.to_list(), q3.to_list(), q3.to_list()]]	]), "style":"fill:none;stroke:#f0f;stroke-width:.1px;"} )							
-		if (q0-q1).mag()!=0 :
-			alpha = math.acos((q0-q1).unit()*(q2-q1).unit())/2
+		if (p0-p1).mag()!=0 :
+			alpha = math.acos( min(1,max(-1,(p0-p1).unit()*(p2-p1).unit())) )/2
 			if math.tan(alpha)!=0:
-				q1 = q0 + (q1-q0)*(1 + r/math.tan(alpha)/(q1-q0).mag())
+				q1_ = q0 + (q1-q0)*(1 - r/math.tan(alpha)/(q1-q0).mag())
 		if (q3-q2).mag()!=0 :
-			alpha = math.acos((q1-q2).unit()*(q3-q2).unit())/2
+			alpha = math.acos( min(1,max(-1,(p1-p2).unit()*(p3-p2).unit())) )/2
 			if math.tan(alpha)!=0:
-				q2 = q3 + (q2-q3)*(1 + r/math.tan(alpha)/(q2-q3).mag())
+				q2 = q3 + (q2-q3)*(1 - r/math.tan(alpha)/(q2-q3).mag())
+
+
+		#return [[q0.to_list(), q0.to_list(), q1.to_list()],[q2.to_list(), q3.to_list(), q3.to_list()]]
+
+
 		s0 = q1-q0
-		s3 = q3-q2		
+		s3 = q3-q2
+		
 		#inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([[[q0.to_list(), q0.to_list(), q1.to_list()],[q2.to_list(), q3.to_list(), q3.to_list()]]	]), "style":"fill:none;stroke:#00f;stroke-width:.1px;"} )					
 		
 		A,B,C = 3*s0+3*s3-2*(q3-q0), -6*s0-3*s3+3*(q3-q0), 3*s0
@@ -1112,8 +1120,9 @@ def csp_offset(csp, r) :
 				y = matrix_mul(transpose(A_),y)
 				B = inv_3x3(B)
 				[x0,x1,x2] = transpose(matrix_mul(B,y))[0]
-				q1 = q0+(1+x0)*s0
-				q2 = q3-(1+x1)*s3
+				if abs(x0)<0.9 and abs(x1)<0.9 :
+					q1 = q0+(1+x0)*s0
+					q2 = q3-(1+x1)*s3
 				#print_(x0,x1,x2)	
 		return [[q0.to_list(), q0.to_list(), q1.to_list()],[q2.to_list(), q3.to_list(), q3.to_list()]]
 	
@@ -1132,12 +1141,15 @@ def csp_offset(csp, r) :
 		arc = csp_from_arc(prev[-1][1], next[0][1], center, r, ccw)
 		return prev,arc,next
 		
-	def offset_segment_recursion(sp1,sp2,r, depth, tolerance=0.5) :
+	def offset_segment_recursion(sp1,sp2,r, depth, tolerance=0.0005) :
 		sp1_r,sp2_r = create_offset_segment(sp1,sp2,r)
 		err = max(
-				(P(csp_at_t(sp1_r,sp2_r,.25)) - P(csp_at_t(sp1,sp2,.25)) - P(csp_normalized_normal(sp1,sp2,.25))*r).mag(),
-				(P(csp_at_t(sp1_r,sp2_r,.75)) - P(csp_at_t(sp1,sp2,.75)) - P(csp_normalized_normal(sp1,sp2,.75))*r).mag())
-		if  err>tolerance and depth>0:
+				csp_seg_to_point_distance(sp1_r,sp2_r, (P(csp_at_t(sp1,sp2,.250)) + P(csp_normalized_normal(sp1,sp2,.250))*r).to_list())[0], 
+				csp_seg_to_point_distance(sp1_r,sp2_r, (P(csp_at_t(sp1,sp2,.750)) + P(csp_normalized_normal(sp1,sp2,.750))*r).to_list())[0],
+				)
+
+		if  err>tolerance**2 and depth>0:
+			print_(csp_seg_to_point_distance(sp1_r,sp2_r, (P(csp_at_t(sp1,sp2,.25)) + P(csp_normalized_normal(sp1,sp2,.25))*r).to_list())[0], tolerance)
 			t = csp_max_curvature(sp1,sp2)
 			t = max(.1+min(depth,3)*.1,min(.9 -min(depth,3)*.1,t))
 			sp3,sp4,sp5 = csp_split(sp1,sp2,t)
@@ -1159,6 +1171,14 @@ def csp_offset(csp, r) :
 	# Prepare the path
 	############################################################################
 	# Remove all small segments (segment length < 0.001)
+
+	for i in xrange(len(csp)) :
+		for j in xrange(len(csp[i])) :
+			sp = csp[i][j]
+			if (P(sp[1])-P(sp[0])).mag() < 0.001 :
+				csp[i][j][0] = sp[1]
+			if (P(sp[2])-P(sp[0])).mag() < 0.001 :
+				csp[i][j][2] = sp[1]
 	for i in xrange(len(csp)) :
 		for j in xrange(1,len(csp[i])) :
 			if cspseglength(csp[i][j-1], csp[i][j])<0.001 : 
@@ -1227,8 +1247,10 @@ def csp_offset(csp, r) :
 		last_offset_len = 0
 		for j in xrange(1,len(subpath)) : 
 			sp1, sp2 = subpath[j-1], subpath[j]
-			offset = offset_segment_recursion(sp1,sp2,r, 3) 
-
+			offset = offset_segment_recursion(sp1,sp2,r, 1) 
+			#inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([offset]), "style":"fill:none;stroke:#d00;stroke-width:1px;"} )					
+			#draw_pointer(sp1[1]+offset[0][1], "#057", "line")
+			#draw_pointer(sp2[1]+offset[-1][1], "#057", "line")
 			if len(subpath_offset)>0 : 
 				prev, arc, next = join_offsets(subpath_offset[-last_offset_len:], offset, sp1[1],  r)
 				subpath_offset[-last_offset_len:] = prev[:]
@@ -1367,6 +1389,11 @@ def csp_offset(csp, r) :
 			r1,r2 = (0.99*r)**2, (1.01*r)**2
 			dist = csp_to_csp_distance([subpath],original_csp,[r1,r2])
 			clip = not (r1 < dist[0] < r2)
+			# check if the closes point on the ends of the subpath and check the distance near this 			
+#			j,t = dist[2], dist[3]
+#			if clip and (j==1 and t==0) or (j==len(subpath)-1 and  t==1) :
+#				if dist[3] == 0 :
+#					d = (cst_at_t(subpath[dist[2]]))
 		if not clip :
 			clipped_offset += [subpath]
 		elif options.offset_draw_clippend_path : 
@@ -1374,7 +1401,7 @@ def csp_offset(csp, r) :
 				draw_pointer(csp_at_t(csp[dist[1]][dist[2]-1],csp[dist[1]][dist[2]],dist[3])+sp[1],"blue", "line", comment = [math.sqrt(dist[0]),i,j,sp]  )
 			else :	
 				draw_pointer( csp_at_t(subpath[dist[2]-1],subpath[dist[2]],dist[3])
-					+csp_at_t(original_csp[dist[4]][dist[5]-1],original_csp[dist[4]][dist[5]],dist[6]),"red","line", comment = math.sqrt(dist[0]))
+					+csp_at_t(original_csp[dist[4]][dist[5]-1],original_csp[dist[4]][dist[5]],dist[6]),"red","line", comment = str(math.sqrt(dist[0]))+str(dist))
 			style = "fill:none;stroke:#c00;stroke-width:0.1px;"
 			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath( [subpath] ), "style":style, "comment":str(math.sqrt(dist[0]))} )
 	print_("Clipped in %s"%(time.time()-time_))
@@ -3159,15 +3186,17 @@ G01 Z1 (going to cutting z)\n""",
 				if self.options.offset_step == 0 : self.options.offset_step = self.options.offset_radius
 				if self.options.offset_step*self.options.offset_radius <0 : self.options.offset_step *= -1
 				time_ = time.time()
+				offsets_count = 0
 				for layer in self.selected_paths :
 					for path in self.selected_paths[layer] :
 										
-						offset = self.options.offset_step
+						offset = self.options.offset_step/2
 						while abs(offset) <= abs(self.options.offset_radius) :
 							offset_ = csp_offset(cubicsuperpath.parsePath(path.get("d")), offset)				
+							offsets_count += 1
 							if offset_ != [] : 
 								inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath( offset_ ), "style":"fill:none;stroke:#000;stroke-width:.2px;"} )	
-								print_(offset_)
+								#print_(offset_)
 							else :
 								print_("------------Reached empty offset at radius %s"% offset )
 								break
@@ -3178,6 +3207,7 @@ G01 Z1 (going to cutting z)\n""",
 				print_("-----------------------------------------------------------------------------------")				
 				print_()
 				print_("Done in %s"%(time.time()-time_))				
+				print_("Total offsets count %s"%(time.time()-time_))				
 #						
 e = Gcodetools()
 e.affect()					
