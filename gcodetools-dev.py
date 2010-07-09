@@ -1422,6 +1422,7 @@ def csp_offset(csp, r) :
 			real_offset = ( P(csp_at_t(csp[i][j-1], csp[i][j], t)) + r * P(csp_normalized_normal(csp[i][j-1], csp[i][j], t)) ).to_list()
 			#draw_pointer(csp_at_t(csp[i][j-1], csp[i][j], t))
 			#draw_pointer(csp_at_t(subpath[0],subpath[1],.5) + reverse_offset, "#057","line")
+			draw_pointer(csp_at_t(subpath[0],subpath[1],.5) + reverse_offset+real_offset, "#057","line")
 			dist = csp_to_point_distance(csp, real_offset, dist_bounds = [r1,r2], tolerance = .0001)
 			#d, i,j,t = dist
 			#ereal = P(csp_at_t(csp[i][j-1], csp[i][j], t)).to_list()
