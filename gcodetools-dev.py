@@ -795,7 +795,7 @@ def csp_seg_bound_to_csp_seg_bound_max_min_distance(sp1,sp2,sp3,sp4) :
 			if max_dist < d  : max_dist = d
 	return min_dist, max_dist
 
-def csp_reverce(csp) :
+def csp_reverse(csp) :
 	for i in range(len(csp)) :
 	 	n = []
 	 	for j in csp[i] :
@@ -809,21 +809,57 @@ def csp_normalized_slope(sp1,sp2,t) :
 	f1y = 3*ay*t*t+2*by*t+cy
 	if f1x*f1x+f1y*f1y != 0 :
 		l = math.sqrt(f1x*f1x+f1y*f1y)
-		return f1x/l, f1y/l
-	if cx*cx+cy*cy != 0	:
-		l = math.sqrt(cx*cx+cy*cy)
-		return cx/l, cy/l
-	elif bx*bx+by*by != 0	:
-		l = math.sqrt(bx*bx+by*by)
-		return bx/l, by/l
-	elif ax*ax+ay*ay != 0	:
+		return [f1x/l, f1y/l]
+	f1x = 3*ax*t+bx  # f''x / 2
+	f1y = 3*ay*t+by  # f''y / 2
+	if t == 0 :
+		f1x = sp2[0][0]-sp1[1][0]
+		f1y = sp2[0][1]-sp1[1][1]
+		if f1x*f1x+f1y*f1y != 0 :
+			l = math.sqrt(f1x*f1x+f1y*f1y)
+			return [f1x/l, f1y/l]
+		else :
+			f1x = sp2[1][0]-sp1[1][0]
+			f1y = sp2[1][1]-sp1[1][1]
+			if f1x*f1x+f1y*f1y != 0 :
+				l = math.sqrt(f1x*f1x+f1y*f1y)
+				return [f1x/l, f1y/l]
+	elif t == 1 :
+		f1x = sp2[1][0]-sp1[2][0]
+		f1y = sp2[1][1]-sp1[2][1]
+		if f1x*f1x+f1y*f1y != 0 :
+			l = math.sqrt(f1x*f1x+f1y*f1y)
+			return [f1x/l, f1y/l]
+		else :
+			f1x = sp2[1][0]-sp1[1][0]
+			f1y = sp2[1][1]-sp1[1][1]
+			if f1x*f1x+f1y*f1y != 0 :
+				l = math.sqrt(f1x*f1x+f1y*f1y)
+				return [f1x/l, f1y/l]
+	### I do not know if the following is needed? Probably a sing calculation should be added...
+	if f1x*f1x+f1y*f1y != 0 :
+		l = math.sqrt(f1x*f1x+f1y*f1y)
+		res = [f1x/l, f1y/l]
+	if ax*ax+ay*ay != 0 :
 		l = math.sqrt(ax*ax+ay*ay)
-		return ax/l, ay/l
+		res = [ax/l, ay/l]
 	else :
-		return 1.,0.
+		return [1.,0.]
+	print_()
+	print_(sp1)
+	print_(sp2)
+	print_(x_sign,y_sign, t)
+	res[0] = -res[0] if res[0]*x_sign < 0 else res[0]
+	res[1] = -res[1] if res[1]*y_sign < 0 else res[1]
+	print_(res)
+	print_()
+	
+	return res
+
+				
 def csp_normalized_normal(sp1,sp2,t) :
 	nx,ny = csp_normalized_slope(sp1,sp2,t)
-	return -ny, nx
+	return [-ny, nx]
 
 def csp_parameterize(sp1,sp2):
 	return bezmisc.bezierparameterize(csp_segment_to_bez(sp1,sp2))
@@ -1099,9 +1135,17 @@ def csp_offset(csp, r) :
 
 		q0,q3 = p0+r*n0, p3+r*n3
 		alpha = math.acos(max(-1,min(1,n0*n1)))/2 
-		q1 = p1 + (n0+n1).unit()* r / math.cos(alpha)	
+		c = math.cos(alpha)
+		if abs(c)>0.001 :
+			q1 = p1 + (n0+n1).unit()* r / math.cos(alpha)	
+		else:
+			q1 = p1+r*n0
 		alpha = math.acos(max(-1,min(1,n1*n3)))/2 
-		q2 = p2 + (n3+n1).unit() * r / math.cos(alpha)	
+		c = math.cos(alpha)
+		if abs(c)>0.01 :
+			q2 = p2 + (n3+n1).unit() * r / math.cos(alpha)	
+		else: 
+			q2 = p2+r*n3
 		print_(q1-q0,q2-q1,q3-q2)
 		#inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([[[q0.to_list(), q0.to_list(), q1.to_list()],[q2.to_list(), q3.to_list(), q3.to_list()]]	]), "style":"fill:none;stroke:#f0f;stroke-width:.1px;"} )							
 		#return [[q0.to_list(), q0.to_list(), q1.to_list()],[q2.to_list(), q3.to_list(), q3.to_list()]]
@@ -1141,23 +1185,26 @@ def csp_offset(csp, r) :
 				y = transpose([y])
 				y = matrix_mul(transpose(A_),y)
 				B = inv_3x3(B)
-				[x0,x1,x2] = transpose(matrix_mul(B,y))[0]
-				if abs(x0)<0.9 and abs(x1)<0.9 and abs(x2)<0.4:
-					q1 = q0+(1+x0)*s0
-					q2 = q3-(1-x1)*s3
+				if B != None :
+					[x0,x1,x2] = transpose(matrix_mul(B,y))[0]
+					if abs(x0)<0.9 and abs(x1)<0.9 and abs(x2)<0.4:
+						q1 = q0+(1+x0)*s0
+						q2 = q3-(1-x1)*s3
 				#print_(x0,x1,x2)	
 		#inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([[[q0.to_list(), q0.to_list(), q1.to_list()],[q2.to_list(), q3.to_list(), q3.to_list()]]	]), "style":"fill:none;stroke:blue;stroke-width:.01px;"} )					
 		return [[q0.to_list(), q0.to_list(), q1.to_list()],[q2.to_list(), q3.to_list(), q3.to_list()]]
 	
 	def join_offsets(prev,next, center, r):
-		for i in xrange(len(prev)-1,0,-1) :
-			for j in xrange(1,len(next)) :
-				intersection = csp_segments_true_intersection(prev[i-1],prev[i],next[j-1],next[j])
-				if len(intersection)>0 :
-					t = max(intersection)
-					sp1,sp2,sp3 = csp_split(prev[i-1],prev[i],t[0])
-					sp3,sp4,sp5 = csp_split(next[j-1],next[j],t[1 if len(t)==2 else 3])
-					return prev[:i-1] + [ [prev[i-1][0],prev[i-1][1],sp1[2]], sp2 ] , [], [sp4,[ sp5[0],sp5[1],next[j][2] ] ] + next[j+1:]
+		# Check for prev and next intersections
+		#for i in xrange(len(prev)-1,0,-1) :
+		#	for j in xrange(1,len(next)) :
+		#		intersection = csp_segments_true_intersection(prev[i-1],prev[i],next[j-1],next[j])
+		#		if len(intersection)>0 :
+		#			t = max(intersection)
+		#			sp1,sp2,sp3 = csp_split(prev[i-1],prev[i],t[0])
+		#			sp3,sp4,sp5 = csp_split(next[j-1],next[j],t[1 if len(t)==2 else 3])
+		#			return prev[:i-1] + [ [prev[i-1][0],prev[i-1][1],sp1[2]], sp2 ] , [], [sp4,[ sp5[0],sp5[1],next[j][2] ] ] + next[j+1:]
+		# If they do not intersect join the offsets with arc
 		prev_slope = csp_normalized_slope(prev[-2],prev[-1],1.)
 		next_slope = csp_normalized_slope(next[0],next[1],0.)
 		ccw = vectors_ccw(prev_slope,next_slope)
@@ -1422,7 +1469,7 @@ def csp_offset(csp, r) :
 			real_offset = ( P(csp_at_t(csp[i][j-1], csp[i][j], t)) + r * P(csp_normalized_normal(csp[i][j-1], csp[i][j], t)) ).to_list()
 			#draw_pointer(csp_at_t(csp[i][j-1], csp[i][j], t))
 			#draw_pointer(csp_at_t(subpath[0],subpath[1],.5) + reverse_offset, "#057","line")
-			draw_pointer(csp_at_t(subpath[0],subpath[1],.5) + reverse_offset+real_offset, "#057","line")
+			draw_pointer(csp_at_t(subpath[0],subpath[1],.5) + reverse_offset+real+real_offset, "#057","line")
 			dist = csp_to_point_distance(csp, real_offset, dist_bounds = [r1,r2], tolerance = .0001)
 			#d, i,j,t = dist
 			#ereal = P(csp_at_t(csp[i][j-1], csp[i][j], t)).to_list()
@@ -1579,7 +1626,7 @@ def biarc_curve_clip_at_l(curve, l, clip_type = "strict") :
 	reverse = False
 	while lc<l :
 		seg = subcurve[i]
-		if reverce :  
+		if reverse :  
 			if seg[1] == "line" :
 				seg = [seg[4], "line", 0 , 0, seg[0], seg[5]] # Hmmm... Do we have to swap seg[5][0] and seg[5][1] (zstart and zend) or not?
 			elif seg[1] == "arc" :
@@ -1600,7 +1647,7 @@ def biarc_curve_clip_at_l(curve, l, clip_type = "strict") :
 					res += [[ seg[0], "line",  0, 0, [(seg[4][0]-seg[0][0])/ls*(l-lc),(seg[4][1]-seg[0][1])/ls*(l-lc)], [seg[5][0],seg[5][1]/ls*(l-lc)]  ]]
 		i += 1 
 		if i >= len(subcurve) and not subcurve_closed: 
-			reverse = not reverce
+			reverse = not reverse
 		i = i%len(subcurve)
 	return res	
 
@@ -2487,7 +2534,7 @@ class Gcodetools(inkex.Effect):
 		 						subp[-1][2], subp[0][0] = subp[-1][1], subp[0][1]
 								subp = [ [ sp2[1], sp2[1],sp2[2] ] ] + [sp3] + subp[j+1:] + subp[:j-1] + [sp1] + [[ sp2[0], sp2[1],sp2[1] ]] 					 	  
 	 					 	csp = [subp] + csp
-							# Reverce path if needed
+							# reverse path if needed
 							st,end = [],[]
 							i=1
 							while i<len(csp[0]):
