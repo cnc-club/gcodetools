@@ -486,6 +486,7 @@ def csp_curvature_at_t(sp1,sp2,t, depth = 3) :
 	ax,ay,bx,by,cx,cy,dx,dy = bezmisc.bezierparameterize(csp_segment_to_bez(sp1,sp2))
 	
 	#curvature = (x'y''-y'x'') / (x'^2+y'^2)^1.5 
+	
 	f1x = 3*ax*t**2 + 2*bx*t + cx
 	f1y = 3*ay*t**2 + 2*by*t + cy
 	f2x = 6*ax*t + 2*bx
@@ -507,7 +508,7 @@ def csp_curvature_at_t(sp1,sp2,t, depth = 3) :
 		if depth>0 :
 			# little hack ;^) hope it wont influence anything...
 			return csp_curvature_at_t(sp1,sp2,t*1.004, depth-1)
-
+		return 1e100
 	 	
 def csp_curvature_radius_at_t(sp1,sp2,t) :
 	c = csp_curvature_at_t(sp1,sp2,t)
@@ -1187,7 +1188,7 @@ def csp_offset(csp, r) :
 	
 	
 	offset_tolerance = 0.05
-
+	offset_subdivision_depth = 5
 	time_ = time.time()
 	time_start  = time_
 	print_("Offset start at %s"% time_)
@@ -1201,66 +1202,14 @@ def csp_offset(csp, r) :
 		n1 = s1.ccw().unit() if s1.l2()!=0 else (n0.unit()+n3.unit()).unit()
 
 		q0,q3 = p0+r*n0, p3+r*n3
-		alpha = math.acos(max(-1,min(1,n0*n1)))/2 
-		c = math.cos(alpha)
-		if abs(c)>0.001 :
-			q1 = p1 + (n0+n1).unit()* r / math.cos(alpha)	
-		else:
-			q1 = p1+r*n0
-		alpha = math.acos(max(-1,min(1,n1*n3)))/2 
-		c = math.cos(alpha)
-		if abs(c)>0.01 :
-			q2 = p2 + (n3+n1).unit() * r / math.cos(alpha)	
-		else: 
-			q2 = p2+r*n3
+		c = csp_curvature_at_t(sp1,sp2,0)
+		q1 = q0 + (p1-p0)*(1- (r*c if abs(c)<100 else 0) )
+		c = csp_curvature_at_t(sp1,sp2,1)
+		q2 = q3 + (p2-p3)*(1- (r*c if abs(c)<100 else 0) ) 
+
 		#inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([[[q0.to_list(), q0.to_list(), q1.to_list()],[q2.to_list(), q3.to_list(), q3.to_list()]]	]), "style":"fill:none;stroke:#f0f;stroke-width:.1px;"} )							
-		#return [[q0.to_list(), q0.to_list(), q1.to_list()],[q2.to_list(), q3.to_list(), q3.to_list()]]
-		
-		# Maybe the following code is useless. Got to check it...
-		
-		s0 = q1-q0
-		s3 = q3-q2
-		a,b,c = 3*s0+3*s3-2*(p3-p0), -6*s0-3*s3+3*(p3-p0), 3*s0
-		A,B,C = 3*s0+3*s3-2*(q3-q0), -6*s0-3*s3+3*(q3-q0), 3*s0
-		pc = a/8+b/4+c/2+p0
-		qc = A/8+B/4+C/2+q0
-		dp = 3./4*a+b+c
-		dq = 3./4*A+B+C
-		nc = dp.ccw().unit()
-		rc = pc+r*nc
-		A_ = [
-				[s0.x,-s3.x,8./3*dp.x],
-				[s0.y,-s3.y,8./3*dp.y],
-				[s0*nc,s3*nc,4*(s0-s3)*nc]
-			]
-		y = [8./3*(rc.x-qc.x), 8./3*(rc.y-qc.y), 4./3*dq*nc]
-		
-		A1 = inv_3x3(A_)
-		if A1!=None:
-			[[x0],[x1],[x2]] = matrix_mul(A1,transpose([y]))
-			#print_(x0,x1,x2)	
-			if abs(x0)<0.9 and abs(x1)<0.9 and abs(x2)<0.4:
-					q1 = q0+(1+x0)*s0
-					q2 = q3-(1-x1)*s3
-			else :
-				
-				A_ += [ [0.1,     0.,    0.],
-						[   0.,  0.1,    0.],
-						[   0.,    0.,  0.1]	]
-				B = matrix_mul(transpose(A_),A_)
-				y += [0.,0.,0.]
-				y = transpose([y])
-				y = matrix_mul(transpose(A_),y)
-				B = inv_3x3(B)
-				if B != None :
-					[x0,x1,x2] = transpose(matrix_mul(B,y))[0]
-					if abs(x0)<0.9 and abs(x1)<0.9 and abs(x2)<0.4:
-						q1 = q0+(1+x0)*s0
-						q2 = q3-(1-x1)*s3
-				#print_(x0,x1,x2)	
-		#inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([[[q0.to_list(), q0.to_list(), q1.to_list()],[q2.to_list(), q3.to_list(), q3.to_list()]]	]), "style":"fill:none;stroke:blue;stroke-width:.01px;"} )					
 		return [[q0.to_list(), q0.to_list(), q1.to_list()],[q2.to_list(), q3.to_list(), q3.to_list()]]
-	
+		
 	def join_offsets(prev,next, center, r):
 		# Check for prev and next intersections
 		#for i in xrange(len(prev)-1,0,-1) :
@@ -1272,7 +1221,7 @@ def csp_offset(csp, r) :
 		#			sp3,sp4,sp5 = csp_split(next[j-1],next[j],t[1 if len(t)==2 else 3])
 		#			return prev[:i-1] + [ [prev[i-1][0],prev[i-1][1],sp1[2]], sp2 ] , [], [sp4,[ sp5[0],sp5[1],next[j][2] ] ] + next[j+1:]
 		# If they do not intersect join the offsets with arc
-		if (P(prev[-1][1])-P(next[0][1])).l2()<0.0001 : 
+		if (P(prev[-1][1])-P(next[0][1])).l2()<0.001 : 
 			return prev,[],next
 		prev_slope = csp_normalized_slope(prev[-2],prev[-1],1.)
 		next_slope = csp_normalized_slope(next[0],next[1],0.)
@@ -1289,10 +1238,12 @@ def csp_offset(csp, r) :
 				)
 
 		if  err>tolerance**2 and depth>0:
-			print_(csp_seg_to_point_distance(sp1_r,sp2_r, (P(csp_at_t(sp1,sp2,.25)) + P(csp_normalized_normal(sp1,sp2,.25))*r).to_list())[0], tolerance)
-			#t = csp_max_curvature(sp1,sp2)
-			#t = max(.1+min(depth,3)*.1,min(.9 -min(depth,3)*.1,t))
-			t = .5
+			#print_(csp_seg_to_point_distance(sp1_r,sp2_r, (P(csp_at_t(sp1,sp2,.25)) + P(csp_normalized_normal(sp1,sp2,.25))*r).to_list())[0], tolerance)
+			if depth > offset_subdivision_depth-2 :
+				t = csp_max_curvature(sp1,sp2)
+				t = max(.1,min(.9 ,t))
+			else :
+				t = .5
 			sp3,sp4,sp5 = csp_split(sp1,sp2,t)
 			r1 = offset_segment_recursion(sp3,sp4,r, depth-1, tolerance)
 			r2 = offset_segment_recursion(sp4,sp5,r, depth-1, tolerance)
@@ -1402,11 +1353,13 @@ def csp_offset(csp, r) :
 				c = csp_curvature_at_t(sp1,sp2,(st+end)/2)
 				sp = csp_split_by_two_points(sp1,sp2,st,end)
 				if sp[1]!=sp[2]:
-					if c>1/r :
-						offset = offset_segment_recursion(sp[1],sp[2],r, 3, offset_tolerance) 
-						#inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([offset]), "style":"fill:none;stroke:#d00;stroke-width:1px;"} )					
-						#draw_pointer(sp1[1]+offset[0][1], "#057", "line")
-						#draw_pointer(sp2[1]+offset[-1][1], "#057", "line")
+					if (c>1/r and r<0 or c<1/r and r>0) :
+					
+						offset = offset_segment_recursion(sp[1],sp[2],r, offset_subdivision_depth, offset_tolerance) 
+					# TODO add if the last offset's end is not the same with curren start add a straight line to offset.
+					#inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([offset]), "style":"fill:none;stroke:#d00;stroke-width:1px;"} )					
+					#draw_pointer(sp1[1]+offset[0][1], "#057", "line")
+					#draw_pointer(sp2[1]+offset[-1][1], "#057", "line")
 						if len(subpath_offset)>0 : 
 							prev, arc, next = join_offsets(subpath_offset[-last_offset_len:], offset, sp[1][1],  r)
 							subpath_offset[-last_offset_len:] = prev[:]
@@ -1534,32 +1487,28 @@ def csp_offset(csp, r) :
 		# distance tolerance can be smaller.
 		clip = True
 		if len(subpath)>2 :
-			for sp in subpath[1:-1]:
-				dist = csp_to_point_distance(csp, sp[1], dist_bounds = [r1,r2], tolerance = .0001)
-				#draw_pointer(csp_at_t(csp[dist[1]][dist[2]-1],csp[dist[1]][dist[2]],dist[3])+sp[1],"#f0f", "line", comment = [math.sqrt(dist[0]),i,j,sp]  )
-				if not (r1 < dist[0] < r2) :
-					break
-				#check further
+			dist = csp_to_point_distance(csp, subpath[int(len(subpath)/2)][1], dist_bounds = [r1,r2], tolerance = .0001)
 			clip =  not (r1 < dist[0] < r2)
 		elif len(subpath) == 2 :
 			# 	Here we'll what I've called reverse offset :)
 			#	First of all find the reverse offsetted points of the end of the subpath
 			
-			reverse_offset = ( P(csp_at_t(subpath[0],subpath[1],.5)) - r * P(csp_normalized_normal(subpath[0],subpath[1],.5)) ).to_list()
-
-			d, i,j,t = csp_to_point_distance(csp, reverse_offset, dist_bounds = [0.,(offset_tolerance*10)**2], tolerance = .0001)
-			real = P(csp_at_t(csp[i][j-1], csp[i][j], t)).to_list()
-			real_offset = ( P(csp_at_t(csp[i][j-1], csp[i][j], t)) + r * P(csp_normalized_normal(csp[i][j-1], csp[i][j], t)) ).to_list()
-			#draw_pointer(csp_at_t(csp[i][j-1], csp[i][j], t))
-			#draw_pointer(csp_at_t(subpath[0],subpath[1],.5) + reverse_offset, "#057","line")
-			#draw_pointer(csp_at_t(subpath[0],subpath[1],.5) + reverse_offset+real+real_offset, "#057","line")
-			dist = csp_to_point_distance(csp, real_offset, dist_bounds = [r1,r2], tolerance = .0001)
-			#d, i,j,t = dist
-			#ereal = P(csp_at_t(csp[i][j-1], csp[i][j], t)).to_list()
-			#draw_pointer(reverse_offset + real + real_offset+ereal, "green","line", comment = math.sqrt(d))
-			
-			clip =  not (r1 < dist[0] < r2)
-
+			#reverse_offset = ( P(csp_at_t(subpath[0],subpath[1],.5)) - r * P(csp_normalized_normal(subpath[0],subpath[1],.5)) ).to_list()
+			middle_point = csp_at_t(subpath[0],subpath[1],.5)
+			d, i,j,t = csp_to_point_distance(csp, middle_point, dist_bounds = [0.,(offset_tolerance*10)**2], tolerance = .0001)
+			if (r1*.8 < d < r2*1.2) :
+				real = P(csp_at_t(csp[i][j-1], csp[i][j], t)).to_list()
+				real_offset = ( P(csp_at_t(csp[i][j-1], csp[i][j], t)) + r * P(csp_normalized_normal(csp[i][j-1], csp[i][j], t)) ).to_list()
+				#draw_pointer(csp_at_t(csp[i][j-1], csp[i][j], t))
+				#draw_pointer(csp_at_t(subpath[0],subpath[1],.5) + reverse_offset, "#057","line")
+				draw_pointer(csp_at_t(subpath[0],subpath[1],.5) + real+real_offset, "#057","line")
+				dist = csp_to_point_distance(csp, real_offset, dist_bounds = [r1,r2], tolerance = .0001)
+				#d, i,j,t = dist
+				#ereal = P(csp_at_t(csp[i][j-1], csp[i][j], t)).to_list()
+				#draw_pointer(reverse_offset + real + real_offset+ereal, "green","line", comment = math.sqrt(d))
+				clip =  not (r1 < dist[0] < r2)
+			else :
+				clip = True 
 
 		if not clip :
 			clipped_offset += [subpath]
