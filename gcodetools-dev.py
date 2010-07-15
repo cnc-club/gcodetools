@@ -1174,6 +1174,7 @@ class P:
 	def to_list(self): return [self.x, self.y]	
 	def ccw(self): return P(-self.y,self.x)
 	def l2(self): return self.x*self.x + self.y*self.y
+	
 ################################################################################
 ###
 ### Offset function 
