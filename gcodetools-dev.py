@@ -713,9 +713,8 @@ def csp_subpath_split_by_points(subpath, points) :
 def csp_from_arc(start, end, center, r, ccw) : 
 	# Creates csp that approximise specified arc
 	r = abs(r)
-	alpha = (atan2(end[0]-center[0],end[1]-center[1]) - atan2(start[0]-center[0],start[1]-center[1])) 
-	if alpha >  math.pi : alpha = alpha - math.pi2
-	if alpha < -math.pi : alpha = alpha + math.pi2
+	alpha = (atan2(end[0]-center[0],end[1]-center[1]) - atan2(start[0]-center[0],start[1]-center[1])) % math.pi2
+	if alpha > 0 and ccw or alpha < 0 and not ccw : alpha = -alpha 
 	if abs(alpha*r)<0.001 : 
 		return [] 
 	sectors = int(abs(alpha)*2/math.pi)+1
@@ -1185,6 +1184,33 @@ class P:
 ###
 ################################################################################
 
+
+def csp_concat_subpaths(*s):
+	def concat(s1,s2) :
+		if s1 == [] : return s2
+		if s2 == [] : return s1
+#		print_(s1[-1], s2[0])
+		if (s1[-1][1][0]-s2[0][1][0])**2 + (s1[-1][1][1]-s2[0][1][1])**2 > 0.00001 :
+	 		return s1[:-1]+[ [s1[-1][0],s1[-1][1],s1[-1][1]],  [s2[0][1],s2[0][1],s2[0][2]] ] + s2[1:]		
+	 	else :
+	 		return s1[:-1]+[ [s1[-1][0],s2[0][1],s2[0][2]] ] + s2[1:]		
+	if len(s) == 0 : return []
+	if len(s) ==1 : return s[0]
+	result = s[0]
+	for s1 in s[1:]:
+		print_(s1)
+		print_(result)
+		result = concat(result,s1)
+	return result	
+
+def csp_draw(csp, color="#05f", group = None, style="fill:none;stroke-width:.1px;") :
+	if group == None : group = options.doc_root 
+	style += "stroke:"+color+";"
+	inkex.etree.SubElement( group, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath(csp), "style":style} )							
+	
+def csp_subpaths_start_to_end_distance2(s1,s2):
+	return (s1[-1][1][0]-s2[0][1][0])**2 + (s1[-1][1][1]-s2[0][1][1])**2
+ 	
 def csp_offset(csp, r) :
 	
 	
@@ -1194,6 +1220,42 @@ def csp_offset(csp, r) :
 	time_start  = time_
 	print_("Offset start at %s"% time_)
 	
+	
+	def csp_offset_segment(sp1,sp2,r) :
+		result = []
+		t = csp_get_t_at_curvature(sp1,sp2,1/r)
+		if len(t) == 0 : t =[0.,1.]
+		t.sort()
+		if t[0]>.001 : t = [0.]+t 
+		if t[-1]<.999 : t.append(1.) 
+		for st,end in zip(t,t[1:]) :	
+			c = csp_curvature_at_t(sp1,sp2,(st+end)/2)
+			sp = csp_split_by_two_points(sp1,sp2,st,end)
+			if sp[1]!=sp[2]:
+				if (c>1/r and r<0 or c<1/r and r>0) :
+					offset = offset_segment_recursion(sp[1],sp[2],r, offset_subdivision_depth, offset_tolerance) 
+					if result==[] :
+						result = offset[:]
+					else: 
+						
+						if csp_subpaths_start_to_end_distance2(result,offset)<0.0001 :
+							csp_concat_subpaths(result,offset)
+						else:
+							
+							intersection = csp_get_subapths_last_first_intersection(result,offset)
+							csp_draw([result])
+							csp_draw([offset],"Red")
+							print_("!!!!!!!!!!!!!!!!!")
+							sys.exit()
+							if intersection != [] :
+								i,t1,j,t2 = intersection
+								sp1_,sp2_,sp3_ = csp_split(result[i-1],result[i],t1)
+								result = result[:i-1] + [ sp1_, sp2_ ]
+								sp1_,sp2_,sp3_ = csp_split(offset[j-1],offset[j],t2)
+								result = csp_concat_subpaths( result, [sp2_,sp3_] + offset[j+1:] )
+							else : raise ValueError, "Offset curvature clipping error"
+		return result					
+						
 	def create_offset_segment(sp1,sp2,r) :
 		# See	Gernot Hoffmann "Bezier Curves"  p.34 -> 7.1 Bezier Offset Curves
 		p0,p1,p2,p3 = P(sp1[1]),P(sp1[2]),P(sp2[0]),P(sp2[1])
@@ -1208,27 +1270,70 @@ def csp_offset(csp, r) :
 		c = csp_curvature_at_t(sp1,sp2,1)
 		q2 = q3 + (p2-p3)*(1- (r*c if abs(c)<100 else 0) ) 
 
-		#inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([[[q0.to_list(), q0.to_list(), q1.to_list()],[q2.to_list(), q3.to_list(), q3.to_list()]]	]), "style":"fill:none;stroke:#f0f;stroke-width:.1px;"} )							
-		return [[q0.to_list(), q0.to_list(), q1.to_list()],[q2.to_list(), q3.to_list(), q3.to_list()]]
 		
-	def join_offsets(prev,next, center, r):
-		# Check for prev and next intersections
-		#for i in xrange(len(prev)-1,0,-1) :
-		#	for j in xrange(1,len(next)) :
-		#		intersection = csp_segments_true_intersection(prev[i-1],prev[i],next[j-1],next[j])
-		#		if len(intersection)>0 :
-		#			t = max(intersection)
-		#			sp1,sp2,sp3 = csp_split(prev[i-1],prev[i],t[0])
-		#			sp3,sp4,sp5 = csp_split(next[j-1],next[j],t[1 if len(t)==2 else 3])
-		#			return prev[:i-1] + [ [prev[i-1][0],prev[i-1][1],sp1[2]], sp2 ] , [], [sp4,[ sp5[0],sp5[1],next[j][2] ] ] + next[j+1:]
-		# If they do not intersect join the offsets with arc
-		if (P(prev[-1][1])-P(next[0][1])).l2()<0.001 : 
+		return [[q0.to_list(), q0.to_list(), q1.to_list()],[q2.to_list(), q3.to_list(), q3.to_list()]]
+	
+	
+	def csp_get_subapths_last_first_intersection(s1,s2):
+		_break = False
+		for i in range(1,len(s1)) :
+			sp11, sp12 = s1[-i-1], s1[-i]
+			for j in range(1,len(s2)) :
+				sp21,sp22 = s2[j-1], s2[j] 
+				intersection = csp_segments_true_intersection(sp11,sp12,sp21,sp22)
+				if intersection != [] :
+					_break = True
+					break 
+			if _break:break
+		if _break :
+			print_(intersection)
+			return [len(s1)-i,intersection[0], j,intersection[1]]
+		else : 
+			return []
+		
+	def csp_join_offsets(prev,next,sp1,sp2,sp1_l,sp2_l,r):
+		if len(next)>1 :
+			if (P(prev[-1][1])-P(next[0][1])).l2()<0.001 : 
+				return prev,[],next
+			intersection = csp_get_subapths_last_first_intersection(prev,next)
+			if intersection != [] :
+				i,t1,j,t2 = intersection
+				sp1_,sp2_,sp3_ = csp_split(prev[i-1],prev[i],t1)
+				sp3_,sp4_,sp5_ = csp_split(next[j-1], next[j],t2)
+				return prev[:i-1] + [ sp1_, sp2_ ], [], [sp4_,sp5_] + next[j+1:] 
+			
+		# Offsets do not intersect... will add an arc...
+		start = (P(csp_at_t(sp1_l,sp2_l,1.)) + r*P(csp_normalized_normal(sp1_l,sp2_l,1.))).to_list()
+		end   = (P(csp_at_t(sp1,sp2,0.)) + r*P(csp_normalized_normal(sp1,sp2,0.))).to_list()
+		arc = csp_from_arc(start, end, sp1[1], r, True)
+		if arc == [] :
 			return prev,[],next
-		prev_slope = csp_normalized_slope(prev[-2],prev[-1],1.)
-		next_slope = csp_normalized_slope(next[0],next[1],0.)
-		ccw = vectors_ccw(prev_slope,next_slope)
-		arc = csp_from_arc(prev[-1][1], next[0][1], center, r, ccw)
-		return prev,arc,next
+		else:
+			# Clip prev by arc
+			if csp_subpaths_start_to_end_distance2(prev,arc)>0.00001 :
+				intersection = csp_get_subapths_last_first_intersection(prev,arc)
+				if intersection != [] :
+					i,t1,j,t2 = intersection
+					sp1_,sp2_,sp3_ = csp_split(prev[i-1],prev[i],t1)
+					sp3_,sp4_,sp5_ = csp_split(arc[j-1],arc[j],t2)
+					prev = prev[:i-1] + [ sp1_, sp2_ ]
+					arc = [sp2_,sp3_] + offset[j+1:] 
+				else : raise ValueError, "Offset curvature clipping error"
+			# Clip next by arc
+			if next == [] :
+				return prev,[],arc
+			if csp_subpaths_start_to_end_distance2(arc,next)>0.00001 :
+				intersection = csp_get_subapths_last_first_intersection(arc,next)
+				if intersection != [] :
+					i,t1,j,t2 = intersection
+					sp1_,sp2_,sp3_ = csp_split(arc[i-1],arc[i],t1)
+					sp3_,sp4_,sp5_ = csp_split(next[j-1],next[j],t2)
+					arc = arc[:i-1] + [ sp1_, sp2_ ]
+					next = [sp2_,sp3_] + next[j+1:] 
+				#else : raise ValueError, "Offset curvature clipping error"
+
+			return prev,arc,next
+		
 		
 	def offset_segment_recursion(sp1,sp2,r, depth, tolerance) :
 		sp1_r,sp2_r = create_offset_segment(sp1,sp2,r)
@@ -1344,62 +1449,37 @@ def csp_offset(csp, r) :
 		subpath_offset = []
 		last_offset_len = 0
 		for sp1,sp2 in zip(subpath, subpath[1:]) : 
-			# check the curvature of the segment if it's exceeds 1/r clip the segment
-			t = csp_get_t_at_curvature(sp1,sp2,1/r)
-			if len(t) == 0 : t =[0.,1.]
-			t.sort()
-			if t[0]>.001 : t = [0.]+t 
-			if t[-1]<.999 : t.append(1.) 
-			for st,end in zip(t,t[1:]) :	
-				c = csp_curvature_at_t(sp1,sp2,(st+end)/2)
-				sp = csp_split_by_two_points(sp1,sp2,st,end)
-				if sp[1]!=sp[2]:
-					if (c>1/r and r<0 or c<1/r and r>0) :
-					
-						offset = offset_segment_recursion(sp[1],sp[2],r, offset_subdivision_depth, offset_tolerance) 
-					# TODO add if the last offset's end is not the same with curren start add a straight line to offset.
-					#inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([offset]), "style":"fill:none;stroke:#d00;stroke-width:1px;"} )					
-					#draw_pointer(sp1[1]+offset[0][1], "#057", "line")
-					#draw_pointer(sp2[1]+offset[-1][1], "#057", "line")
-						if len(subpath_offset)>0 : 
-							prev, arc, next = join_offsets(subpath_offset[-last_offset_len:], offset, sp[1][1],  r)
-							subpath_offset[-last_offset_len:] = prev[:]
-							if arc !=[] : 
-								#inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath([arc]), "style":"fill:none;stroke:#d00;stroke-width:1px;"} )					
-								subpath_offset[-1][2] = arc[0][2]
-								subpath_offset += arc[1:]
-							else :
-								#	If arc == [] the corrner will be clipped so we have to add this corner to the intersection
-								#	to split the offset by it later. All control points that are calculated by intersection of 
-								#	two offsets are less accurate. 
-								intersection[i] += [[len(subpath_offset)-1,1.]] 
-							subpath_offset[-1][2] = next[0][2]
-							subpath_offset += next[1:]
-							last_offset_len = len(next)
-						else :
-							subpath_offset += offset[:]
-							last_offset_len = len(offset)
+			segment_offset = csp_offset_segment(sp1,sp2,r)
+			
+			if subpath_offset == [] :
+				subpath_offset = segment_offset
+				prev_l = len(subpath_offset)
+			else : 
+				prev, arc, next = csp_join_offsets(subpath_offset[-prev_l:],segment_offset,sp1,sp2,sp1_l,sp2_l,r)
+				print_(subpath_offset)
+				print_(prev)
+				print_(arc)
+				print_(next)
+				subpath_offset = csp_concat_subpaths(subpath_offset,prev,arc,next)
+				prev_l = len(next)				
+			sp1_l, sp2_l = sp1, sp2
+						
 		# Join last and first offsets togother to close the curve
 		
-		prev, arc, next = join_offsets(subpath_offset[-last_offset_len:], subpath_offset[:2], subpath[0][1], r)
-		if arc!=[] :
-			subpath_offset[-1][2] = arc[0][2]
-			subpath_offset += arc[1:]
-		else:
-			subpath_offset[-last_offset_len:] = prev[:]
-			subpath_offset[:2] = next[:]
-			intersection[i] += [[1,0.]]
+		prev, arc, next = csp_join_offsets(subpath_offset[-prev_l:], subpath_offset[:2], subpath[0], subpath[1], sp1_l,sp2_l, r)
 
-		# Join subpath's offset and save it to unclipped offset list. 	
+		# Collect subpath's offset and save it to unclipped offset list. 	
 		unclipped_offset[i] = subpath_offset[:]	
 
 		#for k,t in intersection[i]:
 		#	draw_pointer(csp_at_t(subpath_offset[k-1], subpath_offset[k], t))
 			
-	#inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath(unclipped_offset), "style":"fill:none;stroke:#0f0;"} )	
+	inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath(unclipped_offset), "style":"fill:none;stroke:#0f0;"} )	
 	print_("Offsetted path in %s"%(time.time()-time_))
 	time_ = time.time()
-
+	
+	return [[[]]]
+	
 	############################################################################
 	# Now to the clipping. 
 	############################################################################
