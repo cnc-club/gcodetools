@@ -710,19 +710,28 @@ def csp_subpath_split_by_points(subpath, points) :
 				parts += [  [sp1,sp2]+subpath[int1[0]+1:int2[0]-1]+[sp3,sp4]  ]
 	return parts
 
-def csp_from_arc(start, end, center, r, ccw) : 
+def csp_from_arc(start, end, center, r, slope_st) : 
 	# Creates csp that approximise specified arc
 	r = abs(r)
 	alpha = (atan2(end[0]-center[0],end[1]-center[1]) - atan2(start[0]-center[0],start[1]-center[1])) % math.pi2
-	if alpha < 0 and ccw : alpha = -alpha 
-	if abs(alpha*r)<0.01 : 
 
-		return [] 
 	sectors = int(abs(alpha)*2/math.pi)+1
 	alpha_start = atan2(start[0]-center[0],start[1]-center[1])
-	
+	cos_,sin_ = math.cos(alpha_start), math.sin(alpha_start)
+	k = abs(4.*math.tan(alpha/sectors/4.)/3.)
+	print_(dot(slope_st , [start[0] - sin_*k*r, start[1] + cos_*k*r]))
+	print_(alpha)
+	if dot(slope_st , [start[0] - sin_*k*r, start[1] + cos_*k*r]) < 0 : 
+		print_("!!!")
+		#alpha -= alpha
+		#else: alpha += math.pi2
+	if abs(alpha*r)<0.001 : 
+		return []
+	print_(alpha)
+		
+	sectors = int(abs(alpha)*2/math.pi)+1
+	alpha_start = atan2(start[0]-center[0],start[1]-center[1])
 	result = []
-	k = 4.*math.tan(alpha/sectors/4.)/3.
 	for i in range(sectors+1) :
 		cos_,sin_ = math.cos(alpha_start + alpha*i/sectors), math.sin(alpha_start + alpha*i/sectors)
 		sp = [ [], [center[0] + cos_*r, center[1] + sin_*r], [] ]
@@ -1236,14 +1245,12 @@ def csp_offset(csp, r) :
 			if sp[1]!=sp[2]:
 				if (c>1/r and r<0 or c<1/r and r>0) :
 					offset = offset_segment_recursion(sp[1],sp[2],r, offset_subdivision_depth, offset_tolerance) 
-					csp_draw([offset])
 					print_("@@@",offset)
 					if result==[] :
 						result = offset[:]
 					else: 
-						
 						if csp_subpaths_start_to_end_distance2(result,offset)<0.0001 :
-							csp_concat_subpaths(result,offset)
+							result = csp_concat_subpaths(result,offset)
 						else:
 							
 							intersection = csp_get_subapths_last_first_intersection(result,offset)
@@ -1256,7 +1263,8 @@ def csp_offset(csp, r) :
 								result = result[:i-1] + [ sp1_, sp2_ ]
 								sp1_,sp2_,sp3_ = csp_split(offset[j-1],offset[j],t2)
 								result = csp_concat_subpaths( result, [sp2_,sp3_] + offset[j+1:] )
-							#else : #raise ValueError, "Offset curvature clipping error"
+							#else : raise ValueError, "Offset curvature clipping error"
+		csp_draw([result])							
 		return result					
 						
 	def create_offset_segment(sp1,sp2,r) :
@@ -1285,11 +1293,12 @@ def csp_offset(csp, r) :
 				sp21,sp22 = s2[j-1], s2[j] 
 				intersection = csp_segments_true_intersection(sp11,sp12,sp21,sp22)
 				if intersection != [] :
+					print_("!@!@##",intersection)
 					_break = True
 					break 
 			if _break:break
 		if _break :
-			print_(intersection)
+			print_("###",intersection)
 			intersection = max(intersection)
 			return [len(s1)-i,intersection[0], j,intersection[1]]
 		else : 
@@ -1309,7 +1318,7 @@ def csp_offset(csp, r) :
 		# Offsets do not intersect... will add an arc...
 		start = (P(csp_at_t(sp1_l,sp2_l,1.)) + r*P(csp_normalized_normal(sp1_l,sp2_l,1.))).to_list()
 		end   = (P(csp_at_t(sp1,sp2,0.)) + r*P(csp_normalized_normal(sp1,sp2,0.))).to_list()
-		arc = csp_from_arc(start, end, sp1[1], r, True)
+		arc = csp_from_arc(start, end, sp1[1], r, csp_normalized_slope(sp1_l,sp2_l,1.) )
 		if arc == [] :
 			return prev,[],next
 		else:
@@ -1416,6 +1425,7 @@ def csp_offset(csp, r) :
 				csp[j] = csp[j][:i-1]+res+[sp1,sp2]+csp[j][i+1:]		
 				i += len(res)
 			i += 1
+	
 	# Split the segment if the angle between it's slope at t=0 and t=0.01 is big (or 1 and .99)
 	
 	for j in range(len(csp)):
@@ -1454,9 +1464,9 @@ def csp_offset(csp, r) :
 		last_offset_len = 0
 		for sp1,sp2 in zip(subpath, subpath[1:]) : 
 			segment_offset = csp_offset_segment(sp1,sp2,r)
-			
 			if subpath_offset == [] :
 				subpath_offset = segment_offset
+				
 				prev_l = len(subpath_offset)
 			else : 
 				prev, arc, next = csp_join_offsets(subpath_offset[-prev_l:],segment_offset,sp1,sp2,sp1_l,sp2_l,r)
@@ -1466,6 +1476,7 @@ def csp_offset(csp, r) :
 				print_(next)
 				csp_draw([prev],"Blue")
 				csp_draw([arc],"Red")
+				print_("!!!!!!!",[arc])
 				subpath_offset = csp_concat_subpaths(subpath_offset,prev,arc,next)
 				prev_l = len(next)				
 			sp1_l, sp2_l = sp1, sp2
