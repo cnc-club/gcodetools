@@ -411,16 +411,16 @@ def csp_segments_true_intersection(sp1,sp2,sp3,sp4) :
 			res += [intersection]
 	return res
 
-def csp_get_t_at_curvature(sp1,sp2,c, sample_points = 10):
+def csp_get_t_at_curvature(sp1,sp2,c, sample_points = 16):
 	# returns a list containning [t1,t2,t3,...,tn],  0<=ti<=1...
 	if sample_points < 2 : sample_points = 2
-	tolerance = .00000001
+	tolerance = .0000000001
 	res = []
 	ax,ay,bx,by,cx,cy,dx,dy = csp_parameterize(sp1,sp2)
 	for k in range(sample_points) :
 		t = float(k)/(sample_points-1)
 		i, F = 0, 1e100
-		while i<2 or abs(F)>tolerance and i<15 :
+		while i<2 or abs(F)>tolerance and i<17 :
 			try : # some numerical calculation could exceed the limits 
 				t2 = t*t
 				#slopes...
@@ -440,6 +440,7 @@ def csp_get_t_at_curvature(sp1,sp2,c, sample_points = 10):
 			except:
 				break
 			i += 1
+		print_(abs(F))	
 		if 0<=t<=1 and F<=tolerance:
 			if len(res) == 0 :
 				res.append(t)
@@ -1184,10 +1185,8 @@ def csp_concat_subpaths(*s):
 	if len(s) ==1 : return s[0]
 	result = s[0]
 	for s1 in s[1:]:
-		print_(s1)
-		print_(result)
 		result = concat(result,s1)
-	return result	
+	return result
 
 def csp_draw(csp, color="#05f", group = None, style="fill:none;", width = .01) :
 	if csp!=[] and csp!=[[]] :
@@ -1196,12 +1195,10 @@ def csp_draw(csp, color="#05f", group = None, style="fill:none;", width = .01) :
 		
 		inkex.etree.SubElement( group, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath(csp), "style":style} )							
 	
-def csp_subpaths_start_to_end_distance2(s1,s2):
+def csp_subpaths_end_to_start_distance2(s1,s2):
 	return (s1[-1][1][0]-s2[0][1][0])**2 + (s1[-1][1][1]-s2[0][1][1])**2
  	
 def csp_offset(csp, r) :
-	
-	
 	offset_tolerance = 0.05
 	offset_subdivision_depth = 10
 	time_ = time.time()
@@ -1228,7 +1225,7 @@ def csp_offset(csp, r) :
 				if result==[] :
 					result = offset[:]
 				else: 
-					if csp_subpaths_start_to_end_distance2(result,offset)<0.0001 :
+					if csp_subpaths_end_to_start_distance2(result,offset)<0.0001 :
 						result = csp_concat_subpaths(result,offset)
 					else:
 						
@@ -1299,7 +1296,7 @@ def csp_offset(csp, r) :
 			return prev,[],next
 		else:
 			# Clip prev by arc
-			if csp_subpaths_start_to_end_distance2(prev,arc)>0.00001 :
+			if csp_subpaths_end_to_start_distance2(prev,arc)>0.00001 :
 				intersection = csp_get_subapths_last_first_intersection(prev,arc)
 				if intersection != [] :
 					i,t1,j,t2 = intersection
@@ -1311,7 +1308,7 @@ def csp_offset(csp, r) :
 			# Clip next by arc
 			if next == [] :
 				return prev,[],arc
-			if csp_subpaths_start_to_end_distance2(arc,next)>0.00001 :
+			if csp_subpaths_end_to_start_distance2(arc,next)>0.00001 :
 				intersection = csp_get_subapths_last_first_intersection(arc,next)
 				if intersection != [] :
 					i,t1,j,t2 = intersection
@@ -1472,7 +1469,7 @@ def csp_offset(csp, r) :
 	time_ = time.time()
 	
 	#for i in range(len(unclipped_offset)):
-	#	csp_draw([unclipped_offset[i]], color = ["Green","Red","Blue"][i%3])
+	#	csp_draw([unclipped_offset[i]], color = ["Green","Red","Blue"][i%3], width = .1)
 	#return []
 	############################################################################
 	# Now to the clipping. 
@@ -1560,12 +1557,10 @@ def csp_offset(csp, r) :
 			if subpath_i + 1 == subpath_j : continue
 			s2 = splitted_offset[subpath_j]
 			if (P(s1[0][1])-P(s2[-1][1])).l2()<0.0001 :
-				print_(dot(csp_normalized_normal(s2[-2],s2[-1],1.),csp_normalized_slope(s1[0],s1[1],0.)))
 				if dot(csp_normalized_normal(s2[-2],s2[-1],1.),csp_normalized_slope(s1[0],s1[1],0.))*r<-0.000001 :
 					clip = True
 					break
 			if (P(s2[0][1])-P(s1[-1][1])).l2()<0.0001 :
-				print_(dot(csp_normalized_normal(s2[0],s2[1],0.),csp_normalized_slope(s1[-2],s1[-1],1.)))
 				if dot(csp_normalized_normal(s2[0],s2[1],0.),csp_normalized_slope(s1[-2],s1[-1],1.))*r>0.000001 :
 					clip = True
 					break
@@ -1579,7 +1574,51 @@ def csp_offset(csp, r) :
 				(P(csp_at_t(s2[-2],s2[-1],1.))+ P(csp_normalized_normal(s2[-2],s2[-1],1.))*10).to_list(),"Green", "line"  )
 			draw_pointer( csp_at_t(s1[0],s1[1],0.)+
 				(P(csp_at_t(s1[0],s1[1],0.))+ P(csp_normalized_slope(s1[0],s1[1],0.))*10).to_list(),"Red", "line"  )
-	return result
+				
+	# Now join all together and check closure and orientation of result
+	done_smf = True
+	joined_result = []
+	#csp_draw(result,color="Magenta",width=1)
+	while done_smf :
+		done_smf = False
+		while len(result)>0:
+			s1 = result[-1][:]
+			del(result[-1])
+			j = 0
+			joined_smf = False
+			while j<len(joined_result) :
+				if csp_subpaths_end_to_start_distance2(joined_result[j],s1) <0.000001 :
+					joined_result[j] = csp_concat_subpaths(joined_result[j],s1)
+					done_smf = True
+					joined_smf = True
+					break				
+				if csp_subpaths_end_to_start_distance2(s1,joined_result[j]) <0.000001 :
+					joined_result[j] = csp_concat_subpaths(s1,joined_result[j])
+					done_smf = True
+					joined_smf = True
+					break				
+				j += 1
+			if not joined_smf : joined_result += [s1[:]]
+		if done_smf : 
+			result = joined_result[:]
+			joined_result = []
+	# Check if each subpath from joined_result is closed
+	#csp_draw(joined_result,color="Green",width=1)
+
+	
+	for s in joined_result[:] :
+		if csp_subpaths_end_to_start_distance2(s,s) > 0.000001 :
+			#csp_draw([s],color="Orange",width=1)
+			joined_result.remove(s)
+		else : 			
+			minx,miny,maxx,maxy = csp_true_bounds([s])
+			print_((minx[0]-maxx[0])**2 + (miny[1]-maxy[1])**2)
+			if (minx[0]-maxx[0])**2 + (miny[1]-maxy[1])**2 < 0.1 :
+				joined_result.remove(s)
+	print_("Clipped and joined path in %s"%(time.time()-time_))
+	time_ = time.time()
+			
+	return joined_result
 	########################################################################
 	# Dummy cliping: remove parts from splitted offset if their centers are 
 	# closer to the original path than offset radius. 
@@ -3418,7 +3457,8 @@ G01 Z1 (going to cutting z)\n""",
 							offset_ = csp_offset(cubicsuperpath.parsePath(path.get("d")), offset)				
 							offsets_count += 1
 							if offset_ != [] : 
-									csp_draw(offset_, width=1)		
+								for iii in offset_ :
+									csp_draw([iii], color="Green", width=1)		
 									#print_(offset_)
 							else :
 								print_("------------Reached empty offset at radius %s"% offset )
@@ -3430,7 +3470,7 @@ G01 Z1 (going to cutting z)\n""",
 				print_("-----------------------------------------------------------------------------------")				
 				print_()
 				print_("Done in %s"%(time.time()-time_))				
-				print_("Total offsets count %s"%(time.time()-time_))				
+				print_("Total offsets count %s"%offsets_count)				
 #						
 e = Gcodetools()
 e.affect()					
