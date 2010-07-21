@@ -909,7 +909,6 @@ def csp_normalized_slope(sp1,sp2,t) :
 				return [f1x/l, f1y/l]
 	else :
 		return [1.,0.]
-
 				
 def csp_normalized_normal(sp1,sp2,t) :
 	nx,ny = csp_normalized_slope(sp1,sp2,t)
@@ -918,7 +917,94 @@ def csp_normalized_normal(sp1,sp2,t) :
 def csp_parameterize(sp1,sp2):
 	return bezmisc.bezierparameterize(csp_segment_to_bez(sp1,sp2))
 
+def csp_concat_subpaths(*s):
+	def concat(s1,s2) :
+		if s1 == [] : return s2
+		if s2 == [] : return s1
+		if (s1[-1][1][0]-s2[0][1][0])**2 + (s1[-1][1][1]-s2[0][1][1])**2 > 0.00001 :
+	 		return s1[:-1]+[ [s1[-1][0],s1[-1][1],s1[-1][1]],  [s2[0][1],s2[0][1],s2[0][2]] ] + s2[1:]		
+	 	else :
+	 		return s1[:-1]+[ [s1[-1][0],s2[0][1],s2[0][2]] ] + s2[1:]		
+	if len(s) == 0 : return []
+	if len(s) ==1 : return s[0]
+	result = s[0]
+	for s1 in s[1:]:
+		result = concat(result,s1)
+	return result
 
+def csp_draw(csp, color="#05f", group = None, style="fill:none;", width = .1, comment = "") :
+	if csp!=[] and csp!=[[]] :
+		if group == None : group = options.doc_root 
+		style += "stroke:"+color+";"+ "stroke-width:%0.4fpx;"%width
+		args = {"d": cubicsuperpath.formatPath(csp), "style":style}
+		if comment!="" : args["comment"] = str(comment)
+		inkex.etree.SubElement( group, inkex.addNS('path','svg'), args )							
+	
+def csp_subpaths_end_to_start_distance2(s1,s2):
+	return (s1[-1][1][0]-s2[0][1][0])**2 + (s1[-1][1][1]-s2[0][1][1])**2
+
+def csp_clip_by_line(csp,l1,l2) :
+	result = []
+	print_(l1)
+	print_(l2)
+	for i in range(len(csp)):
+		s = csp[i]
+		intersections = []
+		for j in range(1,len(s)) :
+			intersections += [  [j,int_] for int_ in csp_line_intersection(l1,l2,s[j-1],s[j])]
+		splitted_s = csp_subpath_split_by_points(s, intersections)
+		for s in splitted_s[:] :
+			clip = True
+			for p in csp_true_bounds([s]) :
+				if (l1[1]-l2[1])*p[0] + (l2[0]-l1[0])*p[1] + (l1[0]*l2[1]-l2[0]*l1[1])>0 : 
+					clip = False
+					break
+			if clip : splitted_s.remove(s)
+		result += splitted_s
+	return result
+
+def csp_subpath_line_to(subpath, points) :
+	# Appends subpath with line or polyline.
+	if len(points)>0 :
+		if len(subpath)>0:
+			subpath[-1][2] = subpath[-1][1][:]
+		if type(points[0]) == type([1,1]) :
+			for p in points :
+				subpath += [ [p,p,p] ]
+		else: 
+			subpath += [ [points,points,points] ]
+	return subpath
+	
+def csp_join_subpaths(csp) :
+	result = csp[:]
+	done_smf = True
+	joined_result = []
+	while done_smf :
+		done_smf = False
+		while len(result)>0:
+			s1 = result[-1][:]
+			del(result[-1])
+			j = 0
+			joined_smf = False
+			while j<len(joined_result) :
+				if csp_subpaths_end_to_start_distance2(joined_result[j],s1) <0.000001 :
+					joined_result[j] = csp_concat_subpaths(joined_result[j],s1)
+					done_smf = True
+					joined_smf = True
+					break				
+				if csp_subpaths_end_to_start_distance2(s1,joined_result[j]) <0.000001 :
+					joined_result[j] = csp_concat_subpaths(s1,joined_result[j])
+					done_smf = True
+					joined_smf = True
+					break				
+				j += 1
+			if not joined_smf : joined_result += [s1[:]]
+		if done_smf : 
+			result = joined_result[:]
+			joined_result = []
+	return joined_result
+
+	
 ################################################################################
 ###		Bezier additional functions
 ################################################################################
@@ -1170,34 +1256,6 @@ class P:
 ###
 ################################################################################
 
-
-def csp_concat_subpaths(*s):
-	def concat(s1,s2) :
-		if s1 == [] : return s2
-		if s2 == [] : return s1
-#		print_(s1[-1], s2[0])
-		if (s1[-1][1][0]-s2[0][1][0])**2 + (s1[-1][1][1]-s2[0][1][1])**2 > 0.00001 :
-	 		return s1[:-1]+[ [s1[-1][0],s1[-1][1],s1[-1][1]],  [s2[0][1],s2[0][1],s2[0][2]] ] + s2[1:]		
-	 	else :
-	 		return s1[:-1]+[ [s1[-1][0],s2[0][1],s2[0][2]] ] + s2[1:]		
-	if len(s) == 0 : return []
-	if len(s) ==1 : return s[0]
-	result = s[0]
-	for s1 in s[1:]:
-		result = concat(result,s1)
-	return result
-
-def csp_draw(csp, color="#05f", group = None, style="fill:none;", width = .1, comment = "") :
-	if csp!=[] and csp!=[[]] :
-		if group == None : group = options.doc_root 
-		style += "stroke:"+color+";"+ "stroke-width:%0.4fpx;"%width
-		args = {"d": cubicsuperpath.formatPath(csp), "style":style}
-		if comment!="" : args["comment"] = str(comment)
-		inkex.etree.SubElement( group, inkex.addNS('path','svg'), args )							
-	
-def csp_subpaths_end_to_start_distance2(s1,s2):
-	return (s1[-1][1][0]-s2[0][1][0])**2 + (s1[-1][1][1]-s2[0][1][1])**2
- 	
 def csp_offset(csp, r) :
 	offset_tolerance = 0.05
 	offset_subdivision_depth = 10
@@ -1342,7 +1400,7 @@ def csp_offset(csp, r) :
 			r2 = offset_segment_recursion(sp4,sp5,r, depth-1, tolerance)
 			return r1[:-1]+ [[r1[-1][0],r1[-1][1],r2[0][2]]] + r2[1:]
 		else :
-			#csp_draw([[sp1,sp2]])
+			#csp_draw([[sp1_r,sp2_r]])
 			#draw_pointer(sp1[1]+sp1_r[1], "#057", "line")
 			#draw_pointer(sp2[1]+sp2_r[1], "#705", "line")
 			return [sp1_r,sp2_r]
@@ -1377,49 +1435,7 @@ def csp_offset(csp, r) :
 
 	original_csp = csp[:]
 	# Clip segments which has curvature>1/r. Because their offset will be selfintersecting and very nasty.
-	
-	
-	# Get special points (curvature = 0) and split the path at them.	
-	"""for j in range(len(csp)) : 
-		subpath = csp[j]
-		new_subpath = []
-		i = 0
-		while i<len(csp[j]) :
-			sp1,sp2 = csp[j][i-1], csp[j][i]
-			points = csp_special_points(sp1,sp2)	
-			points.sort()
-			res, tl, being_split = [], 0, False
-			for t in points : 	
-				if 0.0001<t<0.9999 :
-					sp3,sp1,sp2 = csp_split(sp1,sp2,(t-tl)/(1-tl))
-					res += [sp3[:]]
-					tl = t
-					being_split = True
-			if being_split :
-				csp[j] = csp[j][:i-1]+res+[sp1,sp2]+csp[j][i+1:]		
-				i += len(res)
-			i += 1"""
-	
-	# Split the segment if the angle between it's slope at t=0 and t=0.01 is big (or 1 and .99)
-	"""
-	for j in range(len(csp)):
-		i = 1
-		while i<len(csp[j]) :
-			sp1,sp2 = csp[j][i-1], csp[j][i]
-#			print_("!",dot( csp_normalized_slope(sp1,sp2,0.), csp_normalized_slope(sp1,sp2,0.1)))
-#			print_("!!", dot( csp_normalized_slope(sp1,sp2,0.9), csp_normalized_slope(sp1,sp2,1.)))
-			if  sp1[2]!=sp1[1] and abs(dot( csp_normalized_slope(sp1,sp2,0.), csp_normalized_slope(sp1,sp2,0.1))) < 0.5 :
-				sp1,sp2,sp3 = csp_split(sp1,sp2,.01)
-				csp[j][i-1:i+1] = [ [sp1[0],sp1[1],sp1[1]], [sp2[1],sp2[1],sp2[2]],sp3]
-				i += 1
-			if  sp2[0]!=sp2[1] and abs(dot( csp_normalized_slope(sp1,sp2,0.9), csp_normalized_slope(sp1,sp2,1.))) < 0.5 :
-				sp1,sp2,sp3 = csp_split(sp1,sp2,.99)
-				csp[j][i-1:i+1] = [sp1,[sp2[0],sp2[1],sp2[1]], [sp3[1],sp3[1],sp3[2]] ]
-				i += 1
-			i += 1	"""
 					
-	# To draw prepared path uncomment the following line			
-	#inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath(csp), "style":"fill:none;stroke:#00f;stroke-width:.1px;"} )					
 	print_("Offset prepared the path in %s"%(time.time()-time_))
 	print_("Path length = %s"% sum([len(i)for i in csp] ) )
 	time_ = time.time()
@@ -1575,32 +1591,7 @@ def csp_offset(csp, r) :
 				(P(csp_at_t(s1[0],s1[1],0.))+ P(csp_normalized_slope(s1[0],s1[1],0.))*10).to_list(),"Red", "line"  )
 				
 	# Now join all together and check closure and orientation of result
-	done_smf = True
-	joined_result = []
-	#csp_draw(result,color="Magenta",width=1)
-	while done_smf :
-		done_smf = False
-		while len(result)>0:
-			s1 = result[-1][:]
-			del(result[-1])
-			j = 0
-			joined_smf = False
-			while j<len(joined_result) :
-				if csp_subpaths_end_to_start_distance2(joined_result[j],s1) <0.000001 :
-					joined_result[j] = csp_concat_subpaths(joined_result[j],s1)
-					done_smf = True
-					joined_smf = True
-					break				
-				if csp_subpaths_end_to_start_distance2(s1,joined_result[j]) <0.000001 :
-					joined_result[j] = csp_concat_subpaths(s1,joined_result[j])
-					done_smf = True
-					joined_smf = True
-					break				
-				j += 1
-			if not joined_smf : joined_result += [s1[:]]
-		if done_smf : 
-			result = joined_result[:]
-			joined_result = []
+	joined_result = csp_join_subpaths(result)
 	# Check if each subpath from joined_result is closed
 	#csp_draw(joined_result,color="Green",width=1)
 
@@ -1640,65 +1631,7 @@ def csp_offset(csp, r) :
 	print_()
 	return joined_result
 	
-		
-	clipped_offset = []	 	
-	for subpath in splitted_offset :
-		# first check distance between offset's start/end points and original path. 
-		# there's no need to check first and last points because they formed by intersection
-		# and could be less accureate. All control points are calculeated very accurate, so 
-		# distance tolerance can be smaller.
-		clip = True
-		if len(subpath)>2 :
-			dist = csp_to_point_distance(csp, subpath[int(len(subpath)/2)][1], dist_bounds = [r1,r2], tolerance = .0001)
-			clip =  not (r1 < dist[0] < r2)
-		elif len(subpath) == 2 :
-			# 	Here we'll what I've called reverse offset :)
-			#	First of all find the reverse offsetted points of the end of the subpath
-			
-			#reverse_offset = ( P(csp_at_t(subpath[0],subpath[1],.5)) - r * P(csp_normalized_normal(subpath[0],subpath[1],.5)) ).to_list()
-			middle_point = csp_at_t(subpath[0],subpath[1],.5)
-			d, i,j,t = csp_to_point_distance(csp, middle_point, dist_bounds = [0.,(offset_tolerance*10)**2], tolerance = .0001)
-			if (r1*.8 < d < r2*1.2) :
-				real = P(csp_at_t(csp[i][j-1], csp[i][j], t)).to_list()
-				real_offset = ( P(csp_at_t(csp[i][j-1], csp[i][j], t)) + r * P(csp_normalized_normal(csp[i][j-1], csp[i][j], t)) ).to_list()
-				#draw_pointer(csp_at_t(csp[i][j-1], csp[i][j], t))
-				#draw_pointer(csp_at_t(subpath[0],subpath[1],.5) + reverse_offset, "#057","line")
-				draw_pointer(csp_at_t(subpath[0],subpath[1],.5) + real+real_offset, "#057","line")
-				dist = csp_to_point_distance(csp, real_offset, dist_bounds = [r1,r2], tolerance = .0001)
-				#d, i,j,t = dist
-				#ereal = P(csp_at_t(csp[i][j-1], csp[i][j], t)).to_list()
-				#draw_pointer(reverse_offset + real + real_offset+ereal, "green","line", comment = math.sqrt(d))
-				clip =  not (r1 < dist[0] < r2)
-			else :
-				clip = True 
-
-		if not clip :
-			clipped_offset += [subpath]
-		elif options.offset_draw_clippend_path : 
-			if len(dist) == 4 :
-				draw_pointer(csp_at_t(csp[dist[1]][dist[2]-1],csp[dist[1]][dist[2]],dist[3])+sp[1],"blue", "line", comment = [math.sqrt(dist[0]),i,j,sp]  )
-			else :	
-				draw_pointer( csp_at_t(subpath[dist[2]-1],subpath[dist[2]],dist[3])
-					+csp_at_t(original_csp[dist[4]][dist[5]-1],original_csp[dist[4]][dist[5]],dist[6]),"red","line", comment = str(math.sqrt(dist[0]))+str(dist))
-			style = "fill:none;stroke:#c00;stroke-width:0.1px;"
-			inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath( [subpath] ), "style":style, "comment":str(math.sqrt(dist[0]))} )
-	print_("Clipped in %s"%(time.time()-time_))
-	print_("-----------------------------")
-	print_("Total offset time %s"%(time.time()-time_start))
-	print_()
-
 	
-	########################################################################
-	# Now try to join all clipped offsets together
-	########################################################################		
-	
-	#	clipped_offset[-1][-1][2] = subpath[0][2]
-	#	clipped_offset[-1] += subpath[1:]	
-		
-	#inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": cubicsuperpath.formatPath( clipped_offset ), "style":"fill:none;stroke:#000;stroke-width:2px;", "comment":str(dist)} )		
-	#print_(clipped_offset)
-	return clipped_offset
-
 		
 
 
@@ -1896,6 +1829,11 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--engraving-cutter-shape-function",action="store", type="string", 	dest="engraving_cutter_shape_function", default="w",		help="Cutter shape function z(w). Ex. cone: w. ")
 
 		self.OptionParser.add_option("",   "--lathe-width",					action="store", type="float", 		dest="lathe_width", default=10.,help="Lathe width")
+		self.OptionParser.add_option("",   "--lathe-fine-cut-width",		action="store", type="float", 		dest="lathe_fine_cut_width", default=1.,help="Fine cut width")
+		self.OptionParser.add_option("",   "--lathe-fine-cut-count",		action="store", type="int", 		dest="lathe_fine_cut_count", default=1,help="Fine cut rounds count")
+		self.OptionParser.add_option("",   "--lathe-x-axis-remap",			action="store", type="string", 		dest="lathe_x_axis_remap", default="X",help="Lathe X axis remap")
+		self.OptionParser.add_option("",   "--lathe-z-axis-remap",			action="store", type="string", 		dest="lathe_z_axis_remap", default="Z",help="Lathe Z axis remap")
+
 
 		self.OptionParser.add_option("",   "--create-log",					action="store", type="inkbool", 	dest="log_create_log", default=False,				help="Create log files")
 		self.OptionParser.add_option("",   "--log-filename",				action="store", type="string", 		dest="log_filename", default='',					help="Create log files")
@@ -1912,6 +1850,9 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--offset-step",					action="store", type="float", 		dest="offset_step", default=10.,		help="Offset step")
 		self.OptionParser.add_option("",   "--offset-draw-clippend-path",	action="store", type="inkbool",		dest="offset_draw_clippend_path", default=False,		help="Draw clipped path")		
 		self.OptionParser.add_option("",   "--offset-just-get-distance",	action="store", type="inkbool",		dest="offset_just_get_distance", default=False,		help="Don't do offset just get distance")		
+
+
+
 
 		self.default_tool = {
 					"name": "Default tool",
@@ -3321,16 +3262,38 @@ G01 Z1 (going to cutting z)\n""",
 				tool = self.tools[layer][0]
 				for path in paths[layer]:
 					
-					# Create solid object from path and lathe_width
 					csp = self.transform_csp(cubicsuperpath.parsePath(path.get("d")),layer)
+					
 					for subpath in csp :
+						# Offset the path if fine cut is defined.
+						fine_cut = subpath[:]
+						if self.options.lathe_fine_cut_width>0 :
+							r = self.options.lathe_fine_cut_width
+							# Close the path to make offset correct 
+							bound = csp_simple_bound([subpath])
+							offsetted_subpath = csp_subpath_line_to(subpath[:], [ [subpath[-1][1][0], bound[1]-r*10 ], [subpath[0][1][0], bound[1]-r*10 ], [subpath[0][1][0], subpath[0][1][1] ]  ])
+							offsetted_subpath = csp_offset([offsetted_subpath], r) 
+							#csp_draw(self.transform_csp(offsetted_subpath,layer,True))
+							offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [subpath[-1][1][0],0], [subpath[-1][1][0],10] )
+							offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [subpath[0][1][0],10], [subpath[0][1][0],0] )
+							offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [0,bound[1]-r ], [10, bound[1]-r ] )
+							#csp_draw(self.transform_csp(offsetted_subpath,layer,True), color = "Orange", width = 1)
+							# Join offsetted_subpath together 
+							# Hope there wont be any cicles
+							subpath = csp_join_subpaths(offsetted_subpath)[0]
+								
+							
+						# Create solid object from path and lathe_width 
 						bound = csp_simple_bound([subpath])
-						top_start, top_end = [subpath[0][1][0], self.options.lathe_width+self.options.Zsafe], [subpath[-1][1][0], self.options.lathe_width+self.options.Zsafe]
+						top_start, top_end = [subpath[0][1][0], self.options.lathe_width+self.options.Zsafe+self.options.lathe_fine_cut_width], [subpath[-1][1][0], self.options.lathe_width+self.options.Zsafe+self.options.lathe_fine_cut_width]
+						subpath = csp_concat_subpaths(csp_subpath_line_to([],[top_start,subpath[0][1]]), subpath)
+						subpath = csp_subpath_line_to(subpath,[top_end,top_start])
+						# Fine cut has the same X coordinate with the subpath, even if it hase been offsetted
+						# so we can freely use same top_start and top_end points
+						fine_cut = csp_concat_subpaths(csp_subpath_line_to([],[top_start,subpath[0][1]]), fine_cut)
+						fine_cut = csp_subpath_line_to(fine_cut,[top_end,top_start])
+
 						
-						subpath = [ [top_start,top_start,[top_start[0],top_start[1]-1] ]] + subpath + [[top_end]*3] + [[top_start]*3]
-#						inkex.etree.SubElement( layer, inkex.addNS("path","svg"), 
-#							{	"d": cubicsuperpath.formatPath(self.transform_csp([subpath],layer, True) ),
-#								"style": "fill:#cccccc;stroke-width:1;stroke:#0055ff;"	} )
 						width = max(0, self.options.lathe_width - max(0, bound[1]) )
 						step = tool['depth step']
 						steps = int(math.ceil(width/step))
@@ -3379,8 +3342,8 @@ G01 Z1 (going to cutting z)\n""",
 						inkex.etree.SubElement( layer, inkex.addNS("path","svg"), 
 						{	"d": cubicsuperpath.formatPath(self.transform_csp(cutting_path,layer, True) ),
 						"style": "fill:none;stroke-width:1;stroke:#5555cc;"	} )
-
-					
+						for i in range(self.options.lathe_fine_cut_count) :
+							csp_draw(self.transform_csp([fine_cut],layer,True), color = "Orange", width = .5)
 	
 
 ################################################################################
@@ -3395,6 +3358,7 @@ G01 Z1 (going to cutting z)\n""",
 	def effect(self):
 		global options
 		options = self.options
+		options.self = self
 		options.doc_root = self.document.getroot()
 
 		# define print_ function 
