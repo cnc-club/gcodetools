@@ -123,6 +123,24 @@ styles = {
 				'line':		simplestyle.formatStyle({ 'stroke': '#5dd', 'fill': 'none', 'stroke-width':'1' }),
 				'area':		simplestyle.formatStyle({ 'stroke': '#aaa', 'fill': 'none', 'stroke-width':'0.3' }),
 			},
+		"biarc_style_lathe_feed" : {
+				'biarc0':	simplestyle.formatStyle({ 'stroke': '#07f', 'fill': 'none', 'stroke-width':'1' }),
+				'biarc1':	simplestyle.formatStyle({ 'stroke': '#0f7', 'fill': 'none', 'stroke-width':'1' }),
+				'line':		simplestyle.formatStyle({ 'stroke': '#f70', 'fill': 'none', 'stroke-width':'1' }),
+				'area':		simplestyle.formatStyle({ 'stroke': '#aaa', 'fill': 'none', 'stroke-width':'0.3' }),
+			},
+		"biarc_style_lathe_passing feed" : {
+				'biarc0':	simplestyle.formatStyle({ 'stroke': '#07f', 'fill': 'none', 'stroke-width':'.2' }),
+				'biarc1':	simplestyle.formatStyle({ 'stroke': '#0f7', 'fill': 'none', 'stroke-width':'.2' }),
+				'line':		simplestyle.formatStyle({ 'stroke': '#f70', 'fill': 'none', 'stroke-width':'.2' }),
+				'area':		simplestyle.formatStyle({ 'stroke': '#aaa', 'fill': 'none', 'stroke-width':'0.3' }),
+			},
+		"biarc_style_lathe_fine feed" : {
+				'biarc0':	simplestyle.formatStyle({ 'stroke': '#057', 'fill': 'none', 'stroke-width':'.2' }),
+				'biarc1':	simplestyle.formatStyle({ 'stroke': '#075', 'fill': 'none', 'stroke-width':'.2' }),
+				'line':		simplestyle.formatStyle({ 'stroke': '#750', 'fill': 'none', 'stroke-width':'.2' }),
+				'area':		simplestyle.formatStyle({ 'stroke': '#aaa', 'fill': 'none', 'stroke-width':'0.3' }),
+			},
 		"area artefact": 		simplestyle.formatStyle({ 'stroke': '#ff0000', 'fill': '#ffff00', 'stroke-width':'1' }),
 		"area artefact arrow":	simplestyle.formatStyle({ 'stroke': '#ff0000', 'fill': '#ffff00', 'stroke-width':'1' }),
 		"dxf_points":		 	simplestyle.formatStyle({ "stroke": "#ff0000", "fill": "#ff0000"}),
@@ -956,7 +974,7 @@ def csp_clip_by_line(csp,l1,l2) :
 		for s in splitted_s[:] :
 			clip = True
 			for p in csp_true_bounds([s]) :
-				if (l1[1]-l2[1])*p[0] + (l2[0]-l1[0])*p[1] + (l1[0]*l2[1]-l2[0]*l1[1])>0 : 
+				if (l1[1]-l2[1])*p[0] + (l2[0]-l1[0])*p[1] + (l1[0]*l2[1]-l2[0]*l1[1])>0.001 : 
 					clip = False
 					break
 			if clip : splitted_s.remove(s)
@@ -1874,7 +1892,8 @@ class Gcodetools(inkex.Effect):
 					"4th axis meaning": " ",
 					"4th axis scale": 1.,
 					"4th axis offset": 0.,
-					
+					"passing feed":"800",					
+					"fine feed":"800",					
 				}			
 		self.tools_field_order = [
 					'name',
@@ -1884,6 +1903,7 @@ class Gcodetools(inkex.Effect):
 					'shape',
 					'penetration angle',
 					'penetration feed',
+					"passing feed",
 					'depth step',
 					"in trajectotry",
 					"out trajectotry",
@@ -3087,6 +3107,19 @@ class Gcodetools(inkex.Effect):
 					"depth step":"1",
 					"tool change gcode":" "
 			}
+		elif self.options.tools_library_type == "lathe cutter" :
+			tool = {
+					"name": "Lathe cutter",
+					"id": "Lathe cutter 0001",
+					"diameter":10,
+					"penetration angle":90,
+					"feed":"400",
+					"passing feed":"800",
+					"fine feed":"100",
+					"penetration feed":"100",
+					"depth step":"1",
+					"tool change gcode":" "
+			}
 		elif self.options.tools_library_type == "cone cutter":	
 			tool = {
 					"name": "Cone cutter",
@@ -3254,12 +3287,62 @@ G01 Z1 (going to cutting z)\n""",
 ###		Lathe
 ################################################################################
 
+	def generate_lathe_gcode(self, subpath, layer, feed_type) :
+		if len(subpath) <2 : return ""
+		feed = " F %f" % self.tool[feed_type] 
+		x,z = self.options.lathe_x_axis_remap, self.options.lathe_z_axis_remap
+		alias = {"X":"I", "Y":"j", "Z":"K", "x":"i", "y":"j", "z":"k"} 
+		i_, k_ = alias[x], alias[z]
+		c = []
+		csp_draw(self.transform_csp([subpath],layer,True), color = "Orange", width = .1)
+		for sp1,sp2 in zip(subpath,subpath[1:]) :
+			c += biarc(sp1,sp2,0,0)
+		for i in range(1,len(c)) : # Just in case check end point of each segment
+			c[i-1][4] = c[i][0][:]
+		print_(c)	
+		self.draw_curve(c, layer, style = styles["biarc_style_lathe_%s" % feed_type])
+		gcode = ("G01 %s %f %s %f" % (x, c[0][4][0], z, c[0][4][1]) ) + feed + "\n" # Just in case move to the shtart...
+		for s in c :
+			if s[1] == 'line':
+				gcode += ("G01 %s %f %s %f" % (x, s[4][0], z, s[4][1]) ) + feed + "\n"
+			elif s[1] == 'arc':
+				r = [(s[2][0]-s[0][0]), (s[2][1]-s[0][1])]
+				if (r[0]**2 + r[1]**2)>self.options.min_arc_radius:
+					r1, r2 = (P(s[0])-P(s[2])), (P(s[4])-P(s[2]))
+					if abs(r1.mag()-r2.mag()) < 0.001 :
+						gcode += ("G02" if s[3]<0 else "G03") + (" %s %f %s %f %s %f %s %f" % (x,s[4][0],z,s[4][1],i_,(s[2][0]-s[0][0]), k_, (s[2][1]-s[0][1]) ) ) + feed + "\n"
+					else:
+						r = (r1.mag()+r2.mag())/2
+						gcode += ("G02" if s[3]<0 else "G03") + (" %s %f %s %f" % (x,s[4][0],z,y[4][1]) ) + " R%f"%r + feed + "\n"
+		return gcode
+
+		
+		
+
 	def lathe(self):
+		if not self.check_dir() : return
+		x,z = self.options.lathe_x_axis_remap, self.options.lathe_z_axis_remap
+		print_("!",x,"!",z,",")
+		x = re.sub("^\s*([XYZxyz])\s*$",r"\1",x) 
+		z = re.sub("^\s*([XYZxyz])\s*$",r"\1",z)
+		if x not in ["X", "Y", "Z", "x", "y", "z"] or z not in ["X", "Y", "Z", "x", "y", "z"] :
+			self.error(_("Lathe X and Z axis remap should be 'X', 'Y' or 'Z'. Exiting..."),"warning") 
+			return
+		self.options.lathe_x_axis_remap, self.options.lathe_z_axis_remap = x, z
+	
 		paths = self.selected_paths
+		self.tool = []
+		gcode = ""
 		for layer in self.layers :
 			if layer in paths :
 				self.set_tool(layer)
-				tool = self.tools[layer][0]
+				if self.tool != self.tools[layer][0] :
+					self.tool = self.tools[layer][0]
+					self.tool["passing feed"]	= float(self.tool["passing feed"])
+					self.tool["feed"]			= float(self.tool["feed"])
+					self.tool["fine feed"]		= float(self.tool["fine feed"])
+					gcode += ( "(Change tool to %s)\n" % re.sub("\"'\(\)\\\\"," ",self.tool["name"]) ) + self.tool["tool change gcode"] + "\n"
+					
 				for path in paths[layer]:
 					
 					csp = self.transform_csp(cubicsuperpath.parsePath(path.get("d")),layer)
@@ -3281,25 +3364,23 @@ G01 Z1 (going to cutting z)\n""",
 							# Join offsetted_subpath together 
 							# Hope there wont be any cicles
 							subpath = csp_join_subpaths(offsetted_subpath)[0]
-								
+
 							
 						# Create solid object from path and lathe_width 
 						bound = csp_simple_bound([subpath])
 						top_start, top_end = [subpath[0][1][0], self.options.lathe_width+self.options.Zsafe+self.options.lathe_fine_cut_width], [subpath[-1][1][0], self.options.lathe_width+self.options.Zsafe+self.options.lathe_fine_cut_width]
+
+						gcode += ("G01 %s %f F %f \n" % (z, top_start[1], self.tool["passing feed"]) )
+						gcode += ("G01 %s %f %s %f F %f \n" % (x, top_start[0], z, top_start[1], self.tool["passing feed"]) )
+
 						subpath = csp_concat_subpaths(csp_subpath_line_to([],[top_start,subpath[0][1]]), subpath)
 						subpath = csp_subpath_line_to(subpath,[top_end,top_start])
-						# Fine cut has the same X coordinate with the subpath, even if it hase been offsetted
-						# so we can freely use same top_start and top_end points
-						fine_cut = csp_concat_subpaths(csp_subpath_line_to([],[top_start,subpath[0][1]]), fine_cut)
-						fine_cut = csp_subpath_line_to(fine_cut,[top_end,top_start])
-
+	
 						
 						width = max(0, self.options.lathe_width - max(0, bound[1]) )
-						step = tool['depth step']
+						step = self.tool['depth step']
 						steps = int(math.ceil(width/step))
-						cutting_path = []
 						for i in range(steps+1):
-							cutting_path += [[]]
 							current_width = self.options.lathe_width - step*i
 							print_(current_width)
 							intersections = []
@@ -3315,35 +3396,23 @@ G01 Z1 (going to cutting z)\n""",
 								y = (maxy[1]+miny[1])/2
 #								draw_pointer(self.transform([x,y],layer,True),"#0000ff")
 								if  y > current_width+step :
-									color = "blue"
-									inkex.etree.SubElement( layer, inkex.addNS("path","svg"), 
-									{	"d": cubicsuperpath.formatPath(self.transform_csp([part],layer, True) ),
-									"style": "fill:none;stroke-width:1;stroke:%s;"%color	} )
-
+									gcode += self.generate_lathe_gcode(part,layer,"passing feed")
 								elif current_width <= y <= current_width+step :
-									color = "green"
-									inkex.etree.SubElement( layer, inkex.addNS("path","svg"), 
-									{	"d": cubicsuperpath.formatPath(self.transform_csp([part],layer, True) ),
-									"style": "fill:none;stroke-width:1;stroke:%s;"%color	} )
+									gcode += self.generate_lathe_gcode(part,layer,"feed")
 								else :
+									# full step cut
 									color = "red"
-									part = [ [part[0][1]]*3, [part[-1][1]]*3]
-									print_(part)	
-									inkex.etree.SubElement( layer, inkex.addNS("path","svg"), 
-									{	"d": cubicsuperpath.formatPath(self.transform_csp([part],layer, True) ),
-									"style": "fill:none;stroke-width:1;stroke:%s;"%color	} )
-									print_( max(csp_simple_bound(self.transform_csp([part],layer, True))) )
-								if cutting_path[-1] == [] :
-									cutting_path[-1] = part
-								else :
-									cutting_path[-1][-1][1:] = part[0][1:]
-									cutting_path[-1] += part[1:]
+									part = csp_subpath_line_to([], [part[0][1], part[-1][1]] )
+									gcode += self.generate_lathe_gcode(part,layer,"feed")
 									
-						inkex.etree.SubElement( layer, inkex.addNS("path","svg"), 
-						{	"d": cubicsuperpath.formatPath(self.transform_csp(cutting_path,layer, True) ),
-						"style": "fill:none;stroke-width:1;stroke:#5555cc;"	} )
+						top_start, top_end = [fine_cut[0][1][0], self.options.lathe_width+self.options.Zsafe+self.options.lathe_fine_cut_width], [fine_cut[-1][1][0], self.options.lathe_width+self.options.Zsafe+self.options.lathe_fine_cut_width]
 						for i in range(self.options.lathe_fine_cut_count) :
-							csp_draw(self.transform_csp([fine_cut],layer,True), color = "Orange", width = .5)
+							
+							gcode += ("G01 %s %f %s %f F %f \n" % (x, top_start[0], z, top_start[1], self.tool["passing feed"]) )
+							gcode += ("G01 %s %f %s %f F %f \n" % (x, fine_cut[0][1][0], z, fine_cut[0][1][1], self.tool["passing feed"]) )
+							gcode += self.generate_lathe_gcode(fine_cut,layer,"fine feed")
+						gcode += ("G01 %s %f %s %f F %f \n" % (x, top_start[0], z, top_start[1], self.tool["passing feed"]) )
+							
 	
 
 ################################################################################
