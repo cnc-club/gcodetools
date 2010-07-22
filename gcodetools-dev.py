@@ -322,9 +322,9 @@ def csp_true_bounds(csp) :
 	for i in range(len(csp)):
 		for j in range(1,len(csp[i])):
 			ax,ay,bx,by,cx,cy,x0,y0 = bezmisc.bezierparameterize((csp[i][j-1][1],csp[i][j-1][2],csp[i][j][0],csp[i][j][1]))
-			roots = cubic_solver(0, ax, bx, cx)	 + [0,1]
+			roots = cubic_solver(0, 3*ax, 2*bx, cx)	 + [0,1]
 			for root in roots :
-				if type(root) is complex and root.imag==0:
+				if type(root) is complex and abs(root.imag)<1e-10:
 					root = root.real
 				if type(root) is not complex and 0<=root<=1:
 					y = ay*(root**3)+by*(root**2)+cy*root+y0  
@@ -332,7 +332,7 @@ def csp_true_bounds(csp) :
 					maxx = max([x,y,i,j,root],maxx)
 					minx = min([x,y,i,j,root],minx)
 
-			roots = cubic_solver(0, ay, by, cy)	 + [0,1]
+			roots = cubic_solver(0, 3*ay, 2*by, cy)	 + [0,1]
 			for root in roots :
 				if type(root) is complex and root.imag==0:
 					root = root.real
@@ -550,32 +550,54 @@ def csp_special_points(sp1,sp2) :
 	
 def csp_subpath_ccw(subpath):
 	# Remove all zerro length segments
+	s = 0
+	#subpath = subpath[:]
+	if (P(subpath[-1][1])-P(subpath[0][1])).l2() > 1e-10 :
+		subpath[-1][2] = subpath[-1][1]
+		subpath[0][0] = subpath[0][1]
+		subpath += [ [subpath[0][1],subpath[0][1],subpath[0][1]]  ]
+	pl = subpath[-1][2]
+	for sp1 in subpath:
+		for p in sp1 :
+			s += (p[0]-pl[0])*(p[1]+pl[1])
+			pl = p
+	return s<0
+	
+	"""
 	path = [subpath[0]]
 	for i in xrange(1,len(subpath)) :
-		 if not subpath[i][1]==path[-1][1]==subpath[i][0]==path[-1][0] :
+		 if not  (P(path[-1][1])-P(subpath[i][1])).l2()<1e-10 :
 		 	path += [ subpath[i] ]
-	# Close the path and remove last point to avoid zerro length last segment
-	if path[-1][1]!=path[0][1] : 
+	# Close the path
+	if (P(path[-1][1])-P(path[0][1])).l2() > 1e-10 :
 		path[-1][2] = path[-1][1]
 		path[0][0] = path[0][1]
-	else :
-		path[0][0] = path[-1][0]
-		del path[-1]
+		path += [ [path[0][1],path[0][1],path[0][1]]  ]
 	
 	# Finding top most point in path (min y value)
-	# We start from segments -1 and 0 because of secific path closure
-	maxy = csp_real_bounds([[path[-1]]+path])[3]
-	i,t = maxy[3], maxy[4]
-	print_(csp_normalized_slope(path[i-1],path[i],t))
+	miny = csp_true_bounds([path])[1]
+	csp_draw([path])
+	i,t = miny[3], miny[4]
+	print_(miny)
+	draw_pointer(miny[:2])
+#	print_(csp_normalized_slope(path[i-1],path[i],t))
 	if 0<t<1 : 
 		d = csp_normalized_slope(path[i-1],path[i],t)
-		return atan2(d)<0
+		print_ (d)
+		return d[0]<0
 	else :
 		if t==1 :
-			return atan2(csp_normalized_slope(path[i-1], path[i],1)) > atan2(csp_normalized_slope(path[i], path[(i+1)%len(path)],0))
+			prev = i+1 % len(path)
 		else :
-			return atan2(csp_normalized_slope(path[i-1], path[i],0)) < atan2(csp_normalized_slope(path[i-2], path[i-1],1))
+			prev = i
+			i = i-1
+		d = cross(csp_normalized_slope(path[i-1], path[i],0), csp_normalized_slope(path[prev-1], path[prev],1))
+		if d!= 0 :
+			return d<0
+		else: 
+			return csp_at_t(path[i-1], path[i],0.01)<csp_at_t(path[prev-1], path[prev],0.01)
 
+"""
 
 def csp_at_t(sp1,sp2,t):
 	ax,bx,cx,dx = sp1[1][0], sp1[2][0], sp2[0][0], sp2[1][0]
@@ -673,7 +695,7 @@ def csp_line_intersection(l1,l2,sp1,sp2):
 	roots = cubic_solver(a,b,c,d)
 	retval = []
 	for i in roots :
-		if type(i) is complex and i.imag==0:
+		if type(i) is complex and abs(i.imag)<1e-7:
 			i = i.real
 		if type(i) is not complex and 0<=i<=1:
 			retval.append(i)
@@ -971,11 +993,13 @@ def csp_clip_by_line(csp,l1,l2) :
 		splitted_s = csp_subpath_split_by_points(s, intersections)
 		for s in splitted_s[:] :
 			clip = True
+			print_()
 			for p in csp_true_bounds([s]) :
 				if (l1[1]-l2[1])*p[0] + (l2[0]-l1[0])*p[1] + (l1[0]*l2[1]-l2[0]*l1[1])>0.001 : 
 					clip = False
 					break
-			if clip : splitted_s.remove(s)
+			if clip :
+				splitted_s.remove(s)
 		result += splitted_s
 	return result
 
@@ -3369,7 +3393,6 @@ G01 Z1 (going to cutting z)\n""",
 					gcode += ( "(Change tool to %s)\n" % re.sub("\"'\(\)\\\\"," ",self.tool["name"]) ) + self.tool["tool change gcode"] + "\n"
 					
 				for path in paths[layer]:
-					
 					csp = self.transform_csp(cubicsuperpath.parsePath(path.get("d")),layer)
 					
 					for subpath in csp :
@@ -3379,17 +3402,19 @@ G01 Z1 (going to cutting z)\n""",
 							r = self.options.lathe_fine_cut_width
 							# Close the path to make offset correct 
 							bound = csp_simple_bound([subpath])
-							offsetted_subpath = csp_subpath_line_to(subpath[:], [ [subpath[-1][1][0], bound[1]-r*10 ], [subpath[0][1][0], bound[1]-r*10 ], [subpath[0][1][0], subpath[0][1][1] ]  ])
-							offsetted_subpath = csp_offset([offsetted_subpath], r) 
-							#csp_draw(self.transform_csp(offsetted_subpath,layer,True))
-							offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [subpath[-1][1][0],0], [subpath[-1][1][0],10] )
-							offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [subpath[0][1][0],10], [subpath[0][1][0],0] )
-							offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [0,bound[1]-r ], [10, bound[1]-r ] )
-							#csp_draw(self.transform_csp(offsetted_subpath,layer,True), color = "Orange", width = 1)
+							minx,miny,maxx,maxy = csp_true_bounds([subpath])
+							offsetted_subpath = csp_subpath_line_to(subpath[:], [ [subpath[-1][1][0], miny[1]-r*10 ], [subpath[0][1][0], miny[1]-r*10 ], [subpath[0][1][0], subpath[0][1][1] ]  ])
+							left,right = subpath[-1][1][0], subpath[0][1][0]
+							if left>right : left, right = right,left
+							offsetted_subpath = csp_offset([offsetted_subpath], r if not csp_subpath_ccw(offsetted_subpath) else -r ) 
+							offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [left,10], [left,0] )
+							offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [right,0], [right,10] )
+							offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [0, miny[1]-r], [10, miny[1]-r] )
+							#csp_draw(self.transform_csp(offsetted_subpath,layer,True), color = "Green", width = 1)
+
 							# Join offsetted_subpath together 
 							# Hope there wont be any cicles
 							subpath = csp_join_subpaths(offsetted_subpath)[0]
-
 							
 						# Create solid object from path and lathe_width 
 						bound = csp_simple_bound([subpath])
@@ -3429,9 +3454,9 @@ G01 Z1 (going to cutting z)\n""",
 									gcode += self.generate_lathe_gcode(part,layer,"feed")
 									
 						top_start, top_end = [fine_cut[0][1][0], self.options.lathe_width+self.options.Zsafe+self.options.lathe_fine_cut_width], [fine_cut[-1][1][0], self.options.lathe_width+self.options.Zsafe+self.options.lathe_fine_cut_width]
-						gcode += "(Fine cutting start)\n"					
+						gcode += "\n(Fine cutting start)"					
 						for i in range(self.options.lathe_fine_cut_count) :
-							gcode += "(Fine cut %i-th cicle start)\n"%(i+1)					
+							gcode += "\n(Fine cut %i-th cicle start)\n"%(i+1)					
 							gcode += ("G01 %s %f %s %f F %f \n" % (x, top_start[0], z, top_start[1], self.tool["passing feed"]) )
 							gcode += ("G01 %s %f %s %f F %f \n" % (x, fine_cut[0][1][0], z, fine_cut[0][1][1]-self.options.lathe_fine_cut_width, self.tool["passing feed"]) )
 							gcode += ("G01 %s %f %s %f F %f \n" % (x, fine_cut[0][1][0], z, fine_cut[0][1][1], self.tool["fine feed"]) )
