@@ -94,52 +94,52 @@ styles = {
 				'main curve':	simplestyle.formatStyle({ 'stroke': '#88f', 'fill': 'none', 'stroke-width':'1', 'marker-end':'url(#Arrow2Mend)' }),
 			},
 		"biarc_style" : {
-				'biarc0':	simplestyle.formatStyle({ 'stroke': '#88f', 'fill': 'none', 'stroke-width':'1' }),
-				'biarc1':	simplestyle.formatStyle({ 'stroke': '#8f8', 'fill': 'none', 'stroke-width':'1' }),
-				'line':		simplestyle.formatStyle({ 'stroke': '#f88', 'fill': 'none', 'stroke-width':'1' }),
-				'area':		simplestyle.formatStyle({ 'stroke': '#777', 'fill': 'none', 'stroke-width':'0.1' }),
+				'biarc0':	simplestyle.formatStyle({ 'stroke': '#88f', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'1' }),
+				'biarc1':	simplestyle.formatStyle({ 'stroke': '#8f8', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'1' }),
+				'line':		simplestyle.formatStyle({ 'stroke': '#f88', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'1' }),
+				'area':		simplestyle.formatStyle({ 'stroke': '#777', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'0.1' }),
 			},
 		"biarc_style_dark" : {
-				'biarc0':	simplestyle.formatStyle({ 'stroke': '#33a', 'fill': 'none', 'stroke-width':'1' }),
-				'biarc1':	simplestyle.formatStyle({ 'stroke': '#3a3', 'fill': 'none', 'stroke-width':'1' }),
-				'line':		simplestyle.formatStyle({ 'stroke': '#a33', 'fill': 'none', 'stroke-width':'1' }),
-				'area':		simplestyle.formatStyle({ 'stroke': '#222', 'fill': 'none', 'stroke-width':'0.3' }),
+				'biarc0':	simplestyle.formatStyle({ 'stroke': '#33a', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'1' }),
+				'biarc1':	simplestyle.formatStyle({ 'stroke': '#3a3', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'1' }),
+				'line':		simplestyle.formatStyle({ 'stroke': '#a33', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'1' }),
+				'area':		simplestyle.formatStyle({ 'stroke': '#222', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'0.3' }),
 			},
 		"biarc_style_dark_area" : {
-				'biarc0':	simplestyle.formatStyle({ 'stroke': '#33a', 'fill': 'none', 'stroke-width':'0.1' }),
-				'biarc1':	simplestyle.formatStyle({ 'stroke': '#3a3', 'fill': 'none', 'stroke-width':'0.1' }),
-				'line':		simplestyle.formatStyle({ 'stroke': '#a33', 'fill': 'none', 'stroke-width':'0.1' }),
-				'area':		simplestyle.formatStyle({ 'stroke': '#222', 'fill': 'none', 'stroke-width':'0.3' }),
+				'biarc0':	simplestyle.formatStyle({ 'stroke': '#33a', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'0.1' }),
+				'biarc1':	simplestyle.formatStyle({ 'stroke': '#3a3', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'0.1' }),
+				'line':		simplestyle.formatStyle({ 'stroke': '#a33', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'0.1' }),
+				'area':		simplestyle.formatStyle({ 'stroke': '#222', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'0.3' }),
 			},
 		"biarc_style_i"  : {
-				'biarc0':	simplestyle.formatStyle({ 'stroke': '#880', 'fill': 'none', 'stroke-width':'1' }),
-				'biarc1':	simplestyle.formatStyle({ 'stroke': '#808', 'fill': 'none', 'stroke-width':'1' }),
-				'line':		simplestyle.formatStyle({ 'stroke': '#088', 'fill': 'none', 'stroke-width':'1' }),
-				'area':		simplestyle.formatStyle({ 'stroke': '#999', 'fill': 'none', 'stroke-width':'0.3' }),
+				'biarc0':	simplestyle.formatStyle({ 'stroke': '#880', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'1' }),
+				'biarc1':	simplestyle.formatStyle({ 'stroke': '#808', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'1' }),
+				'line':		simplestyle.formatStyle({ 'stroke': '#088', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'1' }),
+				'area':		simplestyle.formatStyle({ 'stroke': '#999', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'0.3' }),
 			},
 		"biarc_style_dark_i" : {
-				'biarc0':	simplestyle.formatStyle({ 'stroke': '#dd5', 'fill': 'none', 'stroke-width':'1' }),
-				'biarc1':	simplestyle.formatStyle({ 'stroke': '#d5d', 'fill': 'none', 'stroke-width':'1' }),
-				'line':		simplestyle.formatStyle({ 'stroke': '#5dd', 'fill': 'none', 'stroke-width':'1' }),
-				'area':		simplestyle.formatStyle({ 'stroke': '#aaa', 'fill': 'none', 'stroke-width':'0.3' }),
+				'biarc0':	simplestyle.formatStyle({ 'stroke': '#dd5', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'1' }),
+				'biarc1':	simplestyle.formatStyle({ 'stroke': '#d5d', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'1' }),
+				'line':		simplestyle.formatStyle({ 'stroke': '#5dd', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'1' }),
+				'area':		simplestyle.formatStyle({ 'stroke': '#aaa', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'0.3' }),
 			},
 		"biarc_style_lathe_feed" : {
-				'biarc0':	simplestyle.formatStyle({ 'stroke': '#07f', 'fill': 'none', 'stroke-width':'1' }),
-				'biarc1':	simplestyle.formatStyle({ 'stroke': '#0f7', 'fill': 'none', 'stroke-width':'1' }),
-				'line':		simplestyle.formatStyle({ 'stroke': '#f70', 'fill': 'none', 'stroke-width':'1' }),
-				'area':		simplestyle.formatStyle({ 'stroke': '#aaa', 'fill': 'none', 'stroke-width':'0.3' }),
+				'biarc0':	simplestyle.formatStyle({ 'stroke': '#07f', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'.4' }),
+				'biarc1':	simplestyle.formatStyle({ 'stroke': '#0f7', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'.4' }),
+				'line':		simplestyle.formatStyle({ 'stroke': '#f44', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'.4' }),
+				'area':		simplestyle.formatStyle({ 'stroke': '#aaa', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'0.3' }),
 			},
 		"biarc_style_lathe_passing feed" : {
-				'biarc0':	simplestyle.formatStyle({ 'stroke': '#07f', 'fill': 'none', 'stroke-width':'.2' }),
-				'biarc1':	simplestyle.formatStyle({ 'stroke': '#0f7', 'fill': 'none', 'stroke-width':'.2' }),
-				'line':		simplestyle.formatStyle({ 'stroke': '#f70', 'fill': 'none', 'stroke-width':'.2' }),
-				'area':		simplestyle.formatStyle({ 'stroke': '#aaa', 'fill': 'none', 'stroke-width':'0.3' }),
+				'biarc0':	simplestyle.formatStyle({ 'stroke': '#07f', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'.4' }),
+				'biarc1':	simplestyle.formatStyle({ 'stroke': '#0f7', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'.4' }),
+				'line':		simplestyle.formatStyle({ 'stroke': '#f44', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'.4' }),
+				'area':		simplestyle.formatStyle({ 'stroke': '#aaa', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'0.3' }),
 			},
 		"biarc_style_lathe_fine feed" : {
-				'biarc0':	simplestyle.formatStyle({ 'stroke': '#057', 'fill': 'none', 'stroke-width':'.2' }),
-				'biarc1':	simplestyle.formatStyle({ 'stroke': '#075', 'fill': 'none', 'stroke-width':'.2' }),
-				'line':		simplestyle.formatStyle({ 'stroke': '#750', 'fill': 'none', 'stroke-width':'.2' }),
-				'area':		simplestyle.formatStyle({ 'stroke': '#aaa', 'fill': 'none', 'stroke-width':'0.3' }),
+				'biarc0':	simplestyle.formatStyle({ 'stroke': '#7f0', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'.4' }),
+				'biarc1':	simplestyle.formatStyle({ 'stroke': '#f70', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'.4' }),
+				'line':		simplestyle.formatStyle({ 'stroke': '#744', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'.4' }),
+				'area':		simplestyle.formatStyle({ 'stroke': '#aaa', 'fill': 'none', "marker-end":"url(#DrawCurveMarker)", 'stroke-width':'0.3' }),
 			},
 		"area artefact": 		simplestyle.formatStyle({ 'stroke': '#ff0000', 'fill': '#ffff00', 'stroke-width':'1' }),
 		"area artefact arrow":	simplestyle.formatStyle({ 'stroke': '#ff0000', 'fill': '#ffff00', 'stroke-width':'1' }),
@@ -963,8 +963,6 @@ def csp_subpaths_end_to_start_distance2(s1,s2):
 
 def csp_clip_by_line(csp,l1,l2) :
 	result = []
-	print_(l1)
-	print_(l2)
 	for i in range(len(csp)):
 		s = csp[i]
 		intersections = []
@@ -1950,6 +1948,29 @@ class Gcodetools(inkex.Effect):
 
 
 	def draw_curve(self, curve, layer, group=None, style=styles["biarc_style"]):
+	
+		self.get_defs()
+		# Add marker to defs if it doesnot exists
+		if "DrawCurveMarker" not in self.defs : 
+			defs = inkex.etree.SubElement( self.document.getroot(), inkex.addNS("defs","svg"))
+			marker = inkex.etree.SubElement( defs, inkex.addNS("marker","svg"), {"id":"DrawCurveMarker","orient":"auto","refX":"-8","refY":"-2.41063","style":"overflow:visible"})
+			inkex.etree.SubElement( marker, inkex.addNS("path","svg"), 
+					{	"d":"m -6.55552,-2.41063 0,0 L -13.11104,0 c 1.0473,-1.42323 1.04126,-3.37047 0,-4.82126",
+						"style": "fill:#000044; fill-rule:evenodd;stroke-width:0.62500000;stroke-linejoin:round;"	}
+				)
+		if "DrawCurveMarker_r" not in self.defs : 
+			defs = inkex.etree.SubElement( self.document.getroot(), inkex.addNS("defs","svg"))
+			marker = inkex.etree.SubElement( defs, inkex.addNS("marker","svg"), {"id":"DrawCurveMarker_r","orient":"auto","refX":"8","refY":"-2.41063","style":"overflow:visible"})
+			inkex.etree.SubElement( marker, inkex.addNS("path","svg"), 
+					{	"d":"m 6.55552,-2.41063 0,0 L 13.11104,0 c -1.0473,-1.42323 -1.04126,-3.37047 0,-4.82126",
+						"style": "fill:#000044; fill-rule:evenodd;stroke-width:0.62500000;stroke-linejoin:round;"	}
+				)
+		for i in [0,1]:
+			style['biarc%s_r'%i] = simplestyle.parseStyle(style['biarc%s'%i])
+			style['biarc%s_r'%i]["marker-start"] = "url(#DrawCurveMarker_r)"
+			del(style['biarc%s_r'%i]["marker-end"])
+			style['biarc%s_r'%i] = simplestyle.formatStyle(style['biarc%s_r'%i])
+		
 		if group==None:
 			group = inkex.etree.SubElement( self.layers[min(1,len(self.layers)-1)], inkex.addNS('g','svg'), {"gcodetools": "Preview group"} )
 		s, arcn = '', 0
@@ -1985,14 +2006,17 @@ class Gcodetools(inkex.Effect):
 							else: a = math.pi2+a
 					r = math.sqrt( (sp[0]-c[0])**2 + (sp[1]-c[1])**2 )
 					a_st = ( math.atan2(sp[0]-c[0],- (sp[1]-c[1])) - math.pi/2 ) % (math.pi*2)
+					st = style['biarc%s' % (arcn%2)][:]
 					if a>0:
 						a_end = a_st+a
+						st = style['biarc%s'%(arcn%2)]
 					else: 
 						a_end = a_st*1
-						a_st = a_st+a	
+						a_st = a_st+a
+						st = style['biarc%s_r'%(arcn%2)]
 					inkex.etree.SubElement(	group, inkex.addNS('path','svg'), 
 						 {
-							'style': style['biarc%s' % (arcn%2)],
+							'style': st,
 							 inkex.addNS('cx','sodipodi'):		str(c[0]),
 							 inkex.addNS('cy','sodipodi'):		str(c[1]),
 							 inkex.addNS('rx','sodipodi'):		str(r),
@@ -2028,10 +2052,17 @@ class Gcodetools(inkex.Effect):
 #10 = %s (Offset z)
 #11 = %s (Safe distanse)\n""" % ( self.options.Zscale, self.options.Zoffset, self.options.Zsafe )
 			if not self.options.generate_not_parametric_code else "" )
-			return True
 		else: 
 			error(_("Directory does not exist! Please specify existing directory at Preferences tab!"),"error")
 			return False
+
+		try: 	
+			f = open(self.options.directory+'/'+self.options.file, "w")	
+			f.close()							
+		except:
+			self.error(_("Can not write to specified file!"),"error")
+			return False
+		return True
 
 ################################################################################
 ###
@@ -2554,12 +2585,9 @@ class Gcodetools(inkex.Effect):
 					Zpos = max(		self.Zcoordinates[layer][1],		 self.Zcoordinates[layer][0] - abs(self.tools[layer][0]["depth step"]*(step+1))	)
 					gcode += self.generate_gcode(curve, layer, Zpos)
 		gcode += self.footer
-		try: 	
-			f = open(self.options.directory+'/'+self.options.file, "w")	
-			f.write(gcode)
-			f.close()							
-		except:
-			self.error(_("Can not write to specified file!"),"error")
+		f = open(self.options.directory+'/'+self.options.file, "w")	
+		f.write(gcode)
+		f.close()							
 
 
 ################################################################################
@@ -3027,12 +3055,9 @@ class Gcodetools(inkex.Effect):
 
 		if gcode!='' :
 			gcode = self.header + gcode + self.footer
-			try: 	
-				f = open(self.options.directory+'/'+self.options.file, "w")	
-				f.write(gcode)
-				f.close()							
-			except:
-				self.error(_("Can not write to specified file!"),"error")
+			f = open(self.options.directory+'/'+self.options.file, "w")	
+			f.write(gcode)
+			f.close()							
 		else : 	self.error(_("No need to engrave sharp angles."),"warning")
 
 
@@ -3210,7 +3235,6 @@ G01 Z1 (going to cutting z)\n""",
 		bg.set('d',"m -20,-20 l 400,0 0,%f -400,0 z " % (y+50))
 		tool = []
 		tools_group.set("transform", simpletransform.formatTransform([ [1,0,self.view_center[0]-150 ], [0,1,self.view_center[1]] ] ))
-		print_
 
 
 
@@ -3291,17 +3315,18 @@ G01 Z1 (going to cutting z)\n""",
 		if len(subpath) <2 : return ""
 		feed = " F %f" % self.tool[feed_type] 
 		x,z = self.options.lathe_x_axis_remap, self.options.lathe_z_axis_remap
-		alias = {"X":"I", "Y":"j", "Z":"K", "x":"i", "y":"j", "z":"k"} 
+		alias = {"X":"I", "Y":"J", "Z":"K", "x":"i", "y":"j", "z":"k"} 
 		i_, k_ = alias[x], alias[z]
-		c = []
-		csp_draw(self.transform_csp([subpath],layer,True), color = "Orange", width = .1)
+		c = [ [subpath[0][1], "move", 0, 0, 0] ]
+		#csp_draw(self.transform_csp([subpath],layer,True), color = "Orange", width = .1)
 		for sp1,sp2 in zip(subpath,subpath[1:]) :
 			c += biarc(sp1,sp2,0,0)
 		for i in range(1,len(c)) : # Just in case check end point of each segment
 			c[i-1][4] = c[i][0][:]
-		print_(c)	
+		c += [ [subpath[-1][1], "end", 0, 0, 0] ]			
 		self.draw_curve(c, layer, style = styles["biarc_style_lathe_%s" % feed_type])
-		gcode = ("G01 %s %f %s %f" % (x, c[0][4][0], z, c[0][4][1]) ) + feed + "\n" # Just in case move to the shtart...
+		
+		gcode = ("G01 %s %f %s %f" % (x, c[0][4][0], z, c[0][4][1]) ) + feed + "\n" # Just in case move to the start...
 		for s in c :
 			if s[1] == 'line':
 				gcode += ("G01 %s %f %s %f" % (x, s[4][0], z, s[4][1]) ) + feed + "\n"
@@ -3322,7 +3347,6 @@ G01 Z1 (going to cutting z)\n""",
 	def lathe(self):
 		if not self.check_dir() : return
 		x,z = self.options.lathe_x_axis_remap, self.options.lathe_z_axis_remap
-		print_("!",x,"!",z,",")
 		x = re.sub("^\s*([XYZxyz])\s*$",r"\1",x) 
 		z = re.sub("^\s*([XYZxyz])\s*$",r"\1",z)
 		if x not in ["X", "Y", "Z", "x", "y", "z"] or z not in ["X", "Y", "Z", "x", "y", "z"] :
@@ -3338,9 +3362,10 @@ G01 Z1 (going to cutting z)\n""",
 				self.set_tool(layer)
 				if self.tool != self.tools[layer][0] :
 					self.tool = self.tools[layer][0]
-					self.tool["passing feed"]	= float(self.tool["passing feed"])
+					self.tool["passing feed"]	= float(self.tool["passing feed"] if "passing feed" in self.tool else self.tool["feed"])
 					self.tool["feed"]			= float(self.tool["feed"])
-					self.tool["fine feed"]		= float(self.tool["fine feed"])
+					self.tool["fine feed"]		= float(self.tool["fine feed"] if "fine feed" in self.tool else self.tool["feed"]) 
+					
 					gcode += ( "(Change tool to %s)\n" % re.sub("\"'\(\)\\\\"," ",self.tool["name"]) ) + self.tool["tool change gcode"] + "\n"
 					
 				for path in paths[layer]:
@@ -3382,7 +3407,6 @@ G01 Z1 (going to cutting z)\n""",
 						steps = int(math.ceil(width/step))
 						for i in range(steps+1):
 							current_width = self.options.lathe_width - step*i
-							print_(current_width)
 							intersections = []
 							for j in range(1,len(subpath)) :
 								sp1,sp2 = subpath[j-1], subpath[j]
@@ -3401,19 +3425,26 @@ G01 Z1 (going to cutting z)\n""",
 									gcode += self.generate_lathe_gcode(part,layer,"feed")
 								else :
 									# full step cut
-									color = "red"
 									part = csp_subpath_line_to([], [part[0][1], part[-1][1]] )
 									gcode += self.generate_lathe_gcode(part,layer,"feed")
 									
 						top_start, top_end = [fine_cut[0][1][0], self.options.lathe_width+self.options.Zsafe+self.options.lathe_fine_cut_width], [fine_cut[-1][1][0], self.options.lathe_width+self.options.Zsafe+self.options.lathe_fine_cut_width]
+						gcode += "(Fine cutting start)\n"					
 						for i in range(self.options.lathe_fine_cut_count) :
-							
+							gcode += "(Fine cut %i-th cicle start)\n"%(i+1)					
 							gcode += ("G01 %s %f %s %f F %f \n" % (x, top_start[0], z, top_start[1], self.tool["passing feed"]) )
-							gcode += ("G01 %s %f %s %f F %f \n" % (x, fine_cut[0][1][0], z, fine_cut[0][1][1], self.tool["passing feed"]) )
-							gcode += self.generate_lathe_gcode(fine_cut,layer,"fine feed")
-						gcode += ("G01 %s %f %s %f F %f \n" % (x, top_start[0], z, top_start[1], self.tool["passing feed"]) )
+							gcode += ("G01 %s %f %s %f F %f \n" % (x, fine_cut[0][1][0], z, fine_cut[0][1][1]-self.options.lathe_fine_cut_width, self.tool["passing feed"]) )
+							gcode += ("G01 %s %f %s %f F %f \n" % (x, fine_cut[0][1][0], z, fine_cut[0][1][1], self.tool["fine feed"]) )
 							
-	
+							gcode += self.generate_lathe_gcode(fine_cut,layer,"fine feed")
+							gcode += ("G01 %s %f F %f \n" % (z, top_start[1], self.tool["passing feed"]) )
+						gcode += ("G01 %s %f %s %f F %f \n" % (x, top_start[0], z, top_start[1], self.tool["passing feed"]) )
+		
+							
+		f = open(self.options.directory+'/'+self.options.file, "w")	
+		f.write(self.header+"\n"+gcode + "\n" + self.footer)
+		f.close()							
+
 
 ################################################################################
 ###
