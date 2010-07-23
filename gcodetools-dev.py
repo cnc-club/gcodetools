@@ -1057,6 +1057,34 @@ def csp_join_subpaths(csp) :
 			joined_result = []
 	return joined_result
 
+def triangle_cross(a,b,c):
+	return (a[0]-b[0])*(c[1]-b[1]) - (c[0]-b[0])*(a[1]-b[1])
+	
+
+def csp_segment_convex_hull(sp1,sp2):
+	a,b,c,d = sp1[1][:], sp1[2][:], sp2[0][:], sp2[1][:]
+	
+	abc = triangle_cross(a,b,c)
+	abd = triangle_cross(a,b,d)
+	bcd = triangle_cross(b,c,d)
+	cad = triangle_cross(c,a,d)
+	if abc == 0 and abd == 0 : return [min(a,b,c,d), max(a,b,c,d)]
+	if abc == 0 : return [d, min(a,b,c), max(a,b,c)]
+	if abd == 0 : return [c, min(a,b,d), max(a,b,d)]
+	if bcd == 0 : return [a, min(b,c,d), max(b,c,d)]
+	if cad == 0 : return [b, min(c,a,d), max(c,a,d)]
+	
+	m1, m2, m3  =  abc*abd>0, abc*bcd>0, abc*cad>0
+	if m1 and m2 and m3 : return [a,b,c]
+	if     m1 and     m2 and not m3 : return [a,b,c,d]
+	if     m1 and not m2 and     m3 : return [a,b,d,c]
+	if not m1 and     m2 and     m3 : return [a,d,b,c]
+	if m1 and not (m2 and m3) : return [a,b,d]
+	if not (m1 and m2) and m3 : return [c,a,d]
+	if not (m1 and m3) and m2 : return [b,c,d]
+	
+	raise ValueError, "csp_segment_convex_hull happend something that shouldnot happen!"	
+	
 	
 ################################################################################
 ###		Bezier additional functions
@@ -1831,7 +1859,84 @@ def biarc_curve_clip_at_l(curve, l, clip_type = "strict") :
 		i = i%len(subcurve)
 	return res	
 
-				
+	
+	
+################################################################################
+###		Polygon class
+################################################################################
+class Polygon:
+	def __init__(self, polygon=None):
+		self.polygon = [] if polygon==None else polygon[:]
+	
+	def move(self, x, y) :
+		for i in range(len(self.polygon)) :
+			for j in range(len(self.polygon[i])) :
+				self.polygon[i][j][0] += x
+				self.polygon[i][j][1] += y
+		
+			
+	def drop_down(self, surface) :
+		# Polygon is a list of simple polygons
+		# Surface is a polygon + line y = 0 
+		# Down means min y (0,-1)  
+		if len(self.polygon) == 0 or len(self.polygon[0])==0 : return
+		# Get surface top point
+		top = 0 
+		for poly in surface.polygon : 
+			for p in poly :
+				top = max(top, p[1])
+		print_(surface.polygon)
+		# Get polygon bottom point
+		print_(self.polygon)
+		bottom = self.polygon[0][0][1]
+		for poly in self.polygon :
+			for p in poly :
+				bottom = min(bottom,p[1])
+		
+		
+		self.move(0, top - bottom + 10)		
+		print_( top, bottom,top - bottom + 10)
+		# Now get shortest distance from surface to polygon in positive x=0 direction
+		# Such distance = min(distance(vertex, edge)...)  where edge from surface and 
+		# vertex from polygon and vice versa...
+		dist = 1e100
+		
+		for poly in surface.polygon :
+			for i in range(len(poly)) :
+				for poly1 in self.polygon :
+					for i1 in range(len(poly1)) :
+						st,end = poly[i-1], poly[i] 
+						vertex = poly1[i1]
+						if st[0]<=vertex[0]<= end[0] or end[0]<=vertex[0]<=st[0] :
+							if st[0]==end[0] : d = min(vertex[1]-st[1],vertex[1]-end[1])
+							else : d = vertex[1] - st[1] - (end[1]-st[1])*(vertex[0]-st[0])/(end[0]-st[0]) 
+							if dist > d  : dist = d
+						# and vice versa just change the sign because vertex now under the edge
+						st,end = poly1[i1-1], poly1[i1] 
+						vertex = poly[i]
+						if st[0]<=vertex[0]<=end[0] or end[0]<=vertex[0]<=st[0] :
+							if st[0]==end[0] : d = min(- vertex[1]+st[1],-vertex[1]+end[1])
+							else : d =  - vertex[1] + st[1] + (end[1]-st[1])*(vertex[0]-st[0])/(end[0]-st[0]) 
+							if dist > d  : dist = d
+		if dist > 10 + top : dist = 10 + top 
+		print_(dist, top, bottom)
+		self.draw()
+		self.move(0, -dist)		
+					
+	def draw(self) :
+		for poly in self.polygon :
+			csp_draw( [csp_subpath_line_to([],poly+[poly[0]])] )
+			
+	def add(self, add) :
+		if type(add) == type([]) :
+			self.polygon += add[:]
+		else :	
+			self.polygon += add.polygon[:]
+
+
+
+
+			
 ################################################################################
 ###
 ###		Gcodetools class
@@ -1839,6 +1944,32 @@ def biarc_curve_clip_at_l(curve, l, clip_type = "strict") :
 ################################################################################
 
 class Gcodetools(inkex.Effect):
+
+
+
+################################################################################
+###		Arrangement: arranges paths by givven params
+###		TODO move it to the bottom
+################################################################################
+
+	def arrangement(self) :
+			
+		paths = self.selected_paths
+		surface = Polygon()
+		for layer in self.layers :
+			if layer in paths :
+				for path in paths[layer] :
+					csp = cubicsuperpath.parsePath(path.get("d"))
+					polygon = Polygon()
+					for subpath in csp :
+						for sp1, sp2 in zip(subpath,subpath[1:]) :
+							polygon.add([csp_segment_convex_hull(sp1,sp2)])
+					#polygon.draw()
+					polygon.drop_down(surface)
+					polygon.draw()
+					surface.add(polygon)
+		#surface.draw()					
+							
 
 	def __init__(self):
 		inkex.Effect.__init__(self)
@@ -3490,7 +3621,7 @@ G01 Z1 (going to cutting z)\n""",
 		f.write(self.header+"\n" + gcode_plane_selection + "\n" + gcode + "\n" + self.footer)
 		f.close()							
 
-
+										
 ################################################################################
 ###
 ###		Effect
@@ -3500,7 +3631,7 @@ G01 Z1 (going to cutting z)\n""",
 ################################################################################
 
 	
-	def effect(self):
+	def effect(self) :
 		global options
 		options = self.options
 		options.self = self
@@ -3526,8 +3657,8 @@ G01 Z1 (going to cutting z)\n""",
 		if self.options.active_tab == '"help"' :
 			self.help()
 			return
-		elif self.options.active_tab not in ['"dxfpoints"','"path-to-gcode"', '"area"', '"area_artefacts"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"', '"offset"']:
-			self.error(_("Select one of the active tabs - Path to Gcode, Area, Engraving, DXF points, Orientation or Tools library."),"error")
+		elif self.options.active_tab not in ['"dxfpoints"','"path-to-gcode"', '"area"', '"area_artefacts"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"', '"offset"', '"arrangement"']:
+			self.error(_("Select one of the active tabs - Path to Gcode, Area, Engraving, DXF points, Orientation, Offset, Lathe or Tools library."),"error")
 		else:
 			# Get all Gcodetools data from the scene.
 			self.get_info()
@@ -3596,6 +3727,9 @@ G01 Z1 (going to cutting z)\n""",
 				print_()
 				print_("Done in %s"%(time.time()-time_))				
 				print_("Total offsets count %s"%offsets_count)				
+			elif self.options.active_tab == '"arrangement"': 
+				self.arrangement()
+						
 #						
 e = Gcodetools()
 e.affect()					

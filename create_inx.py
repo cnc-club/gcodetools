@@ -1,4 +1,5 @@
 #!/usr/bin/env python 
+
 import xml.dom.minidom 
 import getopt, sys, os, re, copy
 
@@ -26,7 +27,18 @@ def main():
 			assert False, "unhandled option"
 
 	if args == []: 
-		args = ["DXF Points: dxfpoints no_options", "Path to Gcode: ptg", "Area offset: area", "Area Artefacts: area_artefacts no_options", "Engraving: engraving", "Tools library: tools_library no_options no_preferences", "Orientation points: orientation no_options no_preferences", "All in one: ptg area area_artefacts engraving dxfpoints tools_library orientation", "Offset: offset no_options", "Lathe: lathe ptg"]
+		args = [	
+					"DXF Points: dxfpoints no_options",
+					"Path to Gcode: ptg",
+					"Area offset: area",
+					"Area Artefacts: area_artefacts no_options",
+					"Engraving: engraving",
+					"Tools library: tools_library no_options no_preferences",
+					"Orientation points: orientation no_options no_preferences",
+					"All in one: ptg area area_artefacts engraving dxfpoints tools_library orientation",
+					"Offset: offset no_options", "Lathe: lathe ptg",
+					"Arrangement: arrangement no_options"
+				]
 
 	f = open("gcodetools-dev.inx" if input_file == None else input_file,"r")
 	s = f.read()

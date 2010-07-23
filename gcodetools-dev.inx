@@ -208,6 +208,12 @@ Press Apply to create new tool.
 	</page>
 <!-- Gcodetools: /offset block -->
 
+<!-- Gcodetools: arrangement block -->
+	<page name='arrangement' _gui-text='Arrangement'>	
+	</page>
+<!-- Gcodetools: /arrangement block -->
+
+
 <!-- Gcodetools: footer block -->
 	</param>	
     <effect>
