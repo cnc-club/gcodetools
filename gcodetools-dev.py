@@ -3483,7 +3483,7 @@ G01 Z1 (going to cutting z)\n""",
 		if len(subpath) <2 : return ""
 		feed = " F %f" % self.tool[feed_type] 
 		x,z = self.options.lathe_x_axis_remap, self.options.lathe_z_axis_remap
-		flip_angle = -1 if x.lower()+z.lower() in ["xz", "xy", "yz"] else 1
+		flip_angle = -1 if x.lower()+z.lower() in ["xz", "yx", "zy"] else 1
 		alias = {"X":"I", "Y":"J", "Z":"K", "x":"i", "y":"j", "z":"k"} 
 		i_, k_ = alias[x], alias[z]
 		c = [ [subpath[0][1], "move", 0, 0, 0] ]
