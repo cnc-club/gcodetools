@@ -575,42 +575,6 @@ def csp_subpath_ccw(subpath):
 			s += (p[0]-pl[0])*(p[1]+pl[1])
 			pl = p
 	return s<0
-	
-	"""
-	path = [subpath[0]]
-	for i in xrange(1,len(subpath)) :
-		 if not  (P(path[-1][1])-P(subpath[i][1])).l2()<1e-10 :
-		 	path += [ subpath[i] ]
-	# Close the path
-	if (P(path[-1][1])-P(path[0][1])).l2() > 1e-10 :
-		path[-1][2] = path[-1][1]
-		path[0][0] = path[0][1]
-		path += [ [path[0][1],path[0][1],path[0][1]]  ]
-	
-	# Finding top most point in path (min y value)
-	miny = csp_true_bounds([path])[1]
-	csp_draw([path])
-	i,t = miny[3], miny[4]
-	print_(miny)
-	draw_pointer(miny[:2])
-#	print_(csp_normalized_slope(path[i-1],path[i],t))
-	if 0<t<1 : 
-		d = csp_normalized_slope(path[i-1],path[i],t)
-		print_ (d)
-		return d[0]<0
-	else :
-		if t==1 :
-			prev = i+1 % len(path)
-		else :
-			prev = i
-			i = i-1
-		d = cross(csp_normalized_slope(path[i-1], path[i],0), csp_normalized_slope(path[prev-1], path[prev],1))
-		if d!= 0 :
-			return d<0
-		else: 
-			return csp_at_t(path[i-1], path[i],0.01)<csp_at_t(path[prev-1], path[prev],0.01)
-
-"""
 
 def csp_at_t(sp1,sp2,t):
 	ax,bx,cx,dx = sp1[1][0], sp1[2][0], sp2[0][0], sp2[1][0]
@@ -1084,7 +1048,7 @@ def csp_segment_convex_hull(sp1,sp2):
 	if not (m1 and m3) and m2 : return [b,c,d]
 	
 	raise ValueError, "csp_segment_convex_hull happend something that shouldnot happen!"	
-	
+
 	
 ################################################################################
 ###		Bezier additional functions
@@ -1933,9 +1897,46 @@ class Polygon:
 		else :	
 			self.polygon += add.polygon[:]
 
+	def point_inside(p) :
+		inside = False
+		for poly in self.polygon :
+			for i in range(len(poly)):
+				st,end = poly[i-1], poly[i]
+				###if st[0]=
+				if st[0]>end[0] : st, end = end, st # This will be needed to check that edge if open only at rigth end
+				c = (p[1]-st[1])*(end[0]-st[0])-(end[1]-st[1])*(p[0]-st[0])
+				if st[0]<=p[0]<end[0] : 
+					if c<0 : 
+						inside = not insede
+					elif c == 0 : return True # point is on the edge
+				elif st[0]==end[0]==p[0] and (st[1]<=p[1]<=end[1] or end[1]<=p[1]<=st[1]) : # point is on the edge
+					return True
+					
 
+	def polygon_hull(self) :
+		edges = {}
+		# Add vertices at all self intersection points. 
+		for i1 in range(len(self.polygon)):
+			poly1 = self.polygon[i1]
+			for j1 in range(len(poly1)):
+				s, e = poly1[j-1],poly1[j]
+				# Check self intersections 
+				for j2 in range(j1+1,len(poly1)):
+					s1, e1 = poly1[j-1],poly1[j]
+					
+				for i2 in range(i1+1,len(self.polygon)):
+					poly2 = self.polygon[i2]
+					for j2 in range(len(poly2)):
+						pass
+				
+				
+		for poly in self.polygon :
+			for i in range(len(poly)):
+				st,end = poly[i-1], poly[i]
+				edges[st] = [end] if st in edges else edges[st]+[end] if end not in edges[st] else edges[st]
+				edges[end] = [st] if st in edges else edges[end]+[st] if st not in edges[end] else edges[end]
 
-
+				
 			
 ################################################################################
 ###
