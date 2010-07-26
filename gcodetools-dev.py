@@ -2034,12 +2034,21 @@ class Polygon:
 			min_angle = [1,0]
 			next = last
 			last_edge = [(last[0][0]-last[1][0])/last[2], (last[0][1]-last[1][1])/last[2]]
+			print_("last=", last)
+			print_( last_edge, P(last_edge).l2())
+			print_("len(edges)=", len(edges))
+
 			for p in edges:
 				cur = [(p[1][0]-p[0][0])/p[2],(p[1][1]-p[0][1])/p[2]]
 				cos, sin = dot(cur,last_edge),  cross(cur,last_edge)
+				print_("cos, sin=",cos,sin)
+				print_("min_angle=",min_angle)
+
 				if 	angle_is_less(cos,sin,min_angle[0],min_angle[1]) : 
 					min_angle = [cos,sin]
 					next = p
+				print_("min_angle=",min_angle)
+
 			return next		
 					
 						
@@ -2051,16 +2060,21 @@ class Polygon:
 			start = (1e100,1)
 			for edge in edges : 
 				start = min(start, min(edges[edge])) 
-			last = [(start[0][0]-1,start[0][1]),start[1],1]
+			last = [(start[0][0]-1,start[0][1]),start[0],1]
 			print_(start)
 			print_(last[1])
 			first_run = True
-			while last[1]!=start or first_run : 	
+			while last[1]!=start[0] or first_run : 	
 				first_run = False
 				next = get_closes_edge_by_angle(edges[last[1]],last)
 				if next == last : raise ValueError, "Hull error"
+				print_(last[1]) 
+				print_(len(edges)) 
+				print_() 
 				last = next
 				poly += [ last[0] ]				
+
+			
 			self.polygon += [ poly ]
 			# Remove all edges that are intersects new poly (any vertex inside new poly)
 			for p in edges : 
