@@ -830,21 +830,60 @@ def line_line_intersect(p1,p2,p3,p4) : # Return only true intersection.
 	if (p1[0]==p2[0] and p1[1]==p2[1]) or (p3[0]==p4[0] and p3[1]==p4[1]) : return False
 	x = (p2[0]-p1[0])*(p4[1]-p3[1]) - (p2[1]-p1[1])*(p4[0]-p3[0])
 	if x==0 : # Lines are parallel
-		if p3[0]!=p4[0] :
-			t11 = (p1[0]-p3[0])/(p4[0]-p3[0]) 
-			t12 = (p2[0]-p3[0])/(p4[0]-p3[0]) 
-			t21 = (p3[0]-p1[0])/(p2[0]-p1[0])
-			t22 = (p4[0]-p1[0])/(p2[0]-p1[0])
-		else:
-			t11 = (p1[1]-p3[1])/(p4[1]-p3[1]) 
-			t12 = (p2[1]-p3[1])/(p4[1]-p3[1]) 
-			t21 = (p3[1]-p1[1])/(p2[1]-p1[1])
-			t22 = (p4[1]-p1[1])/(p2[1]-p1[1])
-		return ("Overlap" if (0<=t11<=1 or 0<=t12<=1) and (0<=t21<=1 or  0<=t22<=1) else False)
+		if (p3[0]-p1[0])*(p2[1]-p1[1]) == (p3[1]-p1[1])*(p2[0]-p1[0]) :
+			if p3[0]!=p4[0] :
+				t11 = (p1[0]-p3[0])/(p4[0]-p3[0]) 
+				t12 = (p2[0]-p3[0])/(p4[0]-p3[0]) 
+				t21 = (p3[0]-p1[0])/(p2[0]-p1[0])
+				t22 = (p4[0]-p1[0])/(p2[0]-p1[0])
+			else:
+				t11 = (p1[1]-p3[1])/(p4[1]-p3[1]) 
+				t12 = (p2[1]-p3[1])/(p4[1]-p3[1]) 
+				t21 = (p3[1]-p1[1])/(p2[1]-p1[1])
+				t22 = (p4[1]-p1[1])/(p2[1]-p1[1])
+			return ("Overlap" if (0<=t11<=1 or 0<=t12<=1) and (0<=t21<=1 or  0<=t22<=1) else False)
+		else: return False	
 	else :
 		return (
 					0<=((p4[0]-p3[0])*(p1[1]-p3[1]) - (p4[1]-p3[1])*(p1[0]-p3[0]))/x<=1 and
 					0<=((p2[0]-p1[0])*(p1[1]-p3[1]) - (p2[1]-p1[1])*(p1[0]-p3[0]))/x<=1 )
+					
+					
+def line_line_intersection_points(p1,p2,p3,p4) : # Return only points [ (x,y) ] 
+	if (p1[0]==p2[0] and p1[1]==p2[1]) or (p3[0]==p4[0] and p3[1]==p4[1]) : return False
+	x = (p2[0]-p1[0])*(p4[1]-p3[1]) - (p2[1]-p1[1])*(p4[0]-p3[0])
+	if x==0 : # Lines are parallel
+		if (p3[0]-p1[0])*(p2[1]-p1[1]) == (p3[1]-p1[1])*(p2[0]-p1[0]) :
+			if p3[0]!=p4[0] :
+				t11 = (p1[0]-p3[0])/(p4[0]-p3[0]) 
+				t12 = (p2[0]-p3[0])/(p4[0]-p3[0]) 
+				t21 = (p3[0]-p1[0])/(p2[0]-p1[0])
+				t22 = (p4[0]-p1[0])/(p2[0]-p1[0])
+			else:
+				t11 = (p1[1]-p3[1])/(p4[1]-p3[1]) 
+				t12 = (p2[1]-p3[1])/(p4[1]-p3[1]) 
+				t21 = (p3[1]-p1[1])/(p2[1]-p1[1])
+				t22 = (p4[1]-p1[1])/(p2[1]-p1[1])
+			res = [] 
+			if (0<=t11<=1 or 0<=t12<=1) and (0<=t21<=1 or  0<=t22<=1) :
+				if 0<=t11<=1 : res += [p1]	
+				if 0<=t12<=1 : res += [p2]	
+				if 0<=t21<=1 : res += [p3]	
+				if 0<=t22<=1 : res += [p4]	
+			return res
+		else: return []
+	else :
+		t1 = ((p4[0]-p3[0])*(p1[1]-p3[1]) - (p4[1]-p3[1])*(p1[0]-p3[0]))/x
+		t2 = ((p2[0]-p1[0])*(p1[1]-p3[1]) - (p2[1]-p1[1])*(p1[0]-p3[0]))/x
+		if 0<=t1<=1 and 0<=t2<=1 : return [ [p1[0]*(1-t1)+p2[0]*t1, p1[1]*(1-t1)+p2[1]*t1] ]
+		else : return []					
+
+def point_to_point_d2(a,b):
+	return (a[0]-b[0])**2 + (a[1]-b[1])**2
+
+def point_to_point_d(a,b):
+	return math.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2)
+
 
 def point_to_line_segment_distance_2(p1, p2,p3) :
 	# p1 - point, p2,p3 - line segment
@@ -1837,7 +1876,6 @@ class Polygon:
 			for j in range(len(self.polygon[i])) :
 				self.polygon[i][j][0] += x
 				self.polygon[i][j][1] += y
-		
 			
 	def drop_down(self, surface) :
 		# Polygon is a list of simple polygons
@@ -1884,7 +1922,7 @@ class Polygon:
 							if dist > d  : dist = d
 		if dist > 10 + top : dist = 10 + top 
 		print_(dist, top, bottom)
-		self.draw()
+		#self.draw()
 		self.move(0, -dist)		
 					
 	def draw(self) :
@@ -1897,7 +1935,7 @@ class Polygon:
 		else :	
 			self.polygon += add.polygon[:]
 
-	def point_inside(p) :
+	def point_inside(self,p) :
 		inside = False
 		for poly in self.polygon :
 			for i in range(len(poly)):
@@ -1913,31 +1951,123 @@ class Polygon:
 					return True
 					
 
-	def polygon_hull(self) :
-		edges = {}
+	def hull(self) :
 		# Add vertices at all self intersection points. 
+		hull = []
 		for i1 in range(len(self.polygon)):
 			poly1 = self.polygon[i1]
+			poly_ = []
 			for j1 in range(len(poly1)):
-				s, e = poly1[j-1],poly1[j]
+				s, e = poly1[j1-1],poly1[j1]
+				poly_ += [s]
+				
 				# Check self intersections 
 				for j2 in range(j1+1,len(poly1)):
-					s1, e1 = poly1[j-1],poly1[j]
-					
-				for i2 in range(i1+1,len(self.polygon)):
+					s1, e1 = poly1[j2-1],poly1[j2]
+					int_ = line_line_intersection_points(s,e,s1,e1)
+					for p in int_ :
+						if point_to_point_d2(p,s)>0.0001 and point_to_point_d2(p,e)>0.0001 : 
+							poly_ += [p]
+				# Check self intersections with other polys  
+				for i2 in range(len(self.polygon)):
+					if i1==i2 : continue
 					poly2 = self.polygon[i2]
 					for j2 in range(len(poly2)):
-						pass
-				
-				
+						s1, e1 = poly2[j2-1],poly2[j2]
+						int_ = line_line_intersection_points(s,e,s1,e1)
+						for p in int_ :
+							if point_to_point_d2(p,s)>0.0001 and point_to_point_d2(p,e)>0.0001 : 
+								poly_ += [p]
+			hull += [poly_]
+		# Create the dictionary containing all edges in both directions
+		edges = {}
 		for poly in self.polygon :
 			for i in range(len(poly)):
-				st,end = poly[i-1], poly[i]
-				edges[st] = [end] if st in edges else edges[st]+[end] if end not in edges[st] else edges[st]
-				edges[end] = [st] if st in edges else edges[end]+[st] if st not in edges[end] else edges[end]
-
-				
+				s,e = tuple(poly[i-1]), tuple(poly[i])
+				if (point_to_point_d2(e,s)<0.0001) : continue
+				break_s, break_e = False, False
+				for p in edges :
+					if point_to_point_d2(p,s)<0.0001 : 
+						break_s = True
+						s = p
+					if point_to_point_d2(p,e)<0.0001 : 
+						break_e = True
+						e = p
+					if break_s and break_e : break
+				if not break_s and not break_e : 
+					l = point_to_point_d(s,e)
+					edges[s] = [ [s,e,l] ]
+					edges[e] = [ [e,s,l] ]
+				elif  not break_s : 
+					for edge in edges[e] :	
+						l = point_to_point_d(s,e)
+						if  point_to_point_d2(edge[1],s)<0.0001 :
+							break
+						if point_to_point_d2(edge[1],s)>0.0001 :
+							edges[e] += [ [e,s,l] ]
+						edges[s] = [ [s,e,l] ]
+				elif not break_e : 
+					l = point_to_point_d(s,e)
+					for edge in edges[s] :	
+						if  point_to_point_d2(edge[1],e)<0.0001 :
+							break
+						if point_to_point_d2(edge[1],e)>0.0001 :
+							edges[s] += [ [s,e, l] ]
+						edges[e] = [ [e,s,l] ]
+		def angle_quadrant(sin,cos):
+			if sin>0 and cos>=0 : return 1
+			if sin>=0 and cos<0 : return 2
+			if sin<0 and cos<=0 : return 3
+			if sin<=0 and cos>0 : return 4
 			
+		def angle_is_less(sin,cos,sin1,cos1):
+			if angle_quadrant(sin,cos)<angle_quadrant(sin1,cos1) : return True
+			if [sin1, cos1] == [1,0] : return True
+			if sin>0 and cos>=0 : return sin<sin1
+			if sin>=0 and cos<0 : return sin>sin1
+			if sin<0 and cos<=0 : return sin<sin1
+			if sin<=0 and cos>0 : return sin>sin1
+
+			
+		def get_closes_edge_by_angle(edges, last):
+			# Last edge is normalized vector of the last edge.
+			min_angle = [1,0]
+			next = last
+			last_edge = [(last[0][0]-last[1][0])/last[2], (last[0][1]-last[1][1])/last[2]]
+			for p in edges:
+				cur = [(p[1][0]-p[0][0])/p[2],(p[1][1]-p[0][1])/p[2]]
+				cos, sin = dot(cur,last_edge),  cross(cur,last_edge)
+				if 	angle_is_less(cos,sin,min_angle[0],min_angle[1]) : 
+					min_angle = [cos,sin]
+					next = p
+			return next		
+					
+						
+		# Join edges together into new polygon cutting the vertexes inside new polygon
+		self.polygon = []
+		while len(edges)>0 :
+			poly = []
+			# Find left most vertex.
+			start = (1e100,1)
+			for edge in edges : 
+				start = min(start, min(edges[edge])) 
+			last = [(start[0][0]-1,start[0][1]),start[1],1]
+			print_(start)
+			print_(last[1])
+			first_run = True
+			while last[1]!=start or first_run : 	
+				first_run = False
+				next = get_closes_edge_by_angle(edges[last[1]],last)
+				if next == last : raise ValueError, "Hull error"
+				last = next
+				poly += [ last[0] ]				
+			self.polygon += [ poly ]
+			# Remove all edges that are intersects new poly (any vertex inside new poly)
+			for p in edges : 
+				if Polygon(poly).point_inside(p) : del edges[p]
+			print_(len(edges),len(poly))	
+					
+				
 ################################################################################
 ###
 ###		Gcodetools class
@@ -1966,6 +2096,10 @@ class Gcodetools(inkex.Effect):
 						for sp1, sp2 in zip(subpath,subpath[1:]) :
 							polygon.add([csp_segment_convex_hull(sp1,sp2)])
 					#polygon.draw()
+					
+					polygon.hull()
+					polygon.draw()
+					return
 					polygon.drop_down(surface)
 					polygon.draw()
 					surface.add(polygon)
