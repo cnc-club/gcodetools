@@ -1217,14 +1217,14 @@ def atan2(*arg):
 	else :
 		raise ValueError, "Bad argumets for atan! (%s)" % arg  
 
-def draw_pointer(x,color = "#f00", figure = "cross", comment = "" ) :
+def draw_pointer(x,color = "#f00", figure = "cross", comment = "", width = .1) :
 	if figure ==  "line" :
 		s = ""
 		for i in range(1,len(x)/2) :
 			s+= " %s, %s " %(x[i*2],x[i*2+1])
-		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "M %s,%s L %s"%(x[0],x[1],s), "style":"fill:none;stroke:%s;stroke-width:0.01;"%color,"comment":str(comment)} )
+		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "M %s,%s L %s"%(x[0],x[1],s), "style":"fill:none;stroke:%s;stroke-width:%f;"%(color,width),"comment":str(comment)} )
 	else :
-		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10 -20,-20 10,10 -10,10, 20,-20"%(x[0],x[1]), "style":"fill:none;stroke:%s;stroke-width:0.01;"%color,"comment":str(comment)} )
+		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10 -20,-20 10,10 -10,10, 20,-20"%(x[0],x[1]), "style":"fill:none;stroke:%s;stroke-width:%f;"%(color,width),"comment":str(comment)} )
 
 def straight_segments_intersection(a,b, true_intersection = True) : # (True intersection means check ta and tb are in [0,1])
  	ax,bx,cx,dx, ay,by,cy,dy = a[0][0],a[1][0],b[0][0],b[1][0], a[0][1],a[1][1],b[0][1],b[1][1] 
@@ -1945,7 +1945,7 @@ class Polygon:
 				c = (p[1]-st[1])*(end[0]-st[0])-(end[1]-st[1])*(p[0]-st[0])
 				if st[0]<=p[0]<end[0] : 
 					if c<0 : 
-						inside = not insede
+						inside = not inside
 					elif c == 0 : return True # point is on the edge
 				elif st[0]==end[0]==p[0] and (st[1]<=p[1]<=end[1] or end[1]<=p[1]<=st[1]) : # point is on the edge
 					return True
@@ -1966,7 +1966,7 @@ class Polygon:
 					s1, e1 = poly1[j2-1],poly1[j2]
 					int_ = line_line_intersection_points(s,e,s1,e1)
 					for p in int_ :
-						if point_to_point_d2(p,s)>0.0001 and point_to_point_d2(p,e)>0.0001 : 
+						if point_to_point_d2(p,s)>0.000001 and point_to_point_d2(p,e)>0.000001 : 
 							poly_ += [p]
 				# Check self intersections with other polys  
 				for i2 in range(len(self.polygon)):
@@ -1976,53 +1976,74 @@ class Polygon:
 						s1, e1 = poly2[j2-1],poly2[j2]
 						int_ = line_line_intersection_points(s,e,s1,e1)
 						for p in int_ :
-							if point_to_point_d2(p,s)>0.0001 and point_to_point_d2(p,e)>0.0001 : 
+							if point_to_point_d2(p,s)>0.000001 and point_to_point_d2(p,e)>0.000001 : 
 								poly_ += [p]
 			hull += [poly_]
 		# Create the dictionary containing all edges in both directions
 		edges = {}
 		for poly in self.polygon :
+			print_()
 			for i in range(len(poly)):
 				s,e = tuple(poly[i-1]), tuple(poly[i])
-				if (point_to_point_d2(e,s)<0.0001) : continue
+				print_(point_to_point_d2(e,s))
+				if (point_to_point_d2(e,s)<0.000001) : continue
 				break_s, break_e = False, False
 				for p in edges :
-					if point_to_point_d2(p,s)<0.0001 : 
+					if point_to_point_d2(p,s)<0.000001 : 
 						break_s = True
 						s = p
-					if point_to_point_d2(p,e)<0.0001 : 
+					if point_to_point_d2(p,e)<0.000001 : 
 						break_e = True
 						e = p
 					if break_s and break_e : break
+					
 				if not break_s and not break_e : 
 					l = point_to_point_d(s,e)
 					edges[s] = [ [s,e,l] ]
 					edges[e] = [ [e,s,l] ]
-				elif  not break_s : 
-					for edge in edges[e] :	
+					draw_pointer(s+e,"red","line")
+					draw_pointer(s+e,"red","line")
+					
+				else : 
+					if e in edges :	
 						l = point_to_point_d(s,e)
-						if  point_to_point_d2(edge[1],s)<0.0001 :
-							break
-						if point_to_point_d2(edge[1],s)>0.0001 :
+						for edge in edges[e] :	
+							if point_to_point_d2(edge[1],s)<0.000001 :
+								break
+						if point_to_point_d2(edge[1],s)>0.000001 :
 							edges[e] += [ [e,s,l] ]
-						edges[s] = [ [s,e,l] ]
-				elif not break_e : 
-					l = point_to_point_d(s,e)
-					for edge in edges[s] :	
-						if  point_to_point_d2(edge[1],e)<0.0001 :
-							break
-						if point_to_point_d2(edge[1],e)>0.0001 :
-							edges[s] += [ [s,e, l] ]
+							draw_pointer(s+e,"red","line")
+							
+					else : 
 						edges[e] = [ [e,s,l] ]
+						draw_pointer(s+e,"green","line")
+					if s in edges :	
+						for edge in edges[s] :	
+							if  point_to_point_d2(edge[1],e)<0.000001 :
+								break
+						if point_to_point_d2(edge[1],e)>0.000001 :
+							edges[s] += [ [s,e, l] ]
+							draw_pointer(s+e,"red","line")
+					else : 
+						edges[s] = [ [s,e,l] ]
+						draw_pointer(s+e,"green","line")
 		def angle_quadrant(sin,cos):
 			if sin>0 and cos>=0 : return 1
 			if sin>=0 and cos<0 : return 2
 			if sin<0 and cos<=0 : return 3
 			if sin<=0 and cos>0 : return 4
 			
-		def angle_is_less(sin,cos,sin1,cos1):
-			if angle_quadrant(sin,cos)<angle_quadrant(sin1,cos1) : return True
-			if [sin1, cos1] == [1,0] : return True
+		def angle_is_less(sin1,cos1,sin,cos):
+		
+			if angle_quadrant(sin,cos)>angle_quadrant(sin1,cos1) : 
+				print_("1less",  angle_quadrant(sin,cos),  angle_quadrant(sin1,cos1))
+				print_(sin1,cos1)
+				return True
+			if angle_quadrant(sin,cos)<angle_quadrant(sin1,cos1) : 
+				print_("1more",  angle_quadrant(sin,cos),  angle_quadrant(sin1,cos1))
+				return False
+			if [sin1, cos1] == [1,0] : return False
+			if [sin, cos] == [1,0] : return True
 			if sin>0 and cos>=0 : return sin<sin1
 			if sin>=0 and cos<0 : return sin>sin1
 			if sin<0 and cos<=0 : return sin<sin1
@@ -2031,18 +2052,15 @@ class Polygon:
 			
 		def get_closes_edge_by_angle(edges, last):
 			# Last edge is normalized vector of the last edge.
-			min_angle = [1,0]
+			min_angle = [1,-.000000001]
 			next = last
 			last_edge = [(last[0][0]-last[1][0])/last[2], (last[0][1]-last[1][1])/last[2]]
-			print_("last=", last)
-			print_( last_edge, P(last_edge).l2())
-			print_("len(edges)=", len(edges))
-
 			for p in edges:
+				print_("len(edges)=",len(edges))
 				cur = [(p[1][0]-p[0][0])/p[2],(p[1][1]-p[0][1])/p[2]]
 				cos, sin = dot(cur,last_edge),  cross(cur,last_edge)
 				print_("cos, sin=",cos,sin)
-				print_("min_angle=",min_angle)
+				print_("min_angle_before=",min_angle)
 
 				if 	angle_is_less(cos,sin,min_angle[0],min_angle[1]) : 
 					min_angle = [cos,sin]
@@ -2050,11 +2068,14 @@ class Polygon:
 				print_("min_angle=",min_angle)
 
 			return next		
-					
-						
+			
+		for i in edges:
+			print_(i,len(edges[i]),edges[i])		
+		self.draw()				
 		# Join edges together into new polygon cutting the vertexes inside new polygon
 		self.polygon = []
-		while len(edges)>0 :
+		i = 0 
+		while len(edges)>0 and i<30:
 			poly = []
 			# Find left most vertex.
 			start = (1e100,1)
@@ -2064,21 +2085,24 @@ class Polygon:
 			print_(start)
 			print_(last[1])
 			first_run = True
-			while last[1]!=start[0] or first_run : 	
+			i+=1
+			while (last[1]!=start[0] or first_run)  and i<30 : 	
+				i+=1
 				first_run = False
 				next = get_closes_edge_by_angle(edges[last[1]],last)
-				if next == last : raise ValueError, "Hull error"
+				draw_pointer(next[0]+next[1],"Green","line", comment=i, width= 1)
+				if next == last : return   #raise ValueError, "Hull error"
 				print_(last[1]) 
 				print_(len(edges)) 
-				print_() 
+				print_("!!i!!",i) 
 				last = next
 				poly += [ last[0] ]				
 
 			
 			self.polygon += [ poly ]
 			# Remove all edges that are intersects new poly (any vertex inside new poly)
-			for p in edges : 
-				if Polygon(poly).point_inside(p) : del edges[p]
+			for p in edges.keys()[:] : 
+				if Polygon([poly]).point_inside(p) : del edges[p]
 			print_(len(edges),len(poly))	
 					
 				
