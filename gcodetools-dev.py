@@ -1996,9 +1996,8 @@ class Polygon:
 						break_e = True
 						e = p
 					if break_s and break_e : break
-					
+				l = point_to_point_d(s,e)
 				if not break_s and not break_e : 
-					l = point_to_point_d(s,e)
 					edges[s] = [ [s,e,l] ]
 					edges[e] = [ [e,s,l] ]
 					draw_pointer(s+e,"red","line")
@@ -2006,7 +2005,6 @@ class Polygon:
 					
 				else : 
 					if e in edges :	
-						l = point_to_point_d(s,e)
 						for edge in edges[e] :	
 							if point_to_point_d2(edge[1],s)<0.000001 :
 								break
@@ -2027,27 +2025,25 @@ class Polygon:
 					else : 
 						edges[s] = [ [s,e,l] ]
 						draw_pointer(s+e,"green","line")
+
 		def angle_quadrant(sin,cos):
 			if sin>0 and cos>=0 : return 1
 			if sin>=0 and cos<0 : return 2
 			if sin<0 and cos<=0 : return 3
 			if sin<=0 and cos>0 : return 4
 			
-		def angle_is_less(sin1,cos1,sin,cos):
-		
+		def angle_is_less(cos,sin,cos1,sin1):
+			print_("quads=",angle_quadrant(sin,cos),angle_quadrant(sin1,cos1))
 			if angle_quadrant(sin,cos)>angle_quadrant(sin1,cos1) : 
-				print_("1less",  angle_quadrant(sin,cos),  angle_quadrant(sin1,cos1))
-				print_(sin1,cos1)
-				return True
-			if angle_quadrant(sin,cos)<angle_quadrant(sin1,cos1) : 
-				print_("1more",  angle_quadrant(sin,cos),  angle_quadrant(sin1,cos1))
 				return False
+			if angle_quadrant(sin,cos)<angle_quadrant(sin1,cos1) : 
+				return True
 			if [sin1, cos1] == [1,0] : return False
 			if [sin, cos] == [1,0] : return True
-			if sin>0 and cos>=0 : return sin<sin1
-			if sin>=0 and cos<0 : return sin>sin1
-			if sin<0 and cos<=0 : return sin<sin1
-			if sin<=0 and cos>0 : return sin>sin1
+			if sin>=0 and cos>0 : return sin<sin1
+			if sin>0 and cos<=0 : return sin>sin1
+			if sin<=0 and cos<0 : return sin<sin1
+			if sin<0 and cos>=0 : return sin>sin1
 
 			
 		def get_closes_edge_by_angle(edges, last):
