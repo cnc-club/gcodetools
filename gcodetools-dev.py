@@ -38,7 +38,7 @@ import time
 import cmath
 import numpy
 import codecs
-
+import random
 import gettext
 _ = gettext.gettext
 
@@ -850,7 +850,7 @@ def line_line_intersect(p1,p2,p3,p4) : # Return only true intersection.
 					
 					
 def line_line_intersection_points(p1,p2,p3,p4) : # Return only points [ (x,y) ] 
-	if (p1[0]==p2[0] and p1[1]==p2[1]) or (p3[0]==p4[0] and p3[1]==p4[1]) : return False
+	if (p1[0]==p2[0] and p1[1]==p2[1]) or (p3[0]==p4[0] and p3[1]==p4[1]) : return []
 	x = (p2[0]-p1[0])*(p4[1]-p3[1]) - (p2[1]-p1[1])*(p4[0]-p3[0])
 	if x==0 : # Lines are parallel
 		if (p3[0]-p1[0])*(p2[1]-p1[1]) == (p3[1]-p1[1])*(p2[0]-p1[0]) :
@@ -1876,6 +1876,28 @@ class Polygon:
 			for j in range(len(self.polygon[i])) :
 				self.polygon[i][j][0] += x
 				self.polygon[i][j][1] += y
+	
+	def bounds(self) : 
+		minx,miny,maxx,maxy = 1e400, 1e400, -1e400, -1e400
+		for poly in self.polygon :
+			for p in poly :
+				if minx > p[0] : minx = p[0]
+				if miny > p[1] : miny = p[1]
+				if maxx < p[0] : maxx = p[0]
+				if maxy < p[1] : maxy = p[1]
+		return minx*1,miny*1,maxx*1,maxy*1		
+	
+	def width(self):
+		b = self.bounds()
+		return b[2]-b[0]
+	
+	def rotate(self, a):
+		cos, sin = math.cos(a), math.sin(a)
+		for i in range(len(self.polygon)) :
+			for j in range(len(self.polygon[i])) :
+				x,y = self.polygon[i][j][0], self.polygon[i][j][1] 
+				self.polygon[i][j][0] = x*cos - y*sin
+				self.polygon[i][j][1] = x*sin + y*cos
 			
 	def drop_down(self, surface) :
 		# Polygon is a list of simple polygons
@@ -1883,26 +1905,14 @@ class Polygon:
 		# Down means min y (0,-1)  
 		if len(self.polygon) == 0 or len(self.polygon[0])==0 : return
 		# Get surface top point
-		top = 0 
-		for poly in surface.polygon : 
-			for p in poly :
-				top = max(top, p[1])
-		print_(surface.polygon)
+		top = max(0, self.bounds()[3])
 		# Get polygon bottom point
-		print_(self.polygon)
-		bottom = self.polygon[0][0][1]
-		for poly in self.polygon :
-			for p in poly :
-				bottom = min(bottom,p[1])
-		
-		
+		bottom = self.bounds()[1]
 		self.move(0, top - bottom + 10)		
-		print_( top, bottom,top - bottom + 10)
 		# Now get shortest distance from surface to polygon in positive x=0 direction
 		# Such distance = min(distance(vertex, edge)...)  where edge from surface and 
 		# vertex from polygon and vice versa...
-		dist = 1e100
-		
+		dist = 1e300
 		for poly in surface.polygon :
 			for i in range(len(poly)) :
 				for poly1 in self.polygon :
@@ -1921,13 +1931,14 @@ class Polygon:
 							else : d =  - vertex[1] + st[1] + (end[1]-st[1])*(vertex[0]-st[0])/(end[0]-st[0]) 
 							if dist > d  : dist = d
 		if dist > 10 + top : dist = 10 + top 
-		print_(dist, top, bottom)
+		#print_(dist, top, bottom)
 		#self.draw()
 		self.move(0, -dist)		
+		
 					
-	def draw(self) :
+	def draw(self,color="#075",width=.1) :
 		for poly in self.polygon :
-			csp_draw( [csp_subpath_line_to([],poly+[poly[0]])] )
+			csp_draw( [csp_subpath_line_to([],poly+[poly[0]])], color=color,width=width )
 			
 	def add(self, add) :
 		if type(add) == type([]) :
@@ -1940,16 +1951,17 @@ class Polygon:
 		for poly in self.polygon :
 			for i in range(len(poly)):
 				st,end = poly[i-1], poly[i]
-				###if st[0]=
+				if p==st or p==end : return True # point is a vertex = point is on the edge
 				if st[0]>end[0] : st, end = end, st # This will be needed to check that edge if open only at rigth end
 				c = (p[1]-st[1])*(end[0]-st[0])-(end[1]-st[1])*(p[0]-st[0])
+				#print_(c)
 				if st[0]<=p[0]<end[0] : 
 					if c<0 : 
 						inside = not inside
 					elif c == 0 : return True # point is on the edge
 				elif st[0]==end[0]==p[0] and (st[1]<=p[1]<=end[1] or end[1]<=p[1]<=st[1]) : # point is on the edge
 					return True
-					
+		return inside			
 
 	def hull(self) :
 		# Add vertices at all self intersection points. 
@@ -1982,10 +1994,8 @@ class Polygon:
 		# Create the dictionary containing all edges in both directions
 		edges = {}
 		for poly in self.polygon :
-			print_()
 			for i in range(len(poly)):
 				s,e = tuple(poly[i-1]), tuple(poly[i])
-				print_(point_to_point_d2(e,s))
 				if (point_to_point_d2(e,s)<0.000001) : continue
 				break_s, break_e = False, False
 				for p in edges :
@@ -2000,9 +2010,8 @@ class Polygon:
 				if not break_s and not break_e : 
 					edges[s] = [ [s,e,l] ]
 					edges[e] = [ [e,s,l] ]
-					draw_pointer(s+e,"red","line")
-					draw_pointer(s+e,"red","line")
-					
+					#draw_pointer(s+e,"red","line")
+					#draw_pointer(s+e,"red","line")
 				else : 
 					if e in edges :	
 						for edge in edges[e] :	
@@ -2010,97 +2019,213 @@ class Polygon:
 								break
 						if point_to_point_d2(edge[1],s)>0.000001 :
 							edges[e] += [ [e,s,l] ]
-							draw_pointer(s+e,"red","line")
+							#draw_pointer(s+e,"red","line")
 							
 					else : 
 						edges[e] = [ [e,s,l] ]
-						draw_pointer(s+e,"green","line")
+						#draw_pointer(s+e,"green","line")
 					if s in edges :	
 						for edge in edges[s] :	
 							if  point_to_point_d2(edge[1],e)<0.000001 :
 								break
 						if point_to_point_d2(edge[1],e)>0.000001 :
 							edges[s] += [ [s,e, l] ]
-							draw_pointer(s+e,"red","line")
+							#draw_pointer(s+e,"red","line")
 					else : 
 						edges[s] = [ [s,e,l] ]
-						draw_pointer(s+e,"green","line")
+						#draw_pointer(s+e,"green","line")
 
 		def angle_quadrant(sin,cos):
+			# quadrants are (0,pi/2], (pi/2,pi], (pi,3*pi/2], (3*pi/2, 2*pi], i.e. 0 is in the 4-th quadrant
 			if sin>0 and cos>=0 : return 1
 			if sin>=0 and cos<0 : return 2
 			if sin<0 and cos<=0 : return 3
 			if sin<=0 and cos>0 : return 4
 			
-		def angle_is_less(cos,sin,cos1,sin1):
-			print_("quads=",angle_quadrant(sin,cos),angle_quadrant(sin1,cos1))
+		def angle_is_less(sin,cos,sin1,cos1):
+			# 0 = 2*pi is the largest angle
+			if [sin1, cos1] == [0,1] : return True
+			if [sin, cos] == [0,1] : return False
 			if angle_quadrant(sin,cos)>angle_quadrant(sin1,cos1) : 
 				return False
 			if angle_quadrant(sin,cos)<angle_quadrant(sin1,cos1) : 
 				return True
-			if [sin1, cos1] == [1,0] : return False
-			if [sin, cos] == [1,0] : return True
 			if sin>=0 and cos>0 : return sin<sin1
 			if sin>0 and cos<=0 : return sin>sin1
-			if sin<=0 and cos<0 : return sin<sin1
-			if sin<0 and cos>=0 : return sin>sin1
+			if sin<=0 and cos<0 : return sin>sin1
+			if sin<0 and cos>=0 : return sin<sin1
 
 			
 		def get_closes_edge_by_angle(edges, last):
 			# Last edge is normalized vector of the last edge.
-			min_angle = [1,-.000000001]
+			min_angle = [0,1]
 			next = last
 			last_edge = [(last[0][0]-last[1][0])/last[2], (last[0][1]-last[1][1])/last[2]]
 			for p in edges:
-				print_("len(edges)=",len(edges))
+				#draw_pointer(list(p[0])+[p[0][0]+last_edge[0]*40,p[0][1]+last_edge[1]*40], "Red", "line", width=1)
+				#print_("len(edges)=",len(edges))
 				cur = [(p[1][0]-p[0][0])/p[2],(p[1][1]-p[0][1])/p[2]]
 				cos, sin = dot(cur,last_edge),  cross(cur,last_edge)
-				print_("cos, sin=",cos,sin)
-				print_("min_angle_before=",min_angle)
+				#draw_pointer(list(p[0])+[p[0][0]+cur[0]*40,p[0][1]+cur[1]*40], "Orange", "line", width=1, comment = [sin,cos])
+				#print_("cos, sin=",cos,sin)
+				#print_("min_angle_before=",min_angle)
 
-				if 	angle_is_less(cos,sin,min_angle[0],min_angle[1]) : 
-					min_angle = [cos,sin]
+				if 	angle_is_less(sin,cos,min_angle[0],min_angle[1]) : 
+					min_angle = [sin,cos]
 					next = p
-				print_("min_angle=",min_angle)
+				#print_("min_angle=",min_angle)
 
 			return next		
 			
-		for i in edges:
-			print_(i,len(edges[i]),edges[i])		
-		self.draw()				
 		# Join edges together into new polygon cutting the vertexes inside new polygon
 		self.polygon = []
-		i = 0 
-		while len(edges)>0 and i<30:
+		len_edges = sum([len(edges[p]) for p in edges]) 
+		loops = 0 
+		
+		while len(edges)>0 :
 			poly = []
+			if loops > len_edges  : raise ValueError, "Hull error"
+			loops+=1
 			# Find left most vertex.
 			start = (1e100,1)
 			for edge in edges : 
 				start = min(start, min(edges[edge])) 
 			last = [(start[0][0]-1,start[0][1]),start[0],1]
-			print_(start)
-			print_(last[1])
 			first_run = True
-			i+=1
-			while (last[1]!=start[0] or first_run)  and i<30 : 	
-				i+=1
+			loops1 = 0
+			while (last[1]!=start[0] or first_run) : 	
 				first_run = False
+				if loops1 > len_edges  : raise ValueError, "Hull error"
+				loops1 += 1
 				next = get_closes_edge_by_angle(edges[last[1]],last)
-				draw_pointer(next[0]+next[1],"Green","line", comment=i, width= 1)
-				if next == last : return   #raise ValueError, "Hull error"
-				print_(last[1]) 
-				print_(len(edges)) 
-				print_("!!i!!",i) 
-				last = next
-				poly += [ last[0] ]				
+				#draw_pointer(next[0]+next[1],"Green","line", comment=i, width= 1)
+				#print_(next[0],"-",next[1]) 
 
-			
+				last = next
+				poly += [ list(last[0]) ]				
 			self.polygon += [ poly ]
 			# Remove all edges that are intersects new poly (any vertex inside new poly)
+			poly_ = Polygon([poly])
 			for p in edges.keys()[:] : 
-				if Polygon([poly]).point_inside(p) : del edges[p]
-			print_(len(edges),len(poly))	
+				if poly_.point_inside(list(p)) : del edges[p]
+		self.draw(color="Green", width=1)	
+
+
+class Arangement_Genetic:
+	# gene = [fittness, order, rotation, xposition]
+	# spieces = [gene]*shapes count
+	# population = [spieces]
+	def __init__(self, polygons, material_width):
+		self.population = []
+		self.genes_count = len(polygons)
+		self.polygons = polygons
+		self.width = material_width
+	def add_random_species(self,count):
+		for i in range(count):
+			specimen = []
+			order = range(self.genes_count)
+			random.shuffle(order)
+			for j in order:
+				specimen += [ [j, random.random()*math.pi2, random.random()] ]
+			self.population += [ [None,specimen] ]
+
+	def leave_top_species(self,count):
+		self.population.sort()
+		self.population = self.population[:count]
+		
+	def populate_species(self,count, parent_count):
+		self.population.sort()
+		for c in range(count):
+			parent1 = random.randint(0,parent_count-1)
+			parent2 = random.randint(0,parent_count-1)
+			if parent1==parent2 : parent2 = (parent2+1) % parent_count
+			parent1, parent2 = self.population[parent1][1], self.population[parent2][1]
+			i1,i2 = 0, 0
+			genes_order = []
+			specimen = [ [0,0.,0.] for i in range(self.genes_count) ]
+			
+			start_gene = random.randint(0,self.genes_count)
+			end_gene = (max(1,random.randint(0,self.genes_count),int(self.genes_count/4))+start_gene) % self.genes_count
+			if end_gene<start_gene : 
+				end_gene, start_gene = start_gene, end_gene
+				parent1, parent2 = parent2, parent1
+			
+			for i in range(start_gene,end_gene) : 
+				rotation_mutate_param = random.random()/100
+				xposition_mutate_param = random.random()/100
+				tr = 1 - rotation_mutate_param
+				tp = 1 - xposition_mutate_param
+				specimen[i] = [parent1[i][0], parent1[i][1]*tr+parent2[i][1]*(1-tr),parent1[i][2]*tp+parent2[i][2]*(1-tp)]
+				genes_order += [ parent1[i][0] ]
+
+			for i in range(0,start_gene)+range(end_gene,self.genes_count) : 
+				rotation_mutate_param = random.random()/100
+				xposition_mutate_param = random.random()/100
+				tr = rotation_mutate_param
+				tp = xposition_mutate_param
+				j = i 
+				while parent2[j][0] in genes_order :
+					j = (j+1)%self.genes_count
+				specimen[i] = [parent2[j][0], parent1[i][1]*tr+parent2[i][1]*(1-tr),parent1[i][2]*tp+parent2[i][2]*(1-tp)]
+				genes_order += [ parent2[j][0] ]						
+				
+			self.mutation_factor = 0.4
+			self.order_mutate_factor = 1
+			self.rotation_mutate_factor = 1
+			self.position_mutate_factor = 1
+			if random.random()<self.mutation_factor :
+				
+				for i in range(int(max(random.random()*self.genes_count*self.order_mutate_factor/5,2))) :
+					i1,i2 = random.randint(0,self.genes_count-1),random.randint(0,self.genes_count-1)
+					specimen[i1], specimen[i2] = specimen[i2], specimen[i1]
+				for i in range(int(max(random.random()*self.genes_count*self.rotation_mutate_factor/5,2))) :
+					i1 = random.randint(0,self.genes_count-1)
+					specimen[i1][1] =  (specimen[i1][1]+random.random()*math.pi/2)%math.pi2
+
+				for i in range(int(max(random.random()*self.genes_count*self.position_mutate_factor/5,2))) :
+					i1 = random.randint(0,self.genes_count-1)
+					specimen[i1][2] =  (specimen[i1][2]+random.random()/4)%1
+			self.population += [ [None,specimen] ]	
+	
+		"""	def add_mutants(self, count, best_count, order_mutate_factor = 0.05, rotation_mutate_factor = 0.05, position_mutate_factor = 0.05):
+		for c in range(count) :
+			j1 = random.randint(0,min(best_count,len(self.population))) 
+			mutant = self.population[j1][1][:]
+			print_("m",mutant)
+			for i in range(self.genes_count) : # swap some genes to mutate order
+				if random.random()<order_mutate_factor :
+					i1,i2 = random.randint(0,self.genes_count),random.randint(0,self.genes_count)
+					mutant[i1], mutant[i2] = mutant[i2], mutant[i1]
+			for i in range(self.genes_count) : # add random mutation
+				print_(mutant,i)
+				print_(len(mutant),i)
+				print_(mutant[i][1])
+				print_(mutant[i][2])
+				
+				if random.random()<rotation_mutate_factor :
+					mutant[i][1] = (mutant[i][1]+random.random()*math.pi)%math.pi2
+				if random.random()<position_mutate_factor :
+					mutant[i][2] = (mutant[i][2]+random.random()/4)%1
+			self.population += [ [None,mutant] ]
+	"""		
+	def test_population(self) : 
+		for i in range(len(self.population)) :
+			if self.population[i][0] == None :
+				surface = Polygon()
+				arr = self.population[i][1]
+				for p in arr :
+					time_ = time.time()
+					poly = Polygon(copy.deepcopy(self.polygons[p[0]].polygon))
+					poly.rotate(p[1])
+					w = poly.width()
+					left = poly.bounds()[0]
+					poly.move( -left + (self.width-w)*p[2],0)
+					poly.drop_down(surface)
+					surface.add(poly)
 					
+				b = surface.bounds()
+				self.population[i][0] = (b[2]-b[0])*(b[3]-b[1])
+		self.population.sort() 
 				
 ################################################################################
 ###
@@ -2116,11 +2241,14 @@ class Gcodetools(inkex.Effect):
 ###		Arrangement: arranges paths by givven params
 ###		TODO move it to the bottom
 ################################################################################
-
+	
 	def arrangement(self) :
 			
 		paths = self.selected_paths
 		surface = Polygon()
+		polygons = []
+		time_ = time.time()
+		print_("Arrangement start at %s"%(time_))
 		for layer in self.layers :
 			if layer in paths :
 				for path in paths[layer] :
@@ -2129,15 +2257,60 @@ class Gcodetools(inkex.Effect):
 					for subpath in csp :
 						for sp1, sp2 in zip(subpath,subpath[1:]) :
 							polygon.add([csp_segment_convex_hull(sp1,sp2)])
-					#polygon.draw()
-					
+					#print_("Redused edges count from", sum([len(poly) for poly in polygon.polygon ]) )
 					polygon.hull()
-					polygon.draw()
-					return
-					polygon.drop_down(surface)
-					polygon.draw()
-					surface.add(polygon)
-		#surface.draw()					
+					#polygon.draw(width=1)
+
+					polygons += [polygon]
+					
+		print_("Paths hull computed in %s sec."%(time.time()-time_))
+		print_("Got %s polygons having average %s edges each."% ( len(polygons), float(sum([ sum([len(poly) for poly in polygon.polygon]) for polygon in polygons ])) / len(polygons) ) )
+		time_ = time.time()
+		
+		material_width = self.options.arrangement_material_width
+		population = Arangement_Genetic(polygons, material_width)
+		
+		print_("Genetic alhorithm start at %s"%(time_))
+		time_ = time.time()
+		population.add_random_species(50)
+		population.test_population()
+		print_("Initial population done in %s"%(time.time()-time_))
+		time_ = time.time()
+		
+		for i in range(200):
+			population.leave_top_species(5)
+			#print_("Popolation cropped   at %s"%(time.time()-time_))
+			population.populate_species(60,5)
+			#print_("Popolation populated at %s"%(time.time()-time_))
+			#population.add_mutants(20,30)
+			population.add_random_species(50)
+			#print_("Popolation randomadd at %s"%(time.time()-time_))
+			population.test_population()
+			#print_("Popolation tested    at %s"%(time.time()-time_))
+			k = ""			
+			for j in range(10) :
+				k += "%s   " % population.population[j][0]
+			print_(k)
+			print_(population.population[0])
+			print_("Cicle %s done in %s"%(i,time.time()-time_))
+			time_ = time.time()
+			if i%10==0 :
+				colors = ["red","orange","pink"]
+				surface = Polygon()
+				for p in population.population[0][1] :
+							time_ = time.time()
+							poly = Polygon(copy.deepcopy(population.polygons[p[0]].polygon[:]))
+							poly.rotate(p[1])
+							w = poly.width()
+							left = poly.bounds()[0]
+							poly.move( -left + (self.options.arrangement_material_width-w)*p[2],0)
+							poly.drop_down(surface)
+							surface.add(poly)
+				b = surface.bounds()
+				surface.move(500*i/10,1000*(i%4))
+				surface.draw(width=2, color=colors[i/10%3])
+				print_(b)
+				print_(b[2]-b[0], b[3]-b[1],(b[2]-b[0])*(b[3]-b[1]) )
 							
 
 	def __init__(self):
@@ -2203,8 +2376,10 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--offset-step",					action="store", type="float", 		dest="offset_step", default=10.,		help="Offset step")
 		self.OptionParser.add_option("",   "--offset-draw-clippend-path",	action="store", type="inkbool",		dest="offset_draw_clippend_path", default=False,		help="Draw clipped path")		
 		self.OptionParser.add_option("",   "--offset-just-get-distance",	action="store", type="inkbool",		dest="offset_just_get_distance", default=False,		help="Don't do offset just get distance")		
+	
+		self.OptionParser.add_option("",   "--arrangement-material-width",	action="store", type="float",		dest="arrangement_material_width", default=500,		help="Materials width for arrangement")		
 
-
+	
 
 
 		self.default_tool = {
