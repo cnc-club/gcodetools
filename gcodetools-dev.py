@@ -2120,6 +2120,10 @@ class Arangement_Genetic:
 		self.genes_count = len(polygons)
 		self.polygons = polygons
 		self.width = material_width
+		self.mutation_factor = 0.1
+		self.order_mutate_factor = 1
+		self.rotation_mutate_factor = 1
+		self.position_mutate_factor = 1
 	def add_random_species(self,count):
 		for i in range(count):
 			specimen = []
@@ -2169,10 +2173,7 @@ class Arangement_Genetic:
 				specimen[i] = [parent2[j][0], parent1[i][1]*tr+parent2[i][1]*(1-tr),parent1[i][2]*tp+parent2[i][2]*(1-tp)]
 				genes_order += [ parent2[j][0] ]						
 				
-			self.mutation_factor = 0.4
-			self.order_mutate_factor = 1
-			self.rotation_mutate_factor = 1
-			self.position_mutate_factor = 1
+
 			if random.random()<self.mutation_factor :
 				
 				for i in range(int(max(random.random()*self.genes_count*self.order_mutate_factor/5,2))) :
@@ -2224,7 +2225,7 @@ class Arangement_Genetic:
 					surface.add(poly)
 					
 				b = surface.bounds()
-				self.population[i][0] = (b[2]-b[0])*(b[3]-b[1])
+				self.population[i][0] = (b[3]-b[1])
 		self.population.sort() 
 				
 ################################################################################
@@ -2276,23 +2277,21 @@ class Gcodetools(inkex.Effect):
 		population.test_population()
 		print_("Initial population done in %s"%(time.time()-time_))
 		time_ = time.time()
-		
-		for i in range(200):
+		pop = copy.deepcopy(population)
+		population_count = 51
+		for i in range(population_count):
 			population.leave_top_species(5)
-			#print_("Popolation cropped   at %s"%(time.time()-time_))
-			population.populate_species(60,5)
-			#print_("Popolation populated at %s"%(time.time()-time_))
-			#population.add_mutants(20,30)
-			population.add_random_species(50)
-			#print_("Popolation randomadd at %s"%(time.time()-time_))
-			population.test_population()
-			#print_("Popolation tested    at %s"%(time.time()-time_))
+			population.populate_species(i,5)
+			population.add_random_species(population_count-i)
+			population.test_population() 
+			population.mutation_factor = i/population_count
+			
 			k = ""			
 			for j in range(10) :
 				k += "%s   " % population.population[j][0]
-			print_(k)
-			print_(population.population[0])
 			print_("Cicle %s done in %s"%(i,time.time()-time_))
+			print_(k)
+			print_()
 			time_ = time.time()
 			if i%10==0 :
 				colors = ["red","orange","pink"]
@@ -2307,12 +2306,12 @@ class Gcodetools(inkex.Effect):
 							poly.drop_down(surface)
 							surface.add(poly)
 				b = surface.bounds()
-				surface.move(500*i/10,1000*(i%4))
+				surface.move(500*i/10,0)
 				surface.draw(width=2, color=colors[i/10%3])
 				print_(b)
 				print_(b[2]-b[0], b[3]-b[1],(b[2]-b[0])*(b[3]-b[1]) )
-							
-
+		population = copy.deepcopy(pop)					
+		
 	def __init__(self):
 		inkex.Effect.__init__(self)
 		self.OptionParser.add_option("-d", "--directory",					action="store", type="string", 		dest="directory", default="/home/",					help="Directory for gcode file")
