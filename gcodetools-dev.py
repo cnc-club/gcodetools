@@ -1905,7 +1905,7 @@ class Polygon:
 		# Down means min y (0,-1)  
 		if len(self.polygon) == 0 or len(self.polygon[0])==0 : return
 		# Get surface top point
-		top = max(0, self.bounds()[3])
+		top = max(0, surface.bounds()[3])
 		# Get polygon bottom point
 		bottom = self.bounds()[1]
 		self.move(0, top - bottom + 10)		
@@ -2121,9 +2121,9 @@ class Arangement_Genetic:
 		self.polygons = polygons
 		self.width = material_width
 		self.mutation_factor = 0.1
-		self.order_mutate_factor = 1
-		self.rotation_mutate_factor = 1
-		self.position_mutate_factor = 1
+		self.order_mutate_factor = 1.
+		self.move_mutate_factor = 1.
+
 	def add_random_species(self,count):
 		for i in range(count):
 			specimen = []
@@ -2133,9 +2133,35 @@ class Arangement_Genetic:
 				specimen += [ [j, random.random()*math.pi2, random.random()] ]
 			self.population += [ [None,specimen] ]
 
+	def similarity(self,sp1,top) :
+		# Define similarity as a simple distance between two points in len(gene)*len(spiece) -th dimentions
+		# for sp2 in top_spieces sum(|sp1-sp2|)/top_count
+		sim = 0
+		for sp2 in top : 
+			s = 0
+			for j in range(self.genes_count) :
+				s += (sp1[j][0]-sp2[1][j][0])**2 + (sp1[j][1]-sp2[1][j][2])**2 + (sp1[j][2]-sp2[1][j][2])**2
+			sim += math.sqrt(s)
+		return sim/len(top)
+		
 	def leave_top_species(self,count):
 		self.population.sort()
-		self.population = self.population[:count]
+		res = [  copy.deepcopy(self.population[0]) ]
+		del self.population[0]
+		for c in range(count-1) :
+			rank = []
+			for i in range(len(self.population)) :	
+				sim = self.similarity(self.population[i][1],res)
+				rank += [ [self.population[i][0] / sim if sim>0 else 1e100,i] ]
+			rank.sort()
+			res += [  copy.deepcopy(self.population[rank[0][1]]) ]
+			print_(rank[0],self.population[rank[0][1]][0])
+			print_(res[-1])
+			del self.population[rank[0][1]]
+			
+		self.population = res
+			
+		
 		
 	def populate_species(self,count, parent_count):
 		self.population.sort()
@@ -2155,18 +2181,16 @@ class Arangement_Genetic:
 				parent1, parent2 = parent2, parent1
 			
 			for i in range(start_gene,end_gene) : 
-				rotation_mutate_param = random.random()/100
-				xposition_mutate_param = random.random()/100
-				tr = 1 - rotation_mutate_param
-				tp = 1 - xposition_mutate_param
+				#rotation_mutate_param = random.random()/100
+				#xposition_mutate_param = random.random()/100
+				tr = 1 #- rotation_mutate_param
+				tp = 1 #- xposition_mutate_param
 				specimen[i] = [parent1[i][0], parent1[i][1]*tr+parent2[i][1]*(1-tr),parent1[i][2]*tp+parent2[i][2]*(1-tp)]
 				genes_order += [ parent1[i][0] ]
 
 			for i in range(0,start_gene)+range(end_gene,self.genes_count) : 
-				rotation_mutate_param = random.random()/100
-				xposition_mutate_param = random.random()/100
-				tr = rotation_mutate_param
-				tp = xposition_mutate_param
+				tr = 0 #rotation_mutate_param
+				tp = 0 #xposition_mutate_param
 				j = i 
 				while parent2[j][0] in genes_order :
 					j = (j+1)%self.genes_count
@@ -2174,18 +2198,14 @@ class Arangement_Genetic:
 				genes_order += [ parent2[j][0] ]						
 				
 
-			if random.random()<self.mutation_factor :
-				
-				for i in range(int(max(random.random()*self.genes_count*self.order_mutate_factor/5,2))) :
+			for i in range(random.randint(self.mutation_genes_count[0],self.mutation_genes_count[0])) :
+				if random.random() < self.order_mutate_factor : 
 					i1,i2 = random.randint(0,self.genes_count-1),random.randint(0,self.genes_count-1)
 					specimen[i1], specimen[i2] = specimen[i2], specimen[i1]
-				for i in range(int(max(random.random()*self.genes_count*self.rotation_mutate_factor/5,2))) :
+				if random.random() < self.move_mutation_factor : 
 					i1 = random.randint(0,self.genes_count-1)
-					specimen[i1][1] =  (specimen[i1][1]+random.random()*math.pi/2)%math.pi2
-
-				for i in range(int(max(random.random()*self.genes_count*self.position_mutate_factor/5,2))) :
-					i1 = random.randint(0,self.genes_count-1)
-					specimen[i1][2] =  (specimen[i1][2]+random.random()/4)%1
+					specimen[i1][1] =  (specimen[i1][1]+random.random()*math.pi2*self.move_mutation_multiplier)%math.pi2
+					specimen[i1][2] =  (specimen[i1][2]+random.random()*self.move_mutation_multiplier)%1
 			self.population += [ [None,specimen] ]	
 	
 		"""	def add_mutants(self, count, best_count, order_mutate_factor = 0.05, rotation_mutate_factor = 0.05, position_mutate_factor = 0.05):
@@ -2225,7 +2245,7 @@ class Arangement_Genetic:
 					surface.add(poly)
 					
 				b = surface.bounds()
-				self.population[i][0] = (b[3]-b[1])
+				self.population[i][0] = (b[3]-b[1])*(b[2]-b[0])
 		self.population.sort() 
 				
 ################################################################################
@@ -2278,14 +2298,20 @@ class Gcodetools(inkex.Effect):
 		print_("Initial population done in %s"%(time.time()-time_))
 		time_ = time.time()
 		pop = copy.deepcopy(population)
-		population_count = 51
+		population_count = 400
 		for i in range(population_count):
-			population.leave_top_species(5)
-			population.populate_species(i,5)
-			population.add_random_species(population_count-i)
+			population.leave_top_species(10)
+			randomize = i%100 < 40
+			if 	i%100 < 40 : 
+				population.add_random_species(250)
+			if  40<= i%100 < 100 : 
+				population.mutation_genes_count =  [1,max(2,int(population.genes_count/2))] if 40<=i%100<60 else [1,max(2,int(population.genes_count/10))]
+
+				population.move_mutation_multiplier = 1. if 40<=i%100<80 else .1
+				population.move_mutation_factor = 1. if 50<=i%100<100 else .5
+				population.order_mutation_factor = .1 if 80<=i%100<100 else 1.
+				population.populate_species(250, 10)
 			population.test_population() 
-			population.mutation_factor = i/population_count
-			
 			k = ""			
 			for j in range(10) :
 				k += "%s   " % population.population[j][0]
@@ -2293,7 +2319,7 @@ class Gcodetools(inkex.Effect):
 			print_(k)
 			print_()
 			time_ = time.time()
-			if i%10==0 :
+			if i%10==0 or True :
 				colors = ["red","orange","pink"]
 				surface = Polygon()
 				for p in population.population[0][1] :
@@ -2306,7 +2332,7 @@ class Gcodetools(inkex.Effect):
 							poly.drop_down(surface)
 							surface.add(poly)
 				b = surface.bounds()
-				surface.move(500*i/10,0)
+				surface.move(500*i/2,0)
 				surface.draw(width=2, color=colors[i/10%3])
 				print_(b)
 				print_(b[2]-b[0], b[3]-b[1],(b[2]-b[0])*(b[3]-b[1]) )
