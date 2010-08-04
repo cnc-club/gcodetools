@@ -674,7 +674,7 @@ def csp_line_intersection(l1,l2,sp1,sp2):
 	for i in roots :
 		if type(i) is complex and abs(i.imag)<1e-7:
 			i = i.real
-		if type(i) is not complex and 0<=i<=1:
+		if type(i) is not complex and 1e-10<=i<=1.+1e-10:
 			retval.append(i)
 	return retval
 
@@ -1008,11 +1008,10 @@ def csp_clip_by_line(csp,l1,l2) :
 			intersections += [  [j,int_] for int_ in csp_line_intersection(l1,l2,s[j-1],s[j])]
 		splitted_s = csp_subpath_split_by_points(s, intersections)
 		for s in splitted_s[:] :
-			clip = True
-			print_()
+			clip = False
 			for p in csp_true_bounds([s]) :
-				if (l1[1]-l2[1])*p[0] + (l2[0]-l1[0])*p[1] + (l1[0]*l2[1]-l2[0]*l1[1])>0.001 : 
-					clip = False
+				if (l1[1]-l2[1])*p[0] + (l2[0]-l1[0])*p[1] + (l1[0]*l2[1]-l2[0]*l1[1])<-0.01 : 
+					clip = True
 					break
 			if clip :
 				splitted_s.remove(s)
@@ -4004,7 +4003,6 @@ G01 Z1 (going to cutting z)\n""",
 							offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [right,0], [right,10] )
 							offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [0, miny[1]-r], [10, miny[1]-r] )
 							#csp_draw(self.transform_csp(offsetted_subpath,layer,True), color = "Green", width = 1)
-
 							# Join offsetted_subpath together 
 							# Hope there wont be any cicles
 							subpath = csp_join_subpaths(offsetted_subpath)[0]
