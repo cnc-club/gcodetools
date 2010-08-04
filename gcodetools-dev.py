@@ -1217,6 +1217,29 @@ def atan2(*arg):
 	else :
 		raise ValueError, "Bad argumets for atan! (%s)" % arg  
 
+
+def draw_text(text,x,y,style = None, font_size = 20) :
+	if style == None : 
+		style = "font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;"
+	style += "font-size:%fpx;"%font_size
+	t = inkex.etree.SubElement(	options.doc_root, inkex.addNS('text','svg'), {	
+							'x':	str(x),
+							inkex.addNS("space","xml"):"preserve",
+							'y':	str(y)
+						})
+	text = str(text).split("\n")
+	for s in text :
+		span = inkex.etree.SubElement( t, inkex.addNS('tspan','svg'), 
+						{
+							'x':	str(x),
+							'y':	str(+y),
+							inkex.addNS("role","sodipodi"):"line",
+						})					
+		y += font_size
+		span.text = s
+			
+
+
 def draw_pointer(x,color = "#f00", figure = "cross", comment = "", width = .1) :
 	if figure ==  "line" :
 		s = ""
@@ -2133,31 +2156,45 @@ class Arangement_Genetic:
 				specimen += [ [j, random.random()*math.pi2, random.random()] ]
 			self.population += [ [None,specimen] ]
 
+	def species_distance2(self,sp1,sp2) :
+		# retun distance, each component is normalized
+		s = 0
+		for j in range(self.genes_count) :
+			s += ((sp1[j][0]-sp2[j][0])/self.genes_count)**2 + (( sp1[j][1]-sp2[j][1])/math.pi2 )**2 + ((sp1[j][2]-sp2[j][2])/self.width)**2
+		return s
+
 	def similarity(self,sp1,top) :
 		# Define similarity as a simple distance between two points in len(gene)*len(spiece) -th dimentions
 		# for sp2 in top_spieces sum(|sp1-sp2|)/top_count
 		sim = 0
 		for sp2 in top : 
-			s = 0
-			for j in range(self.genes_count) :
-				s += (sp1[j][0]-sp2[1][j][0])**2 + (sp1[j][1]-sp2[1][j][2])**2 + (sp1[j][2]-sp2[1][j][2])**2
-			sim += math.sqrt(s)
+			sim += math.sqrt(species_distance2(sp1,sp2[1]))
 		return sim/len(top)
 		
 	def leave_top_species(self,count):
 		self.population.sort()
 		res = [  copy.deepcopy(self.population[0]) ]
 		del self.population[0]
-		for c in range(count-1) :
-			rank = []
-			for i in range(len(self.population)) :	
-				sim = self.similarity(self.population[i][1],res)
-				rank += [ [self.population[i][0] / sim if sim>0 else 1e100,i] ]
-			rank.sort()
-			res += [  copy.deepcopy(self.population[rank[0][1]]) ]
-			print_(rank[0],self.population[rank[0][1]][0])
-			print_(res[-1])
-			del self.population[rank[0][1]]
+		for i in range(count-1) :
+			t = []
+			for j in range(20) : 
+				i1 = random.randint(0,len(self.population)-1) 
+				t += [ [self.population[i1][0],i1] ] 
+			t.sort()
+			res += [  copy.deepcopy(self.population[t[0][1]]) ]
+			del self.population[t[0][1]]
+		self.population = res		
+		#del self.population[0]
+		#for c in range(count-1) :
+		#	rank = []
+		#	for i in range(len(self.population)) :	
+		#		sim = self.similarity(self.population[i][1],res)
+		#		rank += [ [self.population[i][0] / sim if sim>0 else 1e100,i] ]
+		#	rank.sort()
+		#	res += [  copy.deepcopy(self.population[rank[0][1]]) ]
+		#	print_(rank[0],self.population[rank[0][1]][0])
+		#	print_(res[-1])
+		#	del self.population[rank[0][1]]
 			
 		self.population = res
 			
@@ -2165,6 +2202,7 @@ class Arangement_Genetic:
 		
 	def populate_species(self,count, parent_count):
 		self.population.sort()
+		self.inc = 0
 		for c in range(count):
 			parent1 = random.randint(0,parent_count-1)
 			parent2 = random.randint(0,parent_count-1)
@@ -2174,12 +2212,22 @@ class Arangement_Genetic:
 			genes_order = []
 			specimen = [ [0,0.,0.] for i in range(self.genes_count) ]
 			
+			self.incest_mutation_multiplyer = 1.
+			self.incest_mutation_count_multiplyer = 1.
+
+			if self.species_distance2(parent1, parent2) <= .01/self.genes_count :
+				# OMG it's a incest :O!!!
+				# Damn you bastards!
+				self.inc +=1
+				self.incest_mutation_multiplyer = 2. 
+				self.incest_mutation_count_multiplyer = 2. 
+			else :
+				if random.random()<.01 : print_(self.species_distance2(parent1, parent2))	
 			start_gene = random.randint(0,self.genes_count)
 			end_gene = (max(1,random.randint(0,self.genes_count),int(self.genes_count/4))+start_gene) % self.genes_count
 			if end_gene<start_gene : 
 				end_gene, start_gene = start_gene, end_gene
 				parent1, parent2 = parent2, parent1
-			
 			for i in range(start_gene,end_gene) : 
 				#rotation_mutate_param = random.random()/100
 				#xposition_mutate_param = random.random()/100
@@ -2198,11 +2246,11 @@ class Arangement_Genetic:
 				genes_order += [ parent2[j][0] ]						
 				
 
-			for i in range(random.randint(self.mutation_genes_count[0],self.mutation_genes_count[0])) :
-				if random.random() < self.order_mutate_factor : 
+			for i in range(random.randint(self.mutation_genes_count[0],self.mutation_genes_count[0]*self.incest_mutation_count_multiplyer )) :
+				if random.random() < self.order_mutate_factor * self.incest_mutation_multiplyer : 
 					i1,i2 = random.randint(0,self.genes_count-1),random.randint(0,self.genes_count-1)
-					specimen[i1], specimen[i2] = specimen[i2], specimen[i1]
-				if random.random() < self.move_mutation_factor : 
+					specimen[i1][0], specimen[i2][0] = specimen[i2][0], specimen[i1][0]
+				if random.random() < self.move_mutation_factor * self.incest_mutation_multiplyer: 
 					i1 = random.randint(0,self.genes_count-1)
 					specimen[i1][1] =  (specimen[i1][1]+random.random()*math.pi2*self.move_mutation_multiplier)%math.pi2
 					specimen[i1][2] =  (specimen[i1][2]+random.random()*self.move_mutation_multiplier)%1
@@ -2298,29 +2346,49 @@ class Gcodetools(inkex.Effect):
 		print_("Initial population done in %s"%(time.time()-time_))
 		time_ = time.time()
 		pop = copy.deepcopy(population)
-		population_count = 100
+		population_count = self.options.arrangement_population_count
+		last_champ = []
+		champions_count = 0
 		for i in range(population_count):
-			population.leave_top_species(10)
+			population.leave_top_species(20)
+			population.move_mutation_multiplier = random.random()/2
+			
+			population.order_mutation_factor = .2
+			population.move_mutation_factor = 1.
+			population.mutation_genes_count = [1,2]
+			population.populate_species(250, 20)
+			"""
 			randomize = i%100 < 40
 			if 	i%100 < 40 : 
 				population.add_random_species(250)
 			if  40<= i%100 < 100 : 
-				population.mutation_genes_count =  [1,max(2,int(population.genes_count/2))] if 40<=i%100<60 else [1,max(2,int(population.genes_count/2))]
-
+				population.mutation_genes_count = [1,max(2,int(population.genes_count/4))]  #[1,max(2,int(population.genes_count/2))] if 40<=i%100<60 else [1,max(2,int(population.genes_count/10))]
 				population.move_mutation_multiplier = 1. if 40<=i%100<80 else .1
-				population.move_mutation_factor = 1. if 50<=i%100<100 else .5
-				population.order_mutation_factor = .1 if 80<=i%100<100 else 1.
+				population.move_mutation_factor = (-(i%100)/30+10/3) if 50<=i%100<100 else .5
+				population.order_mutation_factor = 1./(i%100-79) if 80<=i%100<100 else 1.
 				population.populate_species(250, 10)
+			"""
 			population.test_population() 
+			draw_new_champ = False
+			
+			
+			
+			if population.population[0][0]!= last_champ : 
+				draw_new_champ = True
+				last_champ = population.population[0][0]*1
+			
+
 			k = ""			
-			for j in range(10) :
-				k += "%s   " % population.population[j][0]
+			#for j in range(10) :
+			#	k += "%s   " % population.population[j][0]
 			print_("Cicle %s done in %s"%(i,time.time()-time_))
-			print_(k)
+			print_("%s incests been found"%population.inc)
 			print_()
+			#print_(k)
+			#print_()
 			time_ = time.time()
-			if i%10==0 or True :
-				colors = ["red","orange","pink"]
+			if i == 0  or i == population_count-1 or draw_new_champ :
+				colors = ["blue"]
 				surface = Polygon()
 				for p in population.population[0][1] :
 							time_ = time.time()
@@ -2332,10 +2400,11 @@ class Gcodetools(inkex.Effect):
 							poly.drop_down(surface)
 							surface.add(poly)
 				b = surface.bounds()
-				surface.move(500*i/2,0)
-				surface.draw(width=2, color=colors[i/10%3])
-				print_(b)
-				print_(b[2]-b[0], b[3]-b[1],(b[2]-b[0])*(b[3]-b[1]) )
+				x,y = 250* (champions_count%10), 400*int(champions_count/10)
+				surface.move(x,y)
+				surface.draw(width=2, color=colors[0])
+				draw_text("Step = %s\nSquare = %f"%(i,(b[2]-b[0])*(b[3]-b[1])),x,y-40)
+				champions_count += 1
 		population = copy.deepcopy(pop)					
 		
 	def __init__(self):
@@ -2406,6 +2475,7 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--offset-just-get-distance",	action="store", type="inkbool",		dest="offset_just_get_distance", default=False,		help="Don't do offset just get distance")		
 	
 		self.OptionParser.add_option("",   "--arrangement-material-width",	action="store", type="float",		dest="arrangement_material_width", default=500,		help="Materials width for arrangement")		
+		self.OptionParser.add_option("",   "--arrangement-population-count",action="store", type="int",			dest="arrangement_population_count", default=100,	help="Genetic algorithm populations count")		
 
 	
 

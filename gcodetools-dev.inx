@@ -215,6 +215,7 @@ Press Apply to create new tool.
 <!-- Gcodetools: arrangement block -->
 	<page name='arrangement' _gui-text='Arrangement'>	
 	<param name='arrangement-material-width' type="float" precision="5" min="0" max="1000000" _gui-text='Material width'>500</param>
+	<param name='arrangement-population-count' type="int" min="0" max="1000000" _gui-text='Genetic algorithm populations count'>100</param>
 	</page>
 <!-- Gcodetools: /arrangement block -->
 
