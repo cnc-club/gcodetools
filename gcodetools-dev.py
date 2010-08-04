@@ -674,7 +674,7 @@ def csp_line_intersection(l1,l2,sp1,sp2):
 	for i in roots :
 		if type(i) is complex and abs(i.imag)<1e-7:
 			i = i.real
-		if type(i) is not complex and 1e-10<=i<=1.+1e-10:
+		if type(i) is not complex and -1e-10<=i<=1.+1e-10:
 			retval.append(i)
 	return retval
 
