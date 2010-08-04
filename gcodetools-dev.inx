@@ -191,6 +191,10 @@ Press Apply to create new tool.
 		<param name="lathe-width" type="float" precision="5" min="0" max="1000" _gui-text="Lathe width">10</param>
 		<param name="lathe-fine-cut-width" type="float" precision="5" min="0" max="1000" _gui-text="Fine cut width">1</param>
 		<param name="lathe-fine-cut-count" type="int" min="0" max="1000" _gui-text="Fine cut count">1</param>
+		<param name="lathe-create-fine-cut-using"  _gui-text="Create fine cut using" type="optiongroup" appearance="minimal">
+			<option value="Move path">Move path</option>
+			<option value="Offset path">Offset path</option>
+		</param>
 		<param name="lathe-x-axis-remap" type="string" _gui-text="Lathe X axis remap">X</param>
 		<param name="lathe-z-axis-remap" type="string" _gui-text="Lathe Z axis remap">Z</param>
 

@@ -2298,14 +2298,14 @@ class Gcodetools(inkex.Effect):
 		print_("Initial population done in %s"%(time.time()-time_))
 		time_ = time.time()
 		pop = copy.deepcopy(population)
-		population_count = 400
+		population_count = 100
 		for i in range(population_count):
 			population.leave_top_species(10)
 			randomize = i%100 < 40
 			if 	i%100 < 40 : 
 				population.add_random_species(250)
 			if  40<= i%100 < 100 : 
-				population.mutation_genes_count =  [1,max(2,int(population.genes_count/2))] if 40<=i%100<60 else [1,max(2,int(population.genes_count/10))]
+				population.mutation_genes_count =  [1,max(2,int(population.genes_count/2))] if 40<=i%100<60 else [1,max(2,int(population.genes_count/2))]
 
 				population.move_mutation_multiplier = 1. if 40<=i%100<80 else .1
 				population.move_mutation_factor = 1. if 50<=i%100<100 else .5
@@ -2379,11 +2379,14 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--engraving-draw-calculation-paths",action="store", type="inkbool",	dest="engraving_draw_calculation_paths", default=False,		help="Draw additional graphics to debug engraving path")		
 		self.OptionParser.add_option("",   "--engraving-cutter-shape-function",action="store", type="string", 	dest="engraving_cutter_shape_function", default="w",		help="Cutter shape function z(w). Ex. cone: w. ")
 
-		self.OptionParser.add_option("",   "--lathe-width",					action="store", type="float", 		dest="lathe_width", default=10.,help="Lathe width")
-		self.OptionParser.add_option("",   "--lathe-fine-cut-width",		action="store", type="float", 		dest="lathe_fine_cut_width", default=1.,help="Fine cut width")
-		self.OptionParser.add_option("",   "--lathe-fine-cut-count",		action="store", type="int", 		dest="lathe_fine_cut_count", default=1,help="Fine cut rounds count")
-		self.OptionParser.add_option("",   "--lathe-x-axis-remap",			action="store", type="string", 		dest="lathe_x_axis_remap", default="X",help="Lathe X axis remap")
-		self.OptionParser.add_option("",   "--lathe-z-axis-remap",			action="store", type="string", 		dest="lathe_z_axis_remap", default="Z",help="Lathe Z axis remap")
+		self.OptionParser.add_option("",   "--lathe-width",					action="store", type="float", 		dest="lathe_width", default=10.,							help="Lathe width")
+		self.OptionParser.add_option("",   "--lathe-fine-cut-width",		action="store", type="float", 		dest="lathe_fine_cut_width", default=1.,					help="Fine cut width")
+		self.OptionParser.add_option("",   "--lathe-fine-cut-count",		action="store", type="int", 		dest="lathe_fine_cut_count", default=1.,					help="Fine cut count")
+		self.OptionParser.add_option("",   "--lathe-create-fine-cut-using",	action="store", type="string",		dest="lathe_create_fine_cut_using", default="Move path",			help="Create fine cut using")
+		self.OptionParser.add_option("",   "--lathe-x-axis-remap",			action="store", type="string", 		dest="lathe_x_axis_remap", default="X",						help="Lathe X axis remap")
+		self.OptionParser.add_option("",   "--lathe-z-axis-remap",			action="store", type="string", 		dest="lathe_z_axis_remap", default="Z",						help="Lathe Z axis remap")
+
+
 
 
 		self.OptionParser.add_option("",   "--create-log",					action="store", type="inkbool", 	dest="log_create_log", default=False,				help="Create log files")
@@ -3974,17 +3977,36 @@ G01 Z1 (going to cutting z)\n""",
 									gcode += self.generate_lathe_gcode(part,layer,"feed")
 									
 						top_start, top_end = [fine_cut[0][1][0], self.options.lathe_width+self.options.Zsafe+self.options.lathe_fine_cut_width], [fine_cut[-1][1][0], self.options.lathe_width+self.options.Zsafe+self.options.lathe_fine_cut_width]
-						gcode += "\n(Fine cutting start)"					
+						gcode += "\n(Fine cutting start)\n(Calculating fine cut using %s)\n"%self.options.lathe_create_fine_cut_using
 						for i in range(self.options.lathe_fine_cut_count) :
+							width = self.options.lathe_fine_cut_width*(1-float(i+1)/self.options.lathe_fine_cut_count ) 
+							if width == 0 : 
+								current_pass = fine_cut							
+							else :	
+								if self.options.lathe_create_fine_cut_using == "Move path" :
+									current_pass = [ [  [i2[0],i2[1]+width]  for i2 in i1]  for i1 in fine_cut]
+								else :
+									minx,miny,maxx,maxy = csp_true_bounds([fine_cut])
+									offsetted_subpath = csp_subpath_line_to(fine_cut[:], [ [fine_cut[-1][1][0], miny[1]-r*10 ], [fine_cut[0][1][0], miny[1]-r*10 ], [fine_cut[0][1][0], fine_cut[0][1][1] ]  ])
+									left,right = fine_cut[-1][1][0], fine_cut[0][1][0]
+									if left>right : left, right = right,left
+									offsetted_subpath = csp_offset([offsetted_subpath], width if not csp_subpath_ccw(offsetted_subpath) else -width ) 
+									offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [left,10], [left,0] )
+									offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [right,0], [right,10] )
+									offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [0, miny[1]-r], [10, miny[1]-r] )
+									current_pass = offsetted_subpath[0]
+
+
+
 							gcode += "\n(Fine cut %i-th cicle start)\n"%(i+1)					
 							gcode += ("G01 %s %f %s %f F %f \n" % (x, top_start[0], z, top_start[1], self.tool["passing feed"]) )
-							gcode += ("G01 %s %f %s %f F %f \n" % (x, fine_cut[0][1][0], z, fine_cut[0][1][1]-self.options.lathe_fine_cut_width, self.tool["passing feed"]) )
-							gcode += ("G01 %s %f %s %f F %f \n" % (x, fine_cut[0][1][0], z, fine_cut[0][1][1], self.tool["fine feed"]) )
-							
-							gcode += self.generate_lathe_gcode(fine_cut,layer,"fine feed")
+							gcode += ("G01 %s %f %s %f F %f \n" % (x, current_pass[0][1][0], z, current_pass[0][1][1]+self.options.lathe_fine_cut_width, self.tool["passing feed"]) )
+							gcode += ("G01 %s %f %s %f F %f \n" % (x, current_pass[0][1][0], z, current_pass[0][1][1], self.tool["fine feed"]) )
+						
+							gcode += self.generate_lathe_gcode(current_pass,layer,"fine feed")
 							gcode += ("G01 %s %f F %f \n" % (z, top_start[1], self.tool["passing feed"]) )
-						gcode += ("G01 %s %f %s %f F %f \n" % (x, top_start[0], z, top_start[1], self.tool["passing feed"]) )
-		
+							gcode += ("G01 %s %f %s %f F %f \n" % (x, top_start[0], z, top_start[1], self.tool["passing feed"]) )
+	
 							
 		f = open(self.options.directory+'/'+self.options.file, "w")	
 		f.write(self.header+"\n" + gcode_plane_selection + "\n" + gcode + "\n" + self.footer)
