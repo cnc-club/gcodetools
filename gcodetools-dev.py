@@ -684,12 +684,12 @@ def csp_split_by_two_points(sp1,sp2,t1,t2) :
 	if t1 == t2 : 
 		sp1,sp2,sp3 =  csp_split(sp1,sp2,t)
 		return [sp1,sp2,sp2,sp3]
-	elif t1==0. and t2 == 1. :
+	elif t1 <= 1e-10 and t2 >= 1.-1e-10 :
 		return [sp1,sp1,sp2,sp2]
-	elif t1 == 0. :	
+	elif t1 <= 1e-10:	
 		sp1,sp2,sp3 = csp_split(sp1,sp2,t2)
 		return [sp1,sp1,sp2,sp3]
-	elif t2 == 1. : 
+	elif t2 >= 1.-1e-10 : 
 		sp1,sp2,sp3 = csp_split(sp1,sp2,t1)
 		return [sp1,sp2,sp3,sp3]
 	else:
@@ -1914,21 +1914,71 @@ class Polygon:
 		b = self.bounds()
 		return b[2]-b[0]
 	
-	def rotate(self, a):
-		cos, sin = math.cos(a), math.sin(a)
+	def rotate_(self,sin,cos) :
 		for i in range(len(self.polygon)) :
 			for j in range(len(self.polygon[i])) :
 				x,y = self.polygon[i][j][0], self.polygon[i][j][1] 
 				self.polygon[i][j][0] = x*cos - y*sin
 				self.polygon[i][j][1] = x*sin + y*cos
+		
+	def rotate(self, a):
+		cos, sin = math.cos(a), math.sin(a)
+		self.rotate_(sin,cos)
+	
 			
-	def drop_down(self, surface) :
+	def drop_into_direction(self, direction, surface) :
+		# Polygon is a list of simple polygons
+		# Surface is a polygon + line y = 0 
+		# Direction is [dx,dy]  
+		if len(self.polygon) == 0 or len(self.polygon[0])==0 : return
+		direction = normalize(direction)
+		sin,cos = direction[0], - direction[1]
+		if direction[0]**2+ direction[1]**2 <1e-10 : return
+		self.rotate_(-sin,cos)
+		surface.rotate_(-sin,cos)
+		self.draw(color="Orange",width=2)
+		surface.draw(color="Orange",width=2)
+		self.drop_down(surface, zerro_plane = False)
+		self.rotate_(sin,cos)
+		surface.rotate_(sin,cos)
+		
+	def centroid(self):
+		print_("polygon")
+		centroids = []
+		sa = 0
+		for poly in self.polygon:
+			print_("poly")
+			cx,cy,a = 0,0,0
+			for i in range(len(poly)):
+				[x1,y1],[x2,y2] = poly[i-1],poly[i]
+				cx += (x1+x2)*(x1*y2-x2*y1)
+				cy += (y1+y2)*(x1*y2-x2*y1)
+				a  += (x1*y2-x2*y1)
+			a *= 3.
+			if abs(a)>0 :
+				cx /= a
+				cy /= a
+				sa += abs(a)
+				centroids += [ [cx,cy,a] ]
+		print_(centroids)
+		if sa == 0 : return	[0.,0.]
+		cx,cy = 0.,0.
+		for c in centroids :
+			cx += c[0]*c[2]
+			cy += c[1]*c[2]
+		cx /= sa
+		cy /= sa
+		return [cx,cy]
+
+			
+	def drop_down(self, surface, zerro_plane = True) :
 		# Polygon is a list of simple polygons
 		# Surface is a polygon + line y = 0 
 		# Down means min y (0,-1)  
 		if len(self.polygon) == 0 or len(self.polygon[0])==0 : return
 		# Get surface top point
-		top = max(0, surface.bounds()[3])
+		top = surface.bounds()[3]
+		if zerro_plane : top = max(0, top)
 		# Get polygon bottom point
 		bottom = self.bounds()[1]
 		self.move(0, top - bottom + 10)		
@@ -1953,7 +2003,8 @@ class Polygon:
 							if st[0]==end[0] : d = min(- vertex[1]+st[1],-vertex[1]+end[1])
 							else : d =  - vertex[1] + st[1] + (end[1]-st[1])*(vertex[0]-st[0])/(end[0]-st[0]) 
 							if dist > d  : dist = d
-		if dist > 10 + top : dist = 10 + top 
+		
+		if zerro_plane and dist > 10 + top : dist = 10 + top 
 		#print_(dist, top, bottom)
 		#self.draw()
 		self.move(0, -dist)		
@@ -2256,27 +2307,52 @@ class Arangement_Genetic:
 					specimen[i1][2] =  (specimen[i1][2]+random.random()*self.move_mutation_multiplier)%1
 			self.population += [ [None,specimen] ]	
 	
-		"""	def add_mutants(self, count, best_count, order_mutate_factor = 0.05, rotation_mutate_factor = 0.05, position_mutate_factor = 0.05):
-		for c in range(count) :
-			j1 = random.randint(0,min(best_count,len(self.population))) 
-			mutant = self.population[j1][1][:]
-			print_("m",mutant)
-			for i in range(self.genes_count) : # swap some genes to mutate order
-				if random.random()<order_mutate_factor :
-					i1,i2 = random.randint(0,self.genes_count),random.randint(0,self.genes_count)
-					mutant[i1], mutant[i2] = mutant[i2], mutant[i1]
-			for i in range(self.genes_count) : # add random mutation
-				print_(mutant,i)
-				print_(len(mutant),i)
-				print_(mutant[i][1])
-				print_(mutant[i][2])
+	def populate_species1(self,count, parent_count):
+		self.population.sort()
+		self.inc = 0
+		for c in range(count):
+			parent1 = random.randint(0,parent_count-1)
+			parent2 = random.randint(0,parent_count-1)
+			if parent1==parent2 : parent2 = (parent2+1) % parent_count
+			parent1, parent2 = self.population[parent1][1], self.population[parent2][1]
+			i1,i2 = 0, 0
+			genes_order = []
+			specimen = [ [0,0.,0.] for i in range(self.genes_count) ]
+			
+			self.incest_mutation_multiplyer = 1.
+			self.incest_mutation_count_multiplyer = 1.
+
+			if self.species_distance2(parent1, parent2) <= .01/self.genes_count :
+				# OMG it's a incest :O!!!
+				# Damn you bastards!
+				self.inc +=1
+				self.incest_mutation_multiplyer = 2. 
+				self.incest_mutation_count_multiplyer = 2. 
+			else :
+				if random.random()<.01 : print_(self.species_distance2(parent1, parent2))	
+
+			start_gene = random.randint(0,self.genes_count)
+			end_gene = (max(1,random.randint(0,self.genes_count),int(self.genes_count/4))+start_gene) % self.genes_count
+			if end_gene<start_gene : 
+				end_gene, start_gene = start_gene, end_gene
+				parent1, parent2 = parent2, parent1
+			for i in range(start_gene,end_gene) : 
+				#rotation_mutate_param = random.random()/100
+				#xposition_mutate_param = random.random()/100
+				tr = 1 #- rotation_mutate_param
+				tp = 1 #- xposition_mutate_param
+				specimen[i] = [parent1[i][0], parent1[i][1],parent1[i][2]]
+			for i in range(0,start_gene)+range(end_gene,self.genes_count) : 
+				specimen[i] = [parent2[i][0], parent2[i][1],parent2[i][2]]
 				
-				if random.random()<rotation_mutate_factor :
-					mutant[i][1] = (mutant[i][1]+random.random()*math.pi)%math.pi2
-				if random.random()<position_mutate_factor :
-					mutant[i][2] = (mutant[i][2]+random.random()/4)%1
-			self.population += [ [None,mutant] ]
-	"""		
+
+			for i in range(random.randint(self.mutation_genes_count[0],self.mutation_genes_count[0]*self.incest_mutation_count_multiplyer )) :
+				if random.random() < self.move_mutation_factor * self.incest_mutation_multiplyer: 
+					i1 = random.randint(0,self.genes_count-1)
+					specimen[i1][2] =  (specimen[i1][2]+random.random()*self.move_mutation_multiplier)%1
+					specimen[i1][2] =  (specimen[i1][2]+random.random()*math.pi2*self.move_mutation_multiplier)%math.pi2
+			self.population += [ [None,specimen] ]	
+	
 	def test_population(self) : 
 		for i in range(len(self.population)) :
 			if self.population[i][0] == None :
@@ -2328,7 +2404,6 @@ class Gcodetools(inkex.Effect):
 							polygon.add([csp_segment_convex_hull(sp1,sp2)])
 					#print_("Redused edges count from", sum([len(poly) for poly in polygon.polygon ]) )
 					polygon.hull()
-					#polygon.draw(width=1)
 
 					polygons += [polygon]
 					
@@ -2336,6 +2411,33 @@ class Gcodetools(inkex.Effect):
 		print_("Got %s polygons having average %s edges each."% ( len(polygons), float(sum([ sum([len(poly) for poly in polygon.polygon]) for polygon in polygons ])) / len(polygons) ) )
 		time_ = time.time()
 		
+		
+		c = polygons[0].centroid()
+		c[1] -= 400
+		for polygon in polygons : 
+			polygon.rotate(random.random()*math.pi2)
+			c1 = polygon.centroid()
+			ang = random.random()*math.pi2
+			polygon.move(c[0]-c1[0]+280*math.cos(ang),c[1]-c1[1]+280*math.sin(ang))
+			#polygon.draw(width=1)			
+			#c1 = polygon.centroid()
+		surface  = Polygon()
+		surface.add(polygons[0])	
+		for i in range(1,len(polygons)):
+			c = surface.centroid()
+			draw_pointer(c)
+			c1 = polygons[i].centroid()
+			polygons[i].draw(color="Red")
+			draw_pointer(c1)
+			direction = [c[0]-c1[0],c[1]-c1[1]]
+			if direction[0]**2+direction[1]**2 <1e-10 : direction [0,-1]
+			draw_pointer(c1+[c1[0]+direction[0]*20,c1[1]+direction[1]*20],"Green","line")
+
+			polygons[i].drop_into_direction(direction,surface)
+			surface.add(polygons[i])
+			surface.draw()
+		
+		return
 		material_width = self.options.arrangement_material_width
 		population = Arangement_Genetic(polygons, material_width)
 		
