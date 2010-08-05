@@ -1930,23 +1930,20 @@ class Polygon:
 		# Surface is a polygon + line y = 0 
 		# Direction is [dx,dy]  
 		if len(self.polygon) == 0 or len(self.polygon[0])==0 : return
+		if direction[0]**2 + direction[1]**2 <1e-10 : return
 		direction = normalize(direction)
 		sin,cos = direction[0], - direction[1]
-		if direction[0]**2+ direction[1]**2 <1e-10 : return
 		self.rotate_(-sin,cos)
 		surface.rotate_(-sin,cos)
-		self.draw(color="Orange",width=2)
-		surface.draw(color="Orange",width=2)
 		self.drop_down(surface, zerro_plane = False)
 		self.rotate_(sin,cos)
 		surface.rotate_(sin,cos)
 		
+			
 	def centroid(self):
-		print_("polygon")
 		centroids = []
 		sa = 0
 		for poly in self.polygon:
-			print_("poly")
 			cx,cy,a = 0,0,0
 			for i in range(len(poly)):
 				[x1,y1],[x2,y2] = poly[i-1],poly[i]
@@ -1959,7 +1956,6 @@ class Polygon:
 				cy /= a
 				sa += abs(a)
 				centroids += [ [cx,cy,a] ]
-		print_(centroids)
 		if sa == 0 : return	[0.,0.]
 		cx,cy = 0.,0.
 		for c in centroids :
@@ -2203,14 +2199,14 @@ class Arangement_Genetic:
 			order = range(self.genes_count)
 			random.shuffle(order)
 			for j in order:
-				specimen += [ [j, random.random()*math.pi2, random.random()] ]
+				specimen += [ [j, random.random(), random.random()] ]
 			self.population += [ [None,specimen] ]
 
 	def species_distance2(self,sp1,sp2) :
 		# retun distance, each component is normalized
 		s = 0
 		for j in range(self.genes_count) :
-			s += ((sp1[j][0]-sp2[j][0])/self.genes_count)**2 + (( sp1[j][1]-sp2[j][1])/math.pi2 )**2 + ((sp1[j][2]-sp2[j][2])/self.width)**2
+			s += ((sp1[j][0]-sp2[j][0])/self.genes_count)**2 + (( sp1[j][1]-sp2[j][1]))**2 + ((sp1[j][2]-sp2[j][2]))**2
 		return s
 
 	def similarity(self,sp1,top) :
@@ -2281,14 +2277,14 @@ class Arangement_Genetic:
 			for i in range(start_gene,end_gene) : 
 				#rotation_mutate_param = random.random()/100
 				#xposition_mutate_param = random.random()/100
-				tr = 1 #- rotation_mutate_param
-				tp = 1 #- xposition_mutate_param
+				tr = 1. #- rotation_mutate_param
+				tp = 1. #- xposition_mutate_param
 				specimen[i] = [parent1[i][0], parent1[i][1]*tr+parent2[i][1]*(1-tr),parent1[i][2]*tp+parent2[i][2]*(1-tp)]
 				genes_order += [ parent1[i][0] ]
 
 			for i in range(0,start_gene)+range(end_gene,self.genes_count) : 
-				tr = 0 #rotation_mutate_param
-				tp = 0 #xposition_mutate_param
+				tr = 0. #rotation_mutate_param
+				tp = 0. #xposition_mutate_param
 				j = i 
 				while parent2[j][0] in genes_order :
 					j = (j+1)%self.genes_count
@@ -2302,75 +2298,49 @@ class Arangement_Genetic:
 					specimen[i1][0], specimen[i2][0] = specimen[i2][0], specimen[i1][0]
 				if random.random() < self.move_mutation_factor * self.incest_mutation_multiplyer: 
 					i1 = random.randint(0,self.genes_count-1)
-					specimen[i1][1] =  (specimen[i1][1]+random.random()*math.pi2*self.move_mutation_multiplier)%math.pi2
-					specimen[i1][2] =  (specimen[i1][2]+random.random()*self.move_mutation_multiplier)%1
+					specimen[i1][1] =  (specimen[i1][1]+random.random()*math.pi2*self.move_mutation_multiplier)%1.
+					specimen[i1][2] =  (specimen[i1][2]+random.random()*self.move_mutation_multiplier)%1.
 			self.population += [ [None,specimen] ]	
-	
-	def populate_species1(self,count, parent_count):
-		self.population.sort()
-		self.inc = 0
-		for c in range(count):
-			parent1 = random.randint(0,parent_count-1)
-			parent2 = random.randint(0,parent_count-1)
-			if parent1==parent2 : parent2 = (parent2+1) % parent_count
-			parent1, parent2 = self.population[parent1][1], self.population[parent2][1]
-			i1,i2 = 0, 0
-			genes_order = []
-			specimen = [ [0,0.,0.] for i in range(self.genes_count) ]
-			
-			self.incest_mutation_multiplyer = 1.
-			self.incest_mutation_count_multiplyer = 1.
 
-			if self.species_distance2(parent1, parent2) <= .01/self.genes_count :
-				# OMG it's a incest :O!!!
-				# Damn you bastards!
-				self.inc +=1
-				self.incest_mutation_multiplyer = 2. 
-				self.incest_mutation_count_multiplyer = 2. 
-			else :
-				if random.random()<.01 : print_(self.species_distance2(parent1, parent2))	
+	def test_spiece_drop_down(self,spiece) : 
+		surface = Polygon()
+		for p in spiece :
+			time_ = time.time()
+			poly = Polygon(copy.deepcopy(self.polygons[p[0]].polygon))
+			poly.rotate(p[1]*math.pi2)
+			w = poly.width()
+			left = poly.bounds()[0]
+			poly.move( -left + (self.width-w)*p[2],0)
+			poly.drop_down(surface)
+			surface.add(poly)
+		return surface
 
-			start_gene = random.randint(0,self.genes_count)
-			end_gene = (max(1,random.randint(0,self.genes_count),int(self.genes_count/4))+start_gene) % self.genes_count
-			if end_gene<start_gene : 
-				end_gene, start_gene = start_gene, end_gene
-				parent1, parent2 = parent2, parent1
-			for i in range(start_gene,end_gene) : 
-				#rotation_mutate_param = random.random()/100
-				#xposition_mutate_param = random.random()/100
-				tr = 1 #- rotation_mutate_param
-				tp = 1 #- xposition_mutate_param
-				specimen[i] = [parent1[i][0], parent1[i][1],parent1[i][2]]
-			for i in range(0,start_gene)+range(end_gene,self.genes_count) : 
-				specimen[i] = [parent2[i][0], parent2[i][1],parent2[i][2]]
-				
-
-			for i in range(random.randint(self.mutation_genes_count[0],self.mutation_genes_count[0]*self.incest_mutation_count_multiplyer )) :
-				if random.random() < self.move_mutation_factor * self.incest_mutation_multiplyer: 
-					i1 = random.randint(0,self.genes_count-1)
-					specimen[i1][2] =  (specimen[i1][2]+random.random()*self.move_mutation_multiplier)%1
-					specimen[i1][2] =  (specimen[i1][2]+random.random()*math.pi2*self.move_mutation_multiplier)%math.pi2
-			self.population += [ [None,specimen] ]	
-	
-	def test_population(self) : 
+	def test(self,test_function): 
 		for i in range(len(self.population)) :
 			if self.population[i][0] == None :
-				surface = Polygon()
-				arr = self.population[i][1]
-				for p in arr :
-					time_ = time.time()
-					poly = Polygon(copy.deepcopy(self.polygons[p[0]].polygon))
-					poly.rotate(p[1])
-					w = poly.width()
-					left = poly.bounds()[0]
-					poly.move( -left + (self.width-w)*p[2],0)
-					poly.drop_down(surface)
-					surface.add(poly)
-					
+				surface = test_function(self.population[i][1])
 				b = surface.bounds()
 				self.population[i][0] = (b[3]-b[1])*(b[2]-b[0])
-		self.population.sort() 
-				
+		self.population.sort() 				
+
+
+	def test_spiece_centroid(self,spiece) : 
+		poly = Polygon(copy.deepcopy(self.polygons[spiece[0][0]].polygon))
+		poly.rotate(spiece[0][2]*math.pi2)
+		surface  = Polygon(poly.polygon)
+		for p in spiece[1:] :
+			poly = Polygon(copy.deepcopy(self.polygons[p[0]].polygon))
+			poly.rotate(p[2]*math.pi2)
+			direction = [math.cos(p[1]*math.pi2), math.sin(p[1]*math.pi2)]
+			c = surface.centroid()
+			c1 = poly.centroid()
+			poly.move(c[0]-c1[0]+direction[0],c[1]-c1[1]+direction[1])
+			poly.drop_into_direction(direction,surface)
+			surface.add(poly)
+		return surface
+		#surface.draw()
+
+		
 ################################################################################
 ###
 ###		Gcodetools class
@@ -2410,40 +2380,19 @@ class Gcodetools(inkex.Effect):
 		print_("Got %s polygons having average %s edges each."% ( len(polygons), float(sum([ sum([len(poly) for poly in polygon.polygon]) for polygon in polygons ])) / len(polygons) ) )
 		time_ = time.time()
 		
-		
-		c = polygons[0].centroid()
-		c[1] -= 400
-		for polygon in polygons : 
-			polygon.rotate(random.random()*math.pi2)
-			c1 = polygon.centroid()
-			ang = random.random()*math.pi2
-			polygon.move(c[0]-c1[0]+280*math.cos(ang),c[1]-c1[1]+280*math.sin(ang))
-			#polygon.draw(width=1)			
-			#c1 = polygon.centroid()
-		surface  = Polygon()
-		surface.add(polygons[0])	
-		for i in range(1,len(polygons)):
-			c = surface.centroid()
-			draw_pointer(c)
-			c1 = polygons[i].centroid()
-			polygons[i].draw(color="Red")
-			draw_pointer(c1)
-			direction = [c[0]-c1[0],c[1]-c1[1]]
-			if direction[0]**2+direction[1]**2 <1e-10 : direction [0,-1]
-			draw_pointer(c1+[c1[0]+direction[0]*20,c1[1]+direction[1]*20],"Green","line")
-
-			polygons[i].drop_into_direction(direction,surface)
-			surface.add(polygons[i])
-			surface.draw()
-		
-		return
+#		material_width = self.options.arrangement_material_width
+#		population = Arangement_Genetic(polygons, material_width)
+#		population.add_random_species(1)
+#		population.test_population_centroid()
+##		return
 		material_width = self.options.arrangement_material_width
 		population = Arangement_Genetic(polygons, material_width)
+		
 		
 		print_("Genetic alhorithm start at %s"%(time_))
 		time_ = time.time()
 		population.add_random_species(50)
-		population.test_population()
+		population.test(population.test_spiece_centroid)
 		print_("Initial population done in %s"%(time.time()-time_))
 		time_ = time.time()
 		pop = copy.deepcopy(population)
@@ -2469,10 +2418,11 @@ class Gcodetools(inkex.Effect):
 				population.order_mutation_factor = 1./(i%100-79) if 80<=i%100<100 else 1.
 				population.populate_species(250, 10)
 			"""
-			population.test_population() 
+			population.test(population.test_spiece_centroid)
 			draw_new_champ = False
-			
-			
+			print_()
+			for x in population.population[:10]:
+				print_(x[0])
 			
 			if population.population[0][0]!= last_champ : 
 				draw_new_champ = True
@@ -2490,19 +2440,10 @@ class Gcodetools(inkex.Effect):
 			time_ = time.time()
 			if i == 0  or i == population_count-1 or draw_new_champ :
 				colors = ["blue"]
-				surface = Polygon()
-				for p in population.population[0][1] :
-							time_ = time.time()
-							poly = Polygon(copy.deepcopy(population.polygons[p[0]].polygon[:]))
-							poly.rotate(p[1])
-							w = poly.width()
-							left = poly.bounds()[0]
-							poly.move( -left + (self.options.arrangement_material_width-w)*p[2],0)
-							poly.drop_down(surface)
-							surface.add(poly)
+				surface = population.test_spiece_centroid(population.population[0][1])
 				b = surface.bounds()
 				x,y = 250* (champions_count%10), 400*int(champions_count/10)
-				surface.move(x,y)
+				surface.move(x-b[0],y-b[1])
 				surface.draw(width=2, color=colors[0])
 				draw_text("Step = %s\nSquare = %f"%(i,(b[2]-b[0])*(b[3]-b[1])),x,y-40)
 				champions_count += 1
