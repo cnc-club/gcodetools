@@ -2541,7 +2541,7 @@ class Gcodetools(inkex.Effect):
 				
 				surface = population.test_spiece_centroid(population.population[0][1])
 				b = surface.bounds()
-				x,y = 250* (champions_count%10), 400*int(champions_count/10)
+				x,y = 400* (champions_count%10), 700*int(champions_count/10)
 				surface.move(x-b[0],y-b[1])
 				surface.draw(width=2, color=colors[0])
 				draw_text("Step = %s\nSquare = %f"%(i,(b[2]-b[0])*(b[3]-b[1])),x,y-40)
@@ -4240,7 +4240,8 @@ G01 Z1 (going to cutting z)\n""",
 									offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [left,10], [left,0] )
 									offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [right,0], [right,10] )
 									offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [0, miny[1]-r], [10, miny[1]-r] )
-									current_pass = offsetted_subpath[0]
+									current_pass = csp_join_subpaths(offsetted_subpath)[0]
+
 
 
 
