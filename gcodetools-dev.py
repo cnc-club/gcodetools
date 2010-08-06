@@ -66,6 +66,10 @@ def bezierslopeatt(((bx0,by0),(bx1,by1),(bx2,by2),(bx3,by3)),t):
 	return dx,dy
 bezmisc.bezierslopeatt = bezierslopeatt
 
+def ireplace(self,old,new,count=0):
+	pattern = re.compile(re.escape(old),re.I)
+	return re.sub(pattern,new,self,count) 
+
 ################################################################################
 ###
 ###		Styles and additional parameters
@@ -1025,7 +1029,7 @@ def csp_subpath_line_to(subpath, points) :
 			subpath[-1][2] = subpath[-1][1][:]
 		if type(points[0]) == type([1,1]) :
 			for p in points :
-				subpath += [ [p,p,p] ]
+				subpath += [ [p[:],p[:],p[:]] ]
 		else: 
 			subpath += [ [points,points,points] ]
 	return subpath
@@ -1886,6 +1890,75 @@ def biarc_curve_clip_at_l(curve, l, clip_type = "strict") :
 
 	
 	
+class Postprocessor():
+
+	
+	def __init__(self, error_function_handler):	
+		self.error = error_function_handler 
+		self.functions = {
+					"remap"  : self.remap,
+					"remapi" : self.remapi ,
+					
+					}
+	
+	
+		
+	def process(self,command):
+		command = re.sub(r"\\\\",":#:#:slash:#:#:",command)
+		command = re.sub(r"\\;",":#:#:semicolon:#:#:",command)
+		command = command.split(";")
+		for s in command: 
+			s = re.sub(":#:#:slash:#:#:","\\\\",s)
+			s = re.sub(":#:#:semicolon:#:#:","\\;",s)
+			s = s.strip()
+			if s!="" :
+				self.parse_command(s)		
+			
+	def parse_command(self,command):
+		r = re.match(r"([A-Za-z0-9_]+)\s*\(\s*(.*)\)",command)
+		if not r:
+			self.error("Parse error while postprocessing.\n(Command: '%s')"%(command), "error")
+		function, parameters = r.group(1).lower(),r.group(2)
+		if function in self.functions :
+			print_("Postprocessor: executing function %s(%s)"%(function,parameters))
+			self.functions[function](parameters)
+		else : 
+			self.error("Unrecognized function '%s' while postprocessing.\n(Command: '%s')"%(function,command), "error")
+	
+	def re_sub_on_gcode_lines(self, pattern,replacemant):
+		gcode = self.gcode.split("\n")
+		self.gcode = ""
+		for i in range(len(gcode)) :
+			self.gcode += re.sub(pattern,replacement,gcode[i])
+		
+	def remapi(self,parameters):
+		self.remap(parameters, case_sensitive = True)
+	
+	def remap(self,parameters, case_sensitive = False):
+		# remap parameters should be like "x->y,y->x"
+		parameters = parameters.replace("\,",":#:#:coma:#:#:")
+		parameters = parameters.split(",")
+		pattern, remap = [], []
+		for s in parameters:
+			s = s.replace(":#:#:coma:#:#:","\,")
+			r = re.match("""\s*(\'|\")(.*)\\1\s*->\s*(\'|\")(.*)\\3\s*""",s)
+			if not r :
+				self.error("Bad parameters for remap.\n(Parameters: '%s')"%(parameters), "error")
+			pattern +=[r.group(2)]	
+			remap +=[r.group(4)]	
+		
+		
+		
+		for i in range(len(pattern)) :
+			if case_sensitive :
+				self.gcode = ireplace(self.gcode, pattern[i], ":#:#:remap_pattern%s:#:#:"%i )
+			else :
+				self.gcode = self.gcode.replace(pattern[i], ":#:#:remap_pattern%s:#:#:"%i)
+			
+		for i in range(len(remap)) :
+			self.gcode = self.gcode.replace(":#:#:remap_pattern%s:#:#:"%i, remap[i])
+			
+			
 ################################################################################
 ###		Polygon class
 ################################################################################
@@ -1932,7 +2005,7 @@ class Polygon:
 		if len(self.polygon) == 0 or len(self.polygon[0])==0 : return
 		if direction[0]**2 + direction[1]**2 <1e-10 : return
 		direction = normalize(direction)
-		sin,cos = direction[0], - direction[1]
+		sin,cos = direction[0], -direction[1]
 		self.rotate_(-sin,cos)
 		surface.rotate_(-sin,cos)
 		self.drop_down(surface, zerro_plane = False)
@@ -2328,16 +2401,21 @@ class Arangement_Genetic:
 		poly = Polygon(copy.deepcopy(self.polygons[spiece[0][0]].polygon))
 		poly.rotate(spiece[0][2]*math.pi2)
 		surface  = Polygon(poly.polygon)
+		i = 0
 		for p in spiece[1:] :
+			i += 1
 			poly = Polygon(copy.deepcopy(self.polygons[p[0]].polygon))
 			poly.rotate(p[2]*math.pi2)
-			direction = [math.cos(p[1]*math.pi2), math.sin(p[1]*math.pi2)]
 			c = surface.centroid()
 			c1 = poly.centroid()
-			poly.move(c[0]-c1[0]+direction[0],c[1]-c1[1]+direction[1])
+			direction = [math.cos(p[1]*math.pi2), -math.sin(p[1]*math.pi2)]
+			poly.move(c[0]-c1[0]-direction[0]*100,c[1]-c1[1]-direction[1]*100)
 			poly.drop_into_direction(direction,surface)
 			surface.add(poly)
 		return surface
+		
+		
+		
 		#surface.draw()
 
 		
@@ -2349,12 +2427,24 @@ class Arangement_Genetic:
 
 class Gcodetools(inkex.Effect):
 
-
-
 ################################################################################
 ###		Arrangement: arranges paths by givven params
 ###		TODO move it to the bottom
 ################################################################################
+	
+	
+	def export_gcode(self,gcode) :
+		postprocessor = Postprocessor(self.error)
+		postprocessor.gcode = gcode
+		if self.options.postprocessor != "" :
+			postprocessor.process(self.options.postprocessor)
+		if self.options.postprocessor_custom != "" :
+			postprocessor.process(self.options.postprocessor_custom)
+			
+		f = open(self.options.directory+'/'+self.options.file, "w")	
+		f.write(postprocessor.gcode)
+		f.close()							
+
 	
 	def arrangement(self) :
 			
@@ -2363,6 +2453,7 @@ class Gcodetools(inkex.Effect):
 		polygons = []
 		time_ = time.time()
 		print_("Arrangement start at %s"%(time_))
+		original_paths = []
 		for layer in self.layers :
 			if layer in paths :
 				for path in paths[layer] :
@@ -2373,7 +2464,7 @@ class Gcodetools(inkex.Effect):
 							polygon.add([csp_segment_convex_hull(sp1,sp2)])
 					#print_("Redused edges count from", sum([len(poly) for poly in polygon.polygon ]) )
 					polygon.hull()
-
+					original_paths += [path]
 					polygons += [polygon]
 					
 		print_("Paths hull computed in %s sec."%(time.time()-time_))
@@ -2391,6 +2482,9 @@ class Gcodetools(inkex.Effect):
 		
 		print_("Genetic alhorithm start at %s"%(time_))
 		time_ = time.time()
+		
+	
+
 		population.add_random_species(50)
 		population.test(population.test_spiece_centroid)
 		print_("Initial population done in %s"%(time.time()-time_))
@@ -2399,6 +2493,10 @@ class Gcodetools(inkex.Effect):
 		population_count = self.options.arrangement_population_count
 		last_champ = []
 		champions_count = 0
+		
+		
+		
+		
 		for i in range(population_count):
 			population.leave_top_species(20)
 			population.move_mutation_multiplier = random.random()/2
@@ -2433,13 +2531,14 @@ class Gcodetools(inkex.Effect):
 			#for j in range(10) :
 			#	k += "%s   " % population.population[j][0]
 			print_("Cicle %s done in %s"%(i,time.time()-time_))
+			time_ = time.time()
 			print_("%s incests been found"%population.inc)
 			print_()
 			#print_(k)
 			#print_()
-			time_ = time.time()
 			if i == 0  or i == population_count-1 or draw_new_champ :
 				colors = ["blue"]
+				
 				surface = population.test_spiece_centroid(population.population[0][1])
 				b = surface.bounds()
 				x,y = 250* (champions_count%10), 400*int(champions_count/10)
@@ -2447,7 +2546,43 @@ class Gcodetools(inkex.Effect):
 				surface.draw(width=2, color=colors[0])
 				draw_text("Step = %s\nSquare = %f"%(i,(b[2]-b[0])*(b[3]-b[1])),x,y-40)
 				champions_count += 1
-		population = copy.deepcopy(pop)					
+
+				spiece = population.population[0][1]
+				poly = Polygon(copy.deepcopy(population.polygons[spiece[0][0]].polygon))
+				poly.rotate(spiece[0][2]*math.pi2)
+				surface  = Polygon(poly.polygon)
+				poly.draw(width = 2, color= "Violet")
+				for p in spiece[1:] :
+					poly = Polygon(copy.deepcopy(population.polygons[p[0]].polygon))
+					poly.rotate(p[2]*math.pi2)
+					direction = [math.cos(p[1]*math.pi2), -math.sin(p[1]*math.pi2)]
+					normalize(direction)
+					c = surface.centroid()
+					c1 = poly.centroid()
+					poly.move(c[0]-c1[0]-direction[0]*400,c[1]-c1[1]-direction[1]*400)
+					c = surface.centroid()
+					c1 = poly.centroid()
+					poly.draw(width = 5, color= "Violet")
+					draw_pointer(c+c1,"Green","line")
+					direction = normalize(direction)
+					
+					
+					sin,cos = direction[0], direction[1]
+					poly.rotate_(-sin,cos)
+					surface.rotate_(-sin,cos)
+#					poly.draw(color = "Violet",width=4)					
+					surface.draw(color = "Orange",width=4)					
+					poly.rotate_(sin,cos)
+					surface.rotate_(sin,cos)
+
+
+					poly.drop_into_direction(direction,surface)
+					surface.add(poly)
+				
+				
+		# Now we'll need apply transforms to original paths
+		
+		
 		
 	def __init__(self):
 		inkex.Effect.__init__(self)
@@ -2519,8 +2654,10 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--arrangement-material-width",	action="store", type="float",		dest="arrangement_material_width", default=500,		help="Materials width for arrangement")		
 		self.OptionParser.add_option("",   "--arrangement-population-count",action="store", type="int",			dest="arrangement_population_count", default=100,	help="Genetic algorithm populations count")		
 
+		self.OptionParser.add_option("",   "--postprocessor",				action="store", type="string", 		dest="postprocessor", default='',			help="Postprocessor command.")
+		self.OptionParser.add_option("",   "--postprocessor-custom",		action="store", type="string", 		dest="postprocessor_custom", default='',	help="Postprocessor custom command.")
 	
-
+		
 
 		self.default_tool = {
 					"name": "Default tool",
@@ -3237,11 +3374,9 @@ class Gcodetools(inkex.Effect):
 					Zpos = max(		self.Zcoordinates[layer][1],		 self.Zcoordinates[layer][0] - abs(self.tools[layer][0]["depth step"]*(step+1))	)
 					gcode += self.generate_gcode(curve, layer, Zpos)
 		gcode += self.footer
-		f = open(self.options.directory+'/'+self.options.file, "w")	
-		f.write(gcode)
-		f.close()							
-
-
+	
+		self.export_gcode(gcode)
+	
 ################################################################################
 ###
 ###		dxfpoints
