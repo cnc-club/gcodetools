@@ -53,7 +53,7 @@ Gcodetools ver. 1.6
 				<item value="G20 (All units in inches)">in</item>
 			</param>
 			<param name="postprocessor" type="enum" _gui-text="Post processor ">
-				<item value=""></item>
+				<item value=" ">None</item>
 				<item value="remapi('X'->'Y','Y'->'X');">remapi('X'->'Y','Y'->'X');</item>
 			</param>
 			<param name="postprocessor-custom" type="string" _gui-text="Additional postprocessor:"></param>			
