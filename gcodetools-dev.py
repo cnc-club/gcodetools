@@ -1896,9 +1896,11 @@ class Postprocessor():
 	def __init__(self, error_function_handler):	
 		self.error = error_function_handler 
 		self.functions = {
-					"remap"  : self.remap,
-					"remapi" : self.remapi ,
-					
+					"remap"		: self.remap,
+					"remapi"	: self.remapi ,
+					"scale"		: self.scale,
+					"flip"		: self.flip_axis,
+					"flip_axis"	: self.flip_axis,
 					}
 	
 	
@@ -1957,7 +1959,44 @@ class Postprocessor():
 			
 		for i in range(len(remap)) :
 			self.gcode = self.gcode.replace(":#:#:remap_pattern%s:#:#:"%i, remap[i])
-			
+	
+	def scale(self, parameters):
+		parameters = parameters.split(",")
+		axis = [["xi",1.], ["yj",1.], ["zk",1.], ["a",1.]]
+		try :
+			for i in range(len(parameters)) :
+				if float(parameters[i])==0 : 
+					self.error("Bad parameters for scale. Scale should not be 0 at any axis! \n(Parameters: '%s')"%(parameters), "error")		
+				axis[i][1] = float(parameters[i])
+		except :
+			self.error("Bad parameters for scale.\n(Parameters: '%s')"%(parameters), "error")
+		
+		flip = axis[0][1]*axis[1][1]*axis[2][1] < 0 
+		gcode = ""
+		for s in self.gcode.split("\n"):
+			for ax in axis :
+				if ax[1] != 1. :
+					for a in ax[0] :
+						r = re.search(r"(?i)("+a+r")\s*(-?\s*(\d*\.?\d*))", s)
+						if r : 
+							print_(s)
+							print_(r.groups())
+							if r.group(2)!="":
+								s = re.sub(r"(?i)("+a+r")\s*(-?)\s*(\d*\.?\d*)", r"\1 %f"%(float(r.group(2))*ax[1]), s)
+			gcode += s + "\n"
+		self.gcode = gcode
+		if flip : 
+			self.remapi("'G02'->'G03', 'G03'->'G02'")
+	def flip_axis(self, parameters):
+		parameters = parameters.lower()
+		axis = {"x":1.,"y":1.,"z":1.,"a":1.}	
+		for p in parameters: 
+			if p in [","," ","	","\r","'",'"'] : continue
+			if p not in ["x","y","z","a"] : 
+				self.error("Bad parameters for flip_axis. Parameter should be string consists of 'xyza' \n(Parameters: '%s')"%(parameters), "error")
+			axis[p] = -axis[p]
+		self.scale("%f,%f,%f,%f"%(axis["x"],axis["y"],axis["z"],axis["a"]))	
+
 			
 ################################################################################
 ###		Polygon class
@@ -3842,9 +3881,7 @@ class Gcodetools(inkex.Effect):
 
 		if gcode!='' :
 			gcode = self.header + gcode + self.footer
-			f = open(self.options.directory+'/'+self.options.file, "w")	
-			f.write(gcode)
-			f.close()							
+			self.export_gcode(gcode)
 		else : 	self.error(_("No need to engrave sharp angles."),"warning")
 
 
@@ -4254,10 +4291,9 @@ G01 Z1 (going to cutting z)\n""",
 							gcode += ("G01 %s %f F %f \n" % (z, top_start[1], self.tool["passing feed"]) )
 							gcode += ("G01 %s %f %s %f F %f \n" % (x, top_start[0], z, top_start[1], self.tool["passing feed"]) )
 	
-							
-		f = open(self.options.directory+'/'+self.options.file, "w")	
-		f.write(self.header+"\n" + gcode_plane_selection + "\n" + gcode + "\n" + self.footer)
-		f.close()							
+		
+		
+		self.export_gcode(gcode)
 
 										
 ################################################################################
