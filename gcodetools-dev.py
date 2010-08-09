@@ -2015,7 +2015,7 @@ class Postprocessor():
 		feeds = {}
 		coords = []
 		gcode = ""
-		coords_def = {"x":"x","y":"y","z":"z","i":"x","j":"x","k":"x","a":"a"}
+		coords_def = {"x":"x","y":"y","z":"z","i":"x","j":"y","k":"z","a":"a"}
 		for s in self.gcode.split("\n"):
 			s_wo_comments = re.sub(r"\([^\)]*\)","",s)
 			# get Planes
@@ -2032,12 +2032,12 @@ class Postprocessor():
 					feeds[feed] = "#"+str(len(feeds)+20)
 					
 			#Coordinates
-			r = re.search(r"(?i)([xyzijka])\s*(-?)\s*(\d*\.?\d*)", s_wo_comments)
-			if r :
-				c = coords_def[r.group(1).lower()]
-				if c not in coords :
-					coords += [c]
-
+			for c in "xyzijka" :
+				r = re.search(r"(?i)("+c+r")\s*(-?)\s*(\d*\.?\d*)", s_wo_comments)
+				if r :
+					c = coords_def[r.group(1).lower()]
+					if c not in coords :
+						coords += [c]
 		# Add offset parametrization
 		offset = {"x":"#6","y":"#7","z":"#8","a":"#9"}
 		for c in coords:
@@ -2796,8 +2796,6 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--area-find-artefacts-diameter",action="store", type="float", 		dest="area_find_artefacts_diameter", default="1",					help="artefacts seeking radius")
 		self.OptionParser.add_option("",   "--area-find-artefacts-action",	action="store", type="string",	 	dest="area_find_artefacts_action", default="mark with an arrow",	help="artefacts action type")
 
-
-		self.OptionParser.add_option("",   "--generate_not_parametric_code",action="store", type="inkbool",		dest="generate_not_parametric_code", default=False,	help="Generated code will be not parametric.")		
 		self.OptionParser.add_option("",   "--auto_select_paths",			action="store", type="inkbool",		dest="auto_select_paths", default=True,				help="Select all paths if nothing is selected.")		
 
 		self.OptionParser.add_option("",   "--loft-distances",				action="store", type="string", 		dest="loft_distances", default="10",				help="Distances between paths.")
@@ -3021,14 +3019,7 @@ class Gcodetools(inkex.Effect):
 				f.close()
 			else:
 				self.footer = defaults['footer']
-			self.header += self.options.unit + "\n" + ( """
-#5  = 1 (Scale xy)
-#7  = %s (Scale z)
-#8  = 0 (Offset x)
-#9  = 0 (Offset y)
-#10 = %s (Offset z)
-#11 = %s (Safe distanse)\n""" % ( self.options.Zscale, self.options.Zoffset, self.options.Zsafe )
-			if not self.options.generate_not_parametric_code else "" )
+			self.header += self.options.unit + "\n" 
 		else: 
 			error(_("Directory does not exist! Please specify existing directory at Preferences tab!"),"error")
 			return False
@@ -3056,12 +3047,8 @@ class Gcodetools(inkex.Effect):
 		def c(c):
 			c = [c[i] if i<len(c) else None for i in range(6)]
 			if c[5] == 0 : c[5]=None
-			if self.options.generate_not_parametric_code:
-				s,s1 = [" X", " Y", " Z", " I", " J", " K"], ["","","","","",""]
-				m,a = [1,1,self.options.Zscale*Zauto_scale,1,1,self.options.Zscale*Zauto_scale], [0,0,self.options.Zoffset,0,0,0]
-			else :
-				s,s1 = [" X[", " Y[", " Z[", " I[", " J[", " K["], [ "*#5+#8]", "*#5+#9]", "*#7+#10]", "*#5]",  "*#5]", "*#7]"]
-				m,a = [1,1,Zauto_scale,1,1,Zauto_scale], [0,0,0,0,0,0]
+			s,s1 = [" X", " Y", " Z", " I", " J", " K"], ["","","","","",""]
+			m,a = [1,1,self.options.Zscale*Zauto_scale,1,1,self.options.Zscale*Zauto_scale], [0,0,self.options.Zoffset,0,0,0]
 			r = ''	
 			for i in range(6):
 				if c[i]!=None:
@@ -3084,7 +3071,7 @@ class Gcodetools(inkex.Effect):
 		
 		lg, zs, f =  'G00', self.options.Zsafe, " F%f"%tool['feed'] 
 		current_a = 0
-		go_to_safe_distance = "G00" + c([None,None,zs]) + "\n" if self.options.generate_not_parametric_code else 'G00 Z[#11*#7+#10]\n' 
+		go_to_safe_distance = "G00" + c([None,None,zs]) + "\n" 
 		penetration_feed = " F%s"%tool['penetration feed'] 
 		for i in range(1,len(curve)):
 ### 	Creating Gcode for curve between s=curve[i-1] and si=curve[i] start at s[0] end at s[4]=si[0]
@@ -3513,10 +3500,7 @@ class Gcodetools(inkex.Effect):
 		def print_dxfpoints(points):
 			gcode=""
 			for point in points:
-				if self.options.generate_not_parametric_code:
-					gcode +="(drilling dxfpoint)\nG00 Z%f\nG00 X%f Y%f\nG01 Z%f F%f\nG04 P%f\nG00 Z%f\n" % (self.options.Zsafe,point[0],point[1],self.Zcoordinates[layer][1],self.tools[layer][0]["penetration feed"],0.2,self.options.Zsafe) 
-				else:
-				  gcode +="(drilling dxfpoint)\nG00 Z%s\nG00 X%f Y%f\nG01 Z%f F%f\nG04 P%f\nG00 Z%s\n" % ("[#11*#7+#10]",point[0],point[1],self.Zcoordinates[layer][1],self.tools[layer][0]["penetration feed"],0.2,"[#11*#7+#10]") 
+				gcode +="(drilling dxfpoint)\nG00 Z%f\nG00 X%f Y%f\nG01 Z%f F%f\nG04 P%f\nG00 Z%f\n" % (self.options.Zsafe,point[0],point[1],self.Zcoordinates[layer][1],self.tools[layer][0]["penetration feed"],0.2,self.options.Zsafe) 
 #			print_(("got dxfpoints array=",points))
 			return gcode
 			
