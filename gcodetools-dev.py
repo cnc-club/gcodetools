@@ -1899,8 +1899,10 @@ class Postprocessor():
 					"remap"		: self.remap,
 					"remapi"	: self.remapi ,
 					"scale"		: self.scale,
+					"move"		: self.move,
 					"flip"		: self.flip_axis,
 					"flip_axis"	: self.flip_axis,
+					"round"		: self.round_coordinates,
 					}
 	
 	
@@ -1960,33 +1962,65 @@ class Postprocessor():
 		for i in range(len(remap)) :
 			self.gcode = self.gcode.replace(":#:#:remap_pattern%s:#:#:"%i, remap[i])
 	
-	def scale(self, parameters):
-		parameters = parameters.split(",")
-		axis = [["xi",1.], ["yj",1.], ["zk",1.], ["a",1.]]
-		try :
-			for i in range(len(parameters)) :
-				if float(parameters[i])==0 : 
-					self.error("Bad parameters for scale. Scale should not be 0 at any axis! \n(Parameters: '%s')"%(parameters), "error")		
-				axis[i][1] = float(parameters[i])
-		except :
-			self.error("Bad parameters for scale.\n(Parameters: '%s')"%(parameters), "error")
-		
-		flip = axis[0][1]*axis[1][1]*axis[2][1] < 0 
+	def transform(self, move, scale):
+		axis = ["xi","yj","zk","a"]
+		flip = scale[0]*scale[1]*scale[2] < 0 
 		gcode = ""
 		for s in self.gcode.split("\n"):
-			for ax in axis :
-				if ax[1] != 1. :
-					for a in ax[0] :
+			for i in range(len(axis)) :
+				if move[i] != 0 or scale[i] != 1:
+					for a in axis[i] :
 						r = re.search(r"(?i)("+a+r")\s*(-?\s*(\d*\.?\d*))", s)
 						if r : 
-							print_(s)
-							print_(r.groups())
 							if r.group(2)!="":
-								s = re.sub(r"(?i)("+a+r")\s*(-?)\s*(\d*\.?\d*)", r"\1 %f"%(float(r.group(2))*ax[1]), s)
+								s = re.sub(r"(?i)("+a+r")\s*(-?)\s*(\d*\.?\d*)", r"\1 %f"%(float(r.group(2))*scale[i]+(move[i] if a not in ["i","j","k"] else 0) ), s)
 			gcode += s + "\n"
 		self.gcode = gcode
 		if flip : 
 			self.remapi("'G02'->'G03', 'G03'->'G02'")
+
+	def round_coordinates(self,parameters) :
+		try: 
+			round_ = int(parameters)
+		except :	
+			self.error("Bad parameters for round. Round should be an integer! \n(Parameters: '%s')"%(parameters), "error")		
+		gcode = ""
+		for s in self.gcode.split("\n"):
+			for a in "xyzijkaf" :
+				r = re.search(r"(?i)("+a+r")\s*(-?\s*(\d*\.?\d*))", s)
+				if r : 
+					
+					if r.group(2)!="":
+						s = re.sub(
+									r"(?i)("+a+r")\s*(-?)\s*(\d*\.?\d*)", 
+									(r"\1 %0."+str(round_)+"f" if round_>0 else r"\1 %d")%round(float(r.group(2)),round_),
+									s)
+			gcode += s + "\n"
+		self.gcode = gcode
+	
+	def scale(self, parameters):
+		parameters = parameters.split(",")
+		scale = [1.,1.,1.,1.]
+		try :
+			for i in range(len(parameters)) :
+				if float(parameters[i])==0 : 
+					self.error("Bad parameters for scale. Scale should not be 0 at any axis! \n(Parameters: '%s')"%(parameters), "error")		
+				scale[i] = float(parameters[i])
+		except :
+			self.error("Bad parameters for scale.\n(Parameters: '%s')"%(parameters), "error")
+		self.transform([0,0,0,0],scale)		
+
+	def move(self, parameters):
+		parameters = parameters.split(",")
+		move = [0.,0.,0.,0.]
+		try :
+			for i in range(len(parameters)) :
+				move[i] = float(parameters[i])
+		except :
+			self.error("Bad parameters for move.\n(Parameters: '%s')"%(parameters), "error")
+		self.transform(move,[1.,1.,1.,1.])		
+
+
 	def flip_axis(self, parameters):
 		parameters = parameters.lower()
 		axis = {"x":1.,"y":1.,"z":1.,"a":1.}	
@@ -1997,6 +2031,7 @@ class Postprocessor():
 			axis[p] = -axis[p]
 		self.scale("%f,%f,%f,%f"%(axis["x"],axis["y"],axis["z"],axis["a"]))	
 
+	
 			
 ################################################################################
 ###		Polygon class
