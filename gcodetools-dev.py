@@ -1903,6 +1903,7 @@ class Postprocessor():
 					"flip"		: self.flip_axis,
 					"flip_axis"	: self.flip_axis,
 					"round"		: self.round_coordinates,
+					"parameterize"		: self.parameterize,
 					}
 	
 	
@@ -1966,18 +1967,130 @@ class Postprocessor():
 		axis = ["xi","yj","zk","a"]
 		flip = scale[0]*scale[1]*scale[2] < 0 
 		gcode = ""
+		warned = []
+		r_scale = scale[0]
+		plane = "g17"
 		for s in self.gcode.split("\n"):
+			# get plane selection: 
+			s_wo_comments = re.sub(r"\([^\)]*\)","",s)
+			r = re.search(r"(?i)(G17|G18|G19)", s_wo_comments)
+			if r :
+				plane = r.group(1).lower()
+				if plane == "g17" : r_scale = scale[0] # plane XY -> scale x
+				if plane == "g18" : r_scale = scale[0] # plane XZ -> scale x
+				if plane == "g19" : r_scale = scale[1] # plane YZ -> scale y
+			# Raise warning if scale factors are not the game for G02 and G03	
+			if plane not in warned:
+				r = re.search(r"(?i)(G02|G03)", s_wo_comments)
+				if r :
+					if plane == "g17" and scale[0]!=scale[1]: self.error("Post-processor: Scale factors for X and Y axis are not the same. G02 and G03 codes will be corrupted.","warning") 
+					if plane == "g18" and scale[0]!=scale[2]: self.error("Post-processor: Scale factors for X and Z axis are not the same. G02 and G03 codes will be corrupted.","warning") 
+					if plane == "g19" and scale[1]!=scale[2]: self.error("Post-processor: Scale factors for Y and Z axis are not the same. G02 and G03 codes will be corrupted.","warning") 
+					warned += [plane]
+			# Transform		
 			for i in range(len(axis)) :
 				if move[i] != 0 or scale[i] != 1:
 					for a in axis[i] :
-						r = re.search(r"(?i)("+a+r")\s*(-?\s*(\d*\.?\d*))", s)
-						if r : 
-							if r.group(2)!="":
-								s = re.sub(r"(?i)("+a+r")\s*(-?)\s*(\d*\.?\d*)", r"\1 %f"%(float(r.group(2))*scale[i]+(move[i] if a not in ["i","j","k"] else 0) ), s)
+						r = re.search(r"(?i)("+a+r")\s*(-?)\s*(\d*\.?\d*)", s)
+						if r and r.group(3)!="":
+							s = re.sub(r"(?i)("+a+r")\s*(-?)\s*(\d*\.?\d*)", r"\1 %f"%(float(r.group(2)+r.group(3))*scale[i]+(move[i] if a not in ["i","j","k"] else 0) ), s)
+			#scale radius R
+			if r_scale != 1 :
+				r = re.search(r"(?i)(r)\s*(-?\s*(\d*\.?\d*))", s)
+				if r and r.group(3)!="":
+					try:
+						s = re.sub(r"(?i)(r)\s*(-?)\s*(\d*\.?\d*)", r"\1 %f"%( float(r.group(2)+r.group(3))*r_scale ), s)
+					except:
+						pass	
+
 			gcode += s + "\n"
+			
 		self.gcode = gcode
 		if flip : 
 			self.remapi("'G02'->'G03', 'G03'->'G02'")
+
+
+	def parameterize(self,parameters) :
+		planes = []
+		feeds = {}
+		coords = []
+		gcode = ""
+		coords_def = {"x":"x","y":"y","z":"z","i":"x","j":"x","k":"x","a":"a"}
+		for s in self.gcode.split("\n"):
+			s_wo_comments = re.sub(r"\([^\)]*\)","",s)
+			# get Planes
+			r = re.search(r"(?i)(G17|G18|G19)", s_wo_comments)
+			if r :
+				plane = r.group(1).lower()
+				if plane not in planes : 
+					planes += [plane]
+			# get Feeds
+			r = re.search(r"(?i)(F)\s*(-?)\s*(\d*\.?\d*)", s_wo_comments)
+			if r :
+				feed  = float (r.group(2)+r.group(3))
+				if feed not in feeds :
+					feeds[feed] = "#"+str(len(feeds)+20)
+					
+			#Coordinates
+			r = re.search(r"(?i)([xyzijka])\s*(-?)\s*(\d*\.?\d*)", s_wo_comments)
+			if r :
+				c = coords_def[r.group(1).lower()]
+				if c not in coords :
+					coords += [c]
+
+		# Add offset parametrization
+		offset = {"x":"#6","y":"#7","z":"#8","a":"#9"}
+		for c in coords:
+			gcode += "%s  = 0 (%s axis offset)\n" %  (offset[c],c.upper())
+			
+		# Add scale parametrization
+		if planes == [] : planes = ["g17"]
+		if len(planes)>1 :  # have G02 and G03 in several planes scale_x = scale_y = scale_z required
+			gcode += "#10 = 1 (Scale factor)\n"
+			scale = {"x":"#10","i":"#10","y":"#10","j":"#10","z":"#10","k":"#10","r":"#10"}
+		else :
+			gcode += "#10 = 1 (%s Scale factor)\n" % ({"g17":"XY","g18":"XZ","g19":"YZ"}[planes[0]])
+			gcode += "#11 = 1 (%s Scale factor)\n" % ({"g17":"Z","g18":"Y","g19":"X"}[planes[0]])
+			scale = {"x":"#10","i":"#10","y":"#10","j":"#10","z":"#10","k":"#10","r":"#10"}
+			if "g17" in planes :
+				scale["z"] = "#11"				
+				scale["k"] = "#11"				
+			if "g18" in planes :
+				scale["y"] = "#11"				
+				scale["j"] = "#11"				
+			if "g19" in planes :
+				scale["x"] = "#11"				
+				scale["i"] = "#11"				
+		# Add a scale 
+		if "a" in coords:
+			gcode += "#12  = 1 (A axis scale)\n" 
+			scale["a"] = "#12"
+		
+		# Add feed parametrization 
+		for f in feeds :
+			gcode += "%s = %f (Feed definition)\n" % (feeds[f],f)
+
+		# Parameterize Gcode		
+		for s in self.gcode.split("\n"):
+			#feed replace :
+			r = re.search(r"(?i)(F)\s*(-?)\s*(\d*\.?\d*)", s)
+			if r and len(r.group(3))>0:
+				s = re.sub(r"(?i)(F)\s*(-?)\s*(\d*\.?\d*)", "F %s"%feeds[float(r.group(2)+r.group(3))], s)
+			#Coords XYZA replace
+			for c in "xyza" :
+				r = re.search(r"(?i)(("+c+r")\s*(-?)\s*(\d*\.?\d*))", s)
+				if r and len(r.group(4))>0:
+					s = re.sub(r"(?i)(("+c+r")\s*(-?)\s*(\d*\.?\d*))", r"\1*%s+%s"%(scale[c],offset[c]), s)
+
+			#Coords IJKR replace
+			for c in "ijkr" :
+				r = re.search(r"(?i)(("+c+r")\s*(-?)\s*(\d*\.?\d*))", s)
+				if r and len(r.group(4))>0:
+					s = re.sub(r"(?i)(("+c+r")\s*(-?)\s*(\d*\.?\d*))", r"\1*%s"%scale[c], s)
+
+			gcode += s + "\n"
+	
+		self.gcode = gcode	
 
 	def round_coordinates(self,parameters) :
 		try: 
@@ -2508,13 +2621,14 @@ class Gcodetools(inkex.Effect):
 	
 	
 	def export_gcode(self,gcode) :
-		postprocessor = Postprocessor(self.error)
-		postprocessor.gcode = gcode
-		if self.options.postprocessor != "" :
-			postprocessor.process(self.options.postprocessor)
-		if self.options.postprocessor_custom != "" :
-			postprocessor.process(self.options.postprocessor_custom)
-			
+		if self.options.postprocessor != ""  or self.options.postprocessor_custom != "" :
+			postprocessor = Postprocessor(self.error)
+			postprocessor.gcode = gcode
+			if self.options.postprocessor != "" :
+				postprocessor.process(self.options.postprocessor)
+			if self.options.postprocessor_custom != "" :
+				postprocessor.process(self.options.postprocessor_custom)
+		postprocessor.gcode = self.header + postprocessor.gcode + self.footer
 		f = open(self.options.directory+'/'+self.options.file, "w")	
 		f.write(postprocessor.gcode)
 		f.close()							
@@ -3412,7 +3526,7 @@ class Gcodetools(inkex.Effect):
 		else :
 			paths = self.selected_paths
 		self.check_dir() 
-		gcode = self.header
+		gcode = ""
 
 		biarc_group = inkex.etree.SubElement( self.selected_paths.keys()[0] if len(self.selected_paths.keys())>0 else self.layers[0], inkex.addNS('g','svg') )
 		print_(("self.layers=",self.layers))
@@ -3447,8 +3561,7 @@ class Gcodetools(inkex.Effect):
 				for step in range( 0,  int(math.ceil( abs( (self.Zcoordinates[layer][1]-self.Zcoordinates[layer][0])/self.tools[layer][0]["depth step"] )) ) ):
 					Zpos = max(		self.Zcoordinates[layer][1],		 self.Zcoordinates[layer][0] - abs(self.tools[layer][0]["depth step"]*(step+1))	)
 					gcode += self.generate_gcode(curve, layer, Zpos)
-		gcode += self.footer
-	
+			
 		self.export_gcode(gcode)
 	
 ################################################################################
@@ -3915,7 +4028,6 @@ class Gcodetools(inkex.Effect):
 					gcode += self.generate_gcode(curve, layer, self.options.Zsurface)
 
 		if gcode!='' :
-			gcode = self.header + gcode + self.footer
 			self.export_gcode(gcode)
 		else : 	self.error(_("No need to engrave sharp angles."),"warning")
 
