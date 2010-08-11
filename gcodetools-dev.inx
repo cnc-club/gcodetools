@@ -45,15 +45,15 @@ Gcodetools ver. 1.6
 			<param name="filename" type="string" _gui-text="File">output.ngc</param>
 			<param name="directory" type="string" _gui-text="Directory">/home</param>
 
-		
 			<param name="Zsafe" type="float" precision="5" min="-1000" max="1000" _gui-text="Z safe height for G00 move over blank">5</param>
 			<param name="unit" type="enum" _gui-text="Units (mm or in): ">
 				<item value="G21 (All units in mm)">mm</item>
 				<item value="G20 (All units in inches)">in</item>
 			</param>
 			<param name="postprocessor" type="enum" _gui-text="Post processor ">
-				<item value=" ">None</item>
-				<item value="remapi('X'->'Y','Y'->'X');">remapi('X'->'Y','Y'->'X');</item>
+				<item value="None">None</item>
+				<item value="Parameterize Gcode">parameterize();</item>
+				<item value="Flip y axis and parameterize Gcode">flip(y);parameterize();</item>
 			</param>
 			<param name="postprocessor-custom" type="string" _gui-text="Additional postprocessor:"></param>			
 			
@@ -224,6 +224,12 @@ Press Apply to create new tool.
 	</page>
 <!-- Gcodetools: /arrangement block -->
 
+<!-- Gcodetools: update block -->
+	<page name='update' _gui-text='Check for updates'>	
+		<_param name="help" type="description">Check for Gcodetools latest stable version and try to get the updates.</_param>
+	</page>
+<!-- Gcodetools: /update block -->
+
 
 <!-- Gcodetools: footer block -->
 	</param>	
@@ -235,5 +241,6 @@ Press Apply to create new tool.
     <script>
         <command reldir="extensions" interpreter="python">gcodetools-dev.py</command>
     </script>
+    
 </inkscape-extension>
 <!-- Gcodetools: /footer block -->

@@ -36,8 +36,10 @@ def main():
 					"Tools library: tools_library no_options no_preferences",
 					"Orientation points: orientation no_options no_preferences",
 					"All in one: ptg area area_artefacts engraving dxfpoints tools_library orientation",
-					"Offset: offset no_options", "Lathe: lathe ptg",
-					"Arrangement: arrangement no_options"
+					"Offset: offset no_options", 
+					"Lathe: lathe ptg",
+					"Arrangement: arrangement no_options",
+					"Check for updates: update no_options"
 				]
 
 	f = open("gcodetools-dev.inx" if input_file == None else input_file,"r")
