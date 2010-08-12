@@ -3087,10 +3087,12 @@ class Gcodetools(inkex.Effect):
 			else: 	
 				ext = ""
 				name = self.options.file
-			i = 1 
-			while i == 1 and i<9999 or filename in dir_list :   
-				filename = name + "_" + ( "0"*(4-len(str(i))) + str(i) ) + ext
-				i += 1
+			max_n = 0
+			for s in dir_list :
+				r = re.match(r"^%s_0*(\d+)%s$"%(re.escape(name),re.escape(ext) ), s)
+				if r :
+					max_n = max(max_n,int(r.group(1)))
+			filename = name + "_" + ( "0"*(4-len(str(max_n+1))) + str(max_n+1) ) + ext
 			self.options.file = filename
 			
 		try: 	
