@@ -2836,6 +2836,7 @@ class Gcodetools(inkex.Effect):
 		inkex.Effect.__init__(self)
 		self.OptionParser.add_option("-d", "--directory",					action="store", type="string", 		dest="directory", default="/home/",					help="Directory for gcode file")
 		self.OptionParser.add_option("-f", "--filename",					action="store", type="string", 		dest="file", default="-1.0",						help="File name")			
+		self.OptionParser.add_option("",   "--add-numeric-suffix-to-filename", action="store", type="inkbool",	dest="add_numeric_suffix_to_filename", default=True,help="Add numeric suffix to filename")			
 		self.OptionParser.add_option("",   "--Zscale",						action="store", type="float", 		dest="Zscale", default="1.0",						help="Scale factor Z")				
 		self.OptionParser.add_option("",   "--Zoffset",						action="store", type="float", 		dest="Zoffset", default="0.0",						help="Offset along Z")
 		self.OptionParser.add_option("-s", "--Zsafe",						action="store", type="float", 		dest="Zsafe", default="0.5",						help="Z above all obstacles")
@@ -3077,11 +3078,26 @@ class Gcodetools(inkex.Effect):
 			error(_("Directory does not exist! Please specify existing directory at Preferences tab!"),"error")
 			return False
 
+		if self.options.add_numeric_suffix_to_filename :
+			dir_list = os.listdir(self.options.directory)
+			if "." in self.options.file : 
+				r = re.match(r"^(.*)(\..*)$",self.options.file)
+				ext = r.group(2)
+				name = r.group(1)
+			else: 	
+				ext = ""
+				name = self.options.file
+			i = 1 
+			while i == 1 and i<9999 or filename in dir_list :   
+				filename = name + "_" + ( "0"*(4-len(str(i))) + str(i) ) + ext
+				i += 1
+			self.options.file = filename
+			
 		try: 	
 			f = open(self.options.directory+'/'+self.options.file, "w")	
 			f.close()							
 		except:
-			self.error(_("Can not write to specified file!"),"error")
+			self.error(_("Can not write to specified file!\n%s"%(self.options.directory+'/'+self.options.file)),"error")
 			return False
 		return True
 

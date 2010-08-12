@@ -43,6 +43,8 @@ Gcodetools ver. 1.6
 <!-- Gcodetools: preferences block -->
 		<page name='preferences' _gui-text='Preferences'>
 			<param name="filename" type="string" _gui-text="File">output.ngc</param>
+			<param name="add-numeric-suffix-to-filename" type="boolean" _gui-text="Add numeric suffix to filename">true</param>
+			
 			<param name="directory" type="string" _gui-text="Directory">/home</param>
 
 			<param name="Zsafe" type="float" precision="5" min="-1000" max="1000" _gui-text="Z safe height for G00 move over blank">5</param>
@@ -50,12 +52,13 @@ Gcodetools ver. 1.6
 				<item value="G21 (All units in mm)">mm</item>
 				<item value="G20 (All units in inches)">in</item>
 			</param>
-			<param name="postprocessor" type="enum" _gui-text="Post processor ">
-				<item value="None">None</item>
-				<item value="Parameterize Gcode">parameterize();</item>
-				<item value="Flip y axis and parameterize Gcode">flip(y);parameterize();</item>
+			<param name="postprocessor" type="enum" _gui-text="Post-processor ">
+				<item value="None"></item>
+				<item value="parameterize();">Parameterize Gcode</item>
+				<item value="flip(y);parameterize();">Flip y axis and parameterize Gcode</item>
+				<item value="round(4);">Round all values to 4 digits</item>
 			</param>
-			<param name="postprocessor-custom" type="string" _gui-text="Additional postprocessor:"></param>			
+			<param name="postprocessor-custom" type="string" _gui-text="Additional post-processor"></param>			
 			
 
 			<param name="create-log" type="boolean" _gui-text="Generate log file">false</param>			
