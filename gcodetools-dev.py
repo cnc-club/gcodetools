@@ -1,10 +1,12 @@
 #!/usr/bin/env python 
 """
-gright (C) 2009 Nick Drobchenko, nick@cnc-club.ru
+Copyright (C) 2009 Nick Drobchenko, nick@cnc-club.ru
 based on gcode.py (C) 2007 hugomatic... 
 based on addnodes.py (C) 2005,2007 Aaron Spike, aaron@ekips.org
 based on dots.py (C) 2005 Aaron Spike, aaron@ekips.org
 based on interp.py (C) 2005 Aaron Spike, aaron@ekips.org
+based on bezmisc.py (C) 2005 Aaron Spike, aaron@ekips.org
+based on cubicsuperpath.py (C) 2005 Aaron Spike, aaron@ekips.org
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -4494,7 +4496,7 @@ G01 Z1 (going to cutting z)\n""",
 				if r : 
 					ver = r.group(1).strip()
 					if ver != gcodetools_current_version :
-						self.error("There are available a newer version of Gcodetools you can get it at: \nhttp://www.cnc-club.ru/gcodetools (English version). \nhttp://www.cnc-club.ru/gcodetools_ru (Russian version). ","Warning")					
+						self.error("There is a newer version of Gcodetools you can get it at: \nhttp://www.cnc-club.ru/gcodetools (English version). \nhttp://www.cnc-club.ru/gcodetools_ru (Russian version). ","Warning")					
 					else :
 						self.error("You are currently using latest stable version of Gcodetools.","Warning")					
 					return 
