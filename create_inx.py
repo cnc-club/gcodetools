@@ -39,7 +39,7 @@ def main():
 					"Offset: offset no_options", 
 					"Lathe: lathe ptg",
 					"Arrangement: arrangement no_options",
-					"Check for updates: update no_options"
+					"Check for updates: update no_options no_preferences"
 				]
 
 	f = open("gcodetools-dev.inx" if input_file == None else input_file,"r")
