@@ -30,8 +30,7 @@ def main():
 		args = [	
 					"DXF Points: dxfpoints no_options",
 					"Path to Gcode: ptg",
-					"Area offset: area",
-					"Area Artefacts: area_artefacts no_options",
+					"Area: area area_artefacts ptg",
 					"Engraving: engraving",
 					"Tools library: tools_library no_options no_preferences",
 					"Orientation points: orientation no_options no_preferences",
@@ -41,21 +40,23 @@ def main():
 					"Arrangement: arrangement no_options",
 					"Check for updates: update no_options no_preferences"
 				]
-
-	f = open("gcodetools-dev.inx" if input_file == None else input_file,"r")
+	
+	if input_file == None : input_file = "gcodetools-dev.inx" 
+	dev = "-dev" if "-dev" in input_file else ""
+	f = open(input_file,"r")
 	s = f.read()
 	f.close()
 	
 	tags = dict(re.findall( r"(?ims)<!--\s*Gcodetools\s*:\s*(.*?)\s*block\s*-->(.*)<!--\s*Gcodetools\s*:\s*/\1\s*block\s*-->",s))
-	
+	print (dev)
 	for arg_ in args:
 		print "Computing set: %s..." % arg_
 		r = re.match("((.*):)?(.*)",arg_)
 		if r!=None:
 			arg = r.group(3).split()
 			res = '<?xml version="1.0" encoding="UTF-8"?>\n'+tags['header']
-			name = r.group(2) if r.group(2)!=None else r.group(3)
-			id = re.sub("\s|[\.,!@#$%^&*]", "_", r.group(3).lower())
+			name = ( r.group(2) if r.group(2)!=None else r.group(3) ) + dev
+			id = re.sub("\s|[\.,!@#$%^&*]", "_", r.group(3).lower()) + dev
 			res = re.sub("(?ims)<!--\s*Gcodetools\s*:\s*name\s*-->(.*)<!--\s*Gcodetools\s*:\s*/name\s*-->","<name>%s</name>"%name,res)
 			res = re.sub("(?ims)<!--\s*Gcodetools\s*:\s*id\s*-->(.*)<!--\s*Gcodetools\s*:\s*/id\s*-->","<id>ru.cnc-club.filter.gcodetools%s</id>"%id,res)
 
@@ -70,11 +71,11 @@ def main():
 
 			if i not in tags and not re.match("no_",i) : continue				
 			submenu ="""		<effects-menu>
-			<submenu _name="Gcodetools"/>
-		</effects-menu>"""
+			<submenu _name="Gcodetools%s"/>
+		</effects-menu>"""%dev
 			res += re.sub("(?ims)<!--\s*Gcodetools\s*:\s*submenu\s*-->(.*)<!--\s*Gcodetools\s*:\s*/submenu\s*-->",submenu,tags['footer'])
 			
-			f = open("gcodetools_%s.inx"%re.sub("\s|[\.,!@#$%^&*]", "_", name.lower()),"w")
+			f = open("gcodetools_%s.inx"% ( re.sub("\s|[\.,!@#$%^&*]", "_", name.lower())) ,"w")
 			f.write(res)
 			f.close()
 			print "Done\n"

@@ -153,6 +153,10 @@ different X/Y scale)</_option>
 			</param>
 			<param name="Zsurface" type="float" precision="5" min="-1000" max="1000" _gui-text="Z surface">0</param>
 			<param name="Zdepth" type="float" precision="5" min="-1000" max="1000" _gui-text="Z depth">-1</param>
+			<param name="unit" type="enum" _gui-text="Units (mm or in): ">
+				<item value="G21 (All units in mm)">mm</item>
+				<item value="G20 (All units in inches)">in</item>
+			</param>
 
 			<_param name="help" type="description">
 Orientation points are used to calculate transformation (offset,scale,mirror,rotation in XY plane) of the path.

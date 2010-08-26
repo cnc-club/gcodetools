@@ -959,6 +959,7 @@ def csp_reverse(csp) :
 
 def csp_normalized_slope(sp1,sp2,t) :
 	ax,ay,bx,by,cx,cy,dx,dy=bezmisc.bezierparameterize((sp1[1][:],sp1[2][:],sp2[0][:],sp2[1][:]))
+	if sp1[1]==sp2[1]==sp1[2]==sp2[0] : return [1.,0.]
 	f1x = 3*ax*t*t+2*bx*t+cx
 	f1y = 3*ay*t*t+2*by*t+cy
 	if abs(f1x*f1x+f1y*f1y) > 1e-20 :
@@ -2123,18 +2124,18 @@ class Postprocessor():
 			#feed replace :
 			r = re.search(r"(?i)(F)\s*(-?)\s*(\d*\.?\d*)", s)
 			if r and len(r.group(3))>0:
-				s = re.sub(r"(?i)(F)\s*(-?)\s*(\d*\.?\d*)", "F %s"%feeds[float(r.group(2)+r.group(3))], s)
+				s = re.sub(r"(?i)(F)\s*(-?)\s*(\d*\.?\d*)", "F [%s]"%feeds[float(r.group(2)+r.group(3))], s)
 			#Coords XYZA replace
 			for c in "xyza" :
 				r = re.search(r"(?i)(("+c+r")\s*(-?)\s*(\d*\.?\d*))", s)
 				if r and len(r.group(4))>0:
-					s = re.sub(r"(?i)(("+c+r")\s*(-?)\s*(\d*\.?\d*))", r"\1*%s+%s"%(scale[c],offset[c]), s)
+					s = re.sub(r"(?i)("+c+r")\s*((-?)\s*(\d*\.?\d*))", r"\1[\2*%s+%s]"%(scale[c],offset[c]), s)
 
 			#Coords IJKR replace
 			for c in "ijkr" :
 				r = re.search(r"(?i)(("+c+r")\s*(-?)\s*(\d*\.?\d*))", s)
 				if r and len(r.group(4))>0:
-					s = re.sub(r"(?i)(("+c+r")\s*(-?)\s*(\d*\.?\d*))", r"\1*%s"%scale[c], s)
+					s = re.sub(r"(?i)("+c+r")\s*((-?)\s*(\d*\.?\d*))", r"\1[\2*%s]"%scale[c], s)
 
 			gcode += s + "\n"
 	
@@ -3663,7 +3664,7 @@ class Gcodetools(inkex.Effect):
 				self.error(_("No paths are selected! Trying to work on all available paths."),"warning")
 			else :
 				paths = self.selected_paths
-			for layer in self.paths :
+			for layer in paths :
 #				paths[layer].reverse() # Reverse list of paths to leave their order 
 				for path in paths[layer] :
 					parent = path.getparent()
@@ -3746,31 +3747,7 @@ class Gcodetools(inkex.Effect):
 								subp = [ [ sp2[1], sp2[1],sp2[2] ] ] + [sp3] + subp[j+1:] + subp[:j-1] + [sp1] + [[ sp2[0], sp2[1],sp2[1] ]] 					 	  
 	 					 	csp = [subp] + csp
 							# reverse path if needed
-							st,end = [],[]
-							i=1
-							while i<len(csp[0]):
-								if csp[0][i-1][1][0]==csp[0][i][1][0] and csp[0][i-1][1][1]==csp[0][i][1][1] :
-									csp[0][i-1][2] = csp[0][i][2]
-									del csp[0][i]
-								else:
-									i += 1
-							while len(csp[0])>2 and cspseglength(csp[0][0],csp[0][1]) < straight_tolerance :
-								del csp[0][0]
-							bez = (csp[0][0][1][:],csp[0][0][2][:],csp[0][1][0][:],csp[0][1][1][:])
-							dx, dy = bez_normalized_slope(bez,0)
-							while len(csp[0])>2 and cspseglength(csp[0][-2],csp[0][-1]) < straight_tolerance :
-								del csp[0][-1]
-							bez = (csp[0][-1][1][:],csp[0][-1][2][:],csp[0][0][0][:],csp[0][0][1][:])
-							dx1, dy1 = bez_normalized_slope(bez,1)
-							dx1, dy1 = -dx1, -dy1
-							#ax,ay,bx,by,cx,cy,dx,dy=bezmisc.bezierparameterize(bez)
-							#print_("x = %s*t^3 + %s*t^2 + %s*t + %s." % (ax,bx,cx,dx))
-							#print_("y = %s*t^3 + %s*t^2 + %s*t + %s." % (ay,by,cy,dy))
-							#print_("x' = %s*t^2 + %s*t + %s." % (3*ax,2*bx,cx))
-							#print_("y' = %s*t^2 + %s*t + %s." % (3*ay,2*by,cy))
-							print_("Starting segment's tangent's (%s,%s) ending segment's tangent's (%s,%s) vecrors are cw: %s."% (dx,dy,dx1,dy1,not vectors_ccw([dx,dy],[dx1,dy1])) ) 
-
-							if dx*dy1-dx1*dy<0 or (dx*dy1-dx1*dy==0 and dx>0) :
+							if csp_subpath_ccw(csp[0]) :
 								for i in range(len(csp)):
 								 	n = []
 								 	for j in csp[i]:
@@ -3785,8 +3762,12 @@ class Gcodetools(inkex.Effect):
 						d = re.sub(r'(?i)\s*([A-Za-z])\s*',r' \1 ',d)
 						print_(("formatted d=",d))
 					# scale = sqrt(Xscale**2 + Yscale**2) / sqrt(1**2 + 1**2)
-					self.transform([0,0],layer)
-					scale = 1/self.Zauto_scale[layer]
+					p0 = self.transform([0,0],layer)
+					p1 = self.transform([0,1],layer)
+					scale = (P(p0)-P(p1)).mag()
+					if scale == 0 : scale = 1. 
+					else : scale = 1./scale
+					print_(scale)
 					tool_d = self.tools[layer][0]['diameter']*scale
 					r = self.options.area_inkscape_radius * scale
 					sign=1 if r>0 else -1
@@ -4530,7 +4511,6 @@ G01 Z1 (going to cutting z)\n""",
 			except :
 				print_  = lambda *x : None 
 		else : print_  = lambda *x : None 
-	
 		if self.options.active_tab == '"help"' :
 			self.help()
 			return
