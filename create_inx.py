@@ -38,7 +38,8 @@ def main():
 					"Offset: offset no_options", 
 					"Lathe: lathe ptg",
 					"Arrangement: arrangement no_options",
-					"Check for updates: update no_options no_preferences"
+					"Graffiti: graffiti orientation",
+					"Check for updates: update no_options no_preferences",
 				]
 	
 	if input_file == None : input_file = "gcodetools-dev.inx" 

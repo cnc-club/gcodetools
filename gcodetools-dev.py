@@ -24,9 +24,9 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 """
 
 ###
-###		Gcodetools v 1.6 dev 
+###		Gcodetools v 1.7 dev 
 ###
-gcodetools_current_version = "1.6"
+gcodetools_current_version = "1.7"
 
 import inkex, simplestyle, simplepath
 import cubicsuperpath, simpletransform, bezmisc
@@ -603,6 +603,11 @@ def csp_at_t(sp1,sp2,t):
 	x,y = x4+(x5-x4)*t, y4+(y5-y4)*t 
 	return [x,y]
 
+def csp_at_length(sp1,sp2,l=0.5, tolerance = 0.01):
+	bez = (sp1[1][:],sp1[2][:],sp2[0][:],sp2[1][:])
+	t = bezmisc.beziertatlength(bez, l, tolerance)
+	return csp_at_t(sp1,sp2,t)
+	
 
 def csp_splitatlength(sp1, sp2, l = 0.5, tolerance = 0.01):
 	bez = (sp1[1][:],sp1[2][:],sp2[0][:],sp2[1][:])
@@ -610,7 +615,7 @@ def csp_splitatlength(sp1, sp2, l = 0.5, tolerance = 0.01):
 	return csp_split(sp1, sp2, t)	
 
 	
-def cspseglength(sp1,sp2, tolerance = 0.001):
+def cspseglength(sp1,sp2, tolerance = 0.01):
 	bez = (sp1[1][:],sp1[2][:],sp2[0][:],sp2[1][:])
 	return bezmisc.bezierlength(bez, tolerance)	
 
@@ -2681,7 +2686,7 @@ class Arangement_Genetic:
 
 class Gcodetools(inkex.Effect):
 
-	def export_gcode(self,gcode) :
+	def export_gcode(self,gcode, no_headers = False) :
 		if self.options.postprocessor != ""  or self.options.postprocessor_custom != "" :
 			postprocessor = Postprocessor(self.error)
 			postprocessor.gcode = gcode
@@ -2689,8 +2694,9 @@ class Gcodetools(inkex.Effect):
 				postprocessor.process(self.options.postprocessor)
 			if self.options.postprocessor_custom != "" :
 				postprocessor.process(self.options.postprocessor_custom)
-		postprocessor.gcode = self.header + postprocessor.gcode + self.footer
-		f = open(self.options.directory+'/'+self.options.file, "w")	
+		if not no_headers :
+			postprocessor.gcode = self.header + postprocessor.gcode + self.footer
+		f = open(self.options.directory+self.options.file, "w")	
 		f.write(postprocessor.gcode)
 		f.close()							
 
@@ -2884,7 +2890,7 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--create-log",					action="store", type="inkbool", 	dest="log_create_log", default=False,				help="Create log files")
 		self.OptionParser.add_option("",   "--log-filename",				action="store", type="string", 		dest="log_filename", default='',					help="Create log files")
 
-		self.OptionParser.add_option("",   "--orientation-points-count",	action="store", type="int", 		dest="orientation_points_count", default='2',			help="Orientation points count")
+		self.OptionParser.add_option("",   "--orientation-points-count",	action="store", type="string", 		dest="orientation_points_count", default="2",			help="Orientation points count")
 		self.OptionParser.add_option("",   "--tools-library-type",			action="store", type="string", 		dest="tools_library_type", default='cylinder cutter',	help="Create tools defention")
 
 		self.OptionParser.add_option("",   "--dxfpoints-action",			action="store", type="string", 		dest="dxfpoints_action", default='replace',			help="dxfpoint sign toggle")
@@ -2902,6 +2908,7 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--postprocessor",				action="store", type="string", 		dest="postprocessor", default='',			help="Postprocessor command.")
 		self.OptionParser.add_option("",   "--postprocessor-custom",		action="store", type="string", 		dest="postprocessor_custom", default='',	help="Postprocessor custom command.")
 	
+		self.OptionParser.add_option("",   "--graffiti-max-seg-length",		action="store", type="float", 		dest="graffiti_max_seg_length", default=1.,	help="Ggraffiti maximum segment length.")
 		
 
 		self.default_tool = {
@@ -3063,22 +3070,28 @@ class Gcodetools(inkex.Effect):
 	
 
 	def check_dir(self):
+		if self.options.directory[-1] not in ["/","\\"]:
+			if "\\" in self.options.directory :
+				self.options.directory += "\\"
+			else :
+				self.options.directory += "/"
+		print_("Checking direcrory: '%s'"%self.options.directory)
 		if (os.path.isdir(self.options.directory)):
-			if (os.path.isfile(self.options.directory+'/header')):
-				f = open(self.options.directory+'/header', 'r')
+			if (os.path.isfile(self.options.directory+'header')):
+				f = open(self.options.directory+slash+'header', 'r')
 				self.header = f.read()
 				f.close()
 			else:
 				self.header = defaults['header']
-			if (os.path.isfile(self.options.directory+'/footer')):
-				f = open(self.options.directory+'/footer','r')
+			if (os.path.isfile(self.options.directory+'footer')):
+				f = open(self.options.directory+'footer','r')
 				self.footer = f.read()
 				f.close()
 			else:
 				self.footer = defaults['footer']
 			self.header += self.options.unit + "\n" 
 		else: 
-			error(_("Directory does not exist! Please specify existing directory at Preferences tab!"),"error")
+			self.error(_("Directory does not exist! Please specify existing directory at Preferences tab!"),"error")
 			return False
 
 		if self.options.add_numeric_suffix_to_filename :
@@ -3097,14 +3110,16 @@ class Gcodetools(inkex.Effect):
 					max_n = max(max_n,int(r.group(1)))
 			filename = name + "_" + ( "0"*(4-len(str(max_n+1))) + str(max_n+1) ) + ext
 			self.options.file = filename
-			
+		
+		print_("Testing writing rights on '%s'"%(self.options.directory+self.options.file))
 		try: 	
-			f = open(self.options.directory+'/'+self.options.file, "w")	
+			f = open(self.options.directory+self.options.file, "w")	
 			f.close()							
 		except:
-			self.error(_("Can not write to specified file!\n%s"%(self.options.directory+'/'+self.options.file)),"error")
+			self.error(_("Can not write to specified file!\n%s"%(self.options.directory+self.options.file)),"error")
 			return False
 		return True
+			
 
 
 ################################################################################
@@ -3366,6 +3381,7 @@ class Gcodetools(inkex.Effect):
 		self.paths = {}		
 		self.tools = {}
 		self.orientation_points = {}
+		self.graffiti_reference_points = {}
 		self.layers = [self.document.getroot()]
 		self.Zcoordinates = {}
 		self.transform_matrix = {}
@@ -3381,6 +3397,7 @@ class Gcodetools(inkex.Effect):
 				if i.tag == inkex.addNS("g",'svg') and i.get(inkex.addNS('groupmode','inkscape')) == 'layer':
 					self.layers += [i]
 					recursive_search(i,i)
+
 				elif i.get('gcodetools') == "Gcodetools orientation group" :
 					points = self.get_orientation_points(i)
 					if points != None :
@@ -3388,17 +3405,28 @@ class Gcodetools(inkex.Effect):
 						print_("Found orientation points in '%s' layer: %s" % (layer.get(inkex.addNS('label','inkscape')), points))
 					else :
 						self.error(_("Warning! Found bad orientation points in '%s' layer. Resulting Gcode could be corrupt!") % layer.get(inkex.addNS('label','inkscape')), "bad_orientation_points_in_some_layers") 
+
 				elif i.get("gcodetools") == "Gcodetools tool defenition" :
 					tool = self.get_tool(i)
 					self.tools[layer] = self.tools[layer] + [tool.copy()] if layer in self.tools else [tool.copy()]
 					print_("Found tool in '%s' layer: %s" % (layer.get(inkex.addNS('label','inkscape')), tool))
+
+				elif i.get("gcodetools") == "Gcodetools graffiti reference point" :
+					point = self.get_graffiti_reference_points(i)
+					if point != [] :
+						self.graffiti_reference_points[layer] = self.graffiti_reference_points[layer]+[point[:]] if layer in self.graffiti_reference_points else [point]
+					else :
+						self.error(_("Warning! Found bad graffiti reference point in '%s' layer. Resulting Gcode could be corrupt!") % layer.get(inkex.addNS('label','inkscape')), "bad_orientation_points_in_some_layers") 
+				
 				elif i.tag == inkex.addNS('path','svg'):
 					if "gcodetools"  not in i.keys() :
 						self.paths[layer] = self.paths[layer] + [i] if layer in self.paths else [i]  
 						if i.get("id") in self.selected :
 							self.selected_paths[layer] = self.selected_paths[layer] + [i] if layer in self.selected_paths else [i]  
+
 				elif i.tag == inkex.addNS("g",'svg'):
 					recursive_search(i,layer, (i.get("id") in self.selected) )
+
 				elif i.get("id") in self.selected :
 					self.error(_("This extension works with Paths and Dynamic Offsets and groups of them only! All other objects will be ignored!\nSolution 1: press Path->Object to path or Shift+Ctrl+C.\nSolution 2: Path->Dynamic offset or Ctrl+J.\nSolution 3: export all contours to PostScript level 2 (File->Save As->.ps) and File->Import this file."),"selection_contains_objects_that_are_not_paths")
 				
@@ -3431,7 +3459,16 @@ class Gcodetools(inkex.Effect):
 			if point[0]!=[] and point[1]!=[]:	points += [point]
 		if len(points)==len(p2)==2 or len(points)==len(p3)==3 : return points
 		else : return None
-
+	
+	def get_graffiti_reference_points(self,g):
+			point = [[], '']
+			for node in g :
+				if node.get('gcodetools') == "Gcodetools graffiti reference point arrow":
+					point[0] = self.apply_transforms(node,cubicsuperpath.parsePath(node.get("d")))[0][0][1]
+				if node.get('gcodetools') == "Gcodetools graffiti reference point text":
+					point[1] = node.text;
+			if point[0]!=[] and point[1]!='' : return point
+			else : return []
 
 	def get_tool(self, g):
 		tool = self.default_tool.copy()
@@ -4070,46 +4107,75 @@ class Gcodetools(inkex.Effect):
 ###
 ################################################################################
 	def orientation(self, layer=None) :
-		print_("entering orientations")
-		if layer == None :
-			layer = self.current_layer if self.current_layer is not None else self.document.getroot()
-		if layer in self.orientation_points:
-			self.error(_("Active layer already has orientation points! Remove them or select another layer!"),"active_layer_already_has_orientation_points")
-		
-		orientation_group = inkex.etree.SubElement(layer, inkex.addNS('g','svg'), {"gcodetools":"Gcodetools orientation group"})
-		doc_height = inkex.unittouu(self.document.getroot().get('height'))
-		if self.document.getroot().get('height') == "100%" :
-			doc_height = 1052.3622047
-			print_("Overruding height from 100 percents to %s" % doc_height)
-		if self.options.unit == "G21 (All units in mm)" : 
-			points = [[0.,0.,self.options.Zsurface],[100.,0.,self.options.Zdepth],[0.,100.,0.]]
-			orientation_scale = 3.5433070660
-			print_("orientation_scale < 0 ===> switching to mm units=%0.10f"%orientation_scale )
-		elif self.options.unit == "G20 (All units in inches)" :
-			points = [[0.,0.,self.options.Zsurface],[5.,0.,self.options.Zdepth],[0.,5.,0.]]
-			orientation_scale = 90
-			print_("orientation_scale < 0 ===> switching to inches units=%0.10f"%orientation_scale )
-		if self.options.orientation_points_count == 2 :
-			points = points[:2]
-		print_(("using orientation scale",orientation_scale,"i=",points))
-		for i in points :
-			si = [i[0]*orientation_scale, i[1]*orientation_scale]
-			g = inkex.etree.SubElement(orientation_group, inkex.addNS('g','svg'), {'gcodetools': "Gcodetools orientation point (%s points)" % self.options.orientation_points_count})
+	
+		if self.options.orientation_points_count == "graffiti" :
+			print_(self.graffiti_reference_points)
+			print_("Inserting graffiti points")
+			if layer == None :
+				layer = self.current_layer if self.current_layer is not None else self.document.getroot()
+			if layer in self.graffiti_reference_points: graffiti_reference_points_count =  len(self.graffiti_reference_points[layer])
+			else: graffiti_reference_points_count = 0
+			axis = ["X","Y","Z","A"][graffiti_reference_points_count%4]
+			 
+			g = inkex.etree.SubElement(layer, inkex.addNS('g','svg'), {'gcodetools': "Gcodetools graffiti reference point"})
 			inkex.etree.SubElement(	g, inkex.addNS('path','svg'), 
 				{
-					'style':	"stroke:none;fill:#000000;", 	
-					'd':'m %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z z' % (si[0], -si[1]+doc_height),
-					'gcodetools': "Gcodetools orientation point arrow"
+					'style':	"stroke:none;fill:#00ff00;", 	
+					'd':'m %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z z' % (graffiti_reference_points_count*100, 0),
+					'gcodetools': "Gcodetools graffiti reference point arrow"
 				})
 			t = inkex.etree.SubElement(	g, inkex.addNS('text','svg'), 
 				{
 					'style':	"font-size:10px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
 					inkex.addNS("space","xml"):"preserve",
-					'x':	str(si[0]+10),
-					'y':	str(-si[1]-10+doc_height),
-					'gcodetools': "Gcodetools orientation point text"
+					'x':	str(graffiti_reference_points_count*100+10),
+					'y':	"-10",
+					'gcodetools': "Gcodetools graffiti reference point text"
 				})
-			t.text = "(%s; %s; %s)" % (i[0],i[1],i[2])
+			t.text = axis
+
+				
+		else :
+			print_("Inserting orientation points")
+			if layer == None :
+				layer = self.current_layer if self.current_layer is not None else self.document.getroot()
+			if layer in self.orientation_points:
+				self.error(_("Active layer already has orientation points! Remove them or select another layer!"),"active_layer_already_has_orientation_points")
+		
+			orientation_group = inkex.etree.SubElement(layer, inkex.addNS('g','svg'), {"gcodetools":"Gcodetools orientation group"})
+			doc_height = inkex.unittouu(self.document.getroot().get('height'))
+			if self.document.getroot().get('height') == "100%" :
+				doc_height = 1052.3622047
+				print_("Overruding height from 100 percents to %s" % doc_height)
+			if self.options.unit == "G21 (All units in mm)" : 
+				points = [[0.,0.,self.options.Zsurface],[100.,0.,self.options.Zdepth],[0.,100.,0.]]
+				orientation_scale = 3.5433070660
+				print_("orientation_scale < 0 ===> switching to mm units=%0.10f"%orientation_scale )
+			elif self.options.unit == "G20 (All units in inches)" :
+				points = [[0.,0.,self.options.Zsurface],[5.,0.,self.options.Zdepth],[0.,5.,0.]]
+				orientation_scale = 90
+				print_("orientation_scale < 0 ===> switching to inches units=%0.10f"%orientation_scale )
+			if self.options.orientation_points_count == "2" :
+				points = points[:2]
+			print_(("using orientation scale",orientation_scale,"i=",points))
+			for i in points :
+				si = [i[0]*orientation_scale, i[1]*orientation_scale]
+				g = inkex.etree.SubElement(orientation_group, inkex.addNS('g','svg'), {'gcodetools': "Gcodetools orientation point (%s points)" % self.options.orientation_points_count})
+				inkex.etree.SubElement(	g, inkex.addNS('path','svg'), 
+					{
+						'style':	"stroke:none;fill:#000000;", 	
+						'd':'m %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z z' % (si[0], -si[1]+doc_height),
+						'gcodetools': "Gcodetools orientation point arrow"
+					})
+				t = inkex.etree.SubElement(	g, inkex.addNS('text','svg'), 
+					{
+						'style':	"font-size:10px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
+						inkex.addNS("space","xml"):"preserve",
+						'x':	str(si[0]+10),
+						'y':	str(-si[1]-10+doc_height),
+						'gcodetools': "Gcodetools orientation point text"
+					})
+				t.text = "(%s; %s; %s)" % (i[0],i[1],i[2])
 	
 		
 ################################################################################
@@ -4187,6 +4253,19 @@ G04 P0.2 (pause)
 G01 Z1 (going to cutting z)\n""",
 				"gcode after path":"M05 (turn off plasma)\n",
 			}
+		elif self.options.tools_library_type == "graffiti":	
+			tool = {
+				"name": "Graffiti",
+				"id": "Graffiti 0001",
+				"diameter":10,
+				"penetration feed":100,
+				"feed":400,
+				"gcode before path":"""M03 (Turn spray on)\n""",
+				"gcode after path":"M05 (Turn spray off)\n",
+				"tool change gcode":"(Add G00 here to chenge sprayer if needed)\n",
+				
+			}
+
 		else :
 			tool = self.default_tool
 		
@@ -4485,6 +4564,108 @@ G01 Z1 (going to cutting z)\n""",
 		except :
 			self.error("Can not check the latest version. You can check it manualy at \nhttp://www.cnc-club.ru/gcodetools (English version). \nhttp://www.cnc-club.ru/gcodetools_ru (Russian version). \nCurrent version is Gcodetools %s"%gcodetools_current_version,"Warning")					
 				
+
+
+################################################################################
+### Graffiti function generates Gcode for graffiti drawer
+################################################################################
+	def graffiti(self) :
+		# Get reference points. 
+		
+		if not self.check_dir() : return
+		paths = self.selected_paths
+		self.tool = []
+		gcode = """(Header)
+(Generated by gcodetools from Inkscape.)
+(Using graffiti extension.)
+(Header end.)"""
+		for layer in self.layers :
+			if layer in paths :
+				self.set_tool(layer)
+				self.tool = self.tools[layer][0]
+				# Change tool every layer. (Probably layer = color so it'll be 
+				# better to change it even if the tool has not been changed)
+				gcode += ( "(Change tool to %s)\n" % re.sub("\"'\(\)\\\\"," ",self.tool["name"]) ) + self.tool["tool change gcode"] + "\n"
+				
+				# Set reference points
+				if layer not in self.graffiti_reference_points:
+					reference_points = None
+					for i in range(self.layers.index(layer),-1,-1):
+						if self.layers[i] in self.graffiti_reference_points :
+							reference_points = self.graffiti_reference_points[self.layers[i]]
+							self.graffiti_reference_points[layer] = self.graffiti_reference_points[self.layers[i]]
+							break
+					if reference_points == None :
+					 	self.error('There are no graffiti reference points for layer %s'%layer,"error")
+							 	
+				for path in self.paths[layer]:
+					# Rebuild the paths to polyline.
+					csp = cubicsuperpath.parsePath(path.get("d"))
+					csp = self.apply_transforms(path, csp)
+					polylines = []
+					for subpath in csp:
+						polyline = []
+						for sp1, sp2 in zip(subpath,subpath[1:]) :
+							# Split segments into straight lines having length less than 
+							# max_segment_length 
+							l = cspseglength(sp1,sp2)
+							parts = int(math.ceil(l/self.options.graffiti_max_seg_length))
+							polyline += [sp1[1]]
+							for i in range(1,parts):
+								polyline += [csp_at_length(sp1,sp2,float(i)/parts) ]
+						polyline += [sp2[1]]	
+						polylines += [polyline]
+						
+					d = ""
+					for i in polylines:
+						d += "M %s,%s " % (i[0][0],i[0][1])
+						for i1 in i :
+							d += "L %s,%s " % (i1[0],i1[1])
+					
+					inkex.etree.SubElement( 
+						layer, inkex.addNS("path","svg"), 
+						{	"d":d,
+							"style": "fill:none; stroke-width:0.2500000;stroke:#ff00ff;",
+							"gcodetools": "Preview",
+						}
+					)
+					
+					# Export polyline to gcode
+					# we are making trnsform from XYZA coordinates to R1...Rn
+					# where R1...Rn are radius vectors from grafiti reference points
+					# to current (x,y) point. Also we need to assign custom feed rate 
+					# for each segment. And we'll use only G01 gcode.
+
+
+					def get_gcode_coordinates(point,layer):
+						gcode = ''	
+						pos = []
+						for ref_point in self.graffiti_reference_points[layer] :
+							c = math.sqrt((point[0]-ref_point[0][0])**2 + (point[1]-ref_point[0][1])**2)
+							gcode += " %s %f"%(ref_point[1], c)
+							pos += [c]
+						return pos, gcode
+					
+					
+					for polyline in polylines :
+						last_real_pos, g = get_gcode_coordinates(polyline[0],layer)
+						last_pos = polyline[0]
+						gcode += self.tool['gcode before path']
+						gcode += "G00 " + g + "\n"
+						for point in polyline :
+							real_pos, g = get_gcode_coordinates(point,layer)
+							
+							real_l = sum([(real_pos[i]-last_real_pos[i])**2 for i in range(len(last_real_pos))])
+							l = (last_pos[0]-point[0])**2 + (last_pos[1]-point[1])**2 
+							if l!=0:
+								feed = self.tool['feed']*math.sqrt(real_l/l)
+								gcode += "G01 " + g + " F %f\n"%feed
+								last_real_pos = real_pos
+								last_pos = point[:]
+						gcode += self.tool['gcode after path']
+						
+		self.export_gcode(gcode, no_headers=True)				
+	
 										
 ################################################################################
 ###
@@ -4505,6 +4686,7 @@ G01 Z1 (going to cutting z)\n""",
 			try :
 				if os.path.isfile(self.options.log_filename) : os.remove(self.options.log_filename)
 				f = open(self.options.log_filename,"a")
+				start_time = time.time()
 				f.write("Gcodetools log file.\nStarted at %s.\n%s\n" % (time.strftime("%d.%m.%Y %H:%M:%S"),options.log_filename))
 				f.write("%s tab is active.\n" % self.options.active_tab)
 				f.close()
@@ -4514,12 +4696,12 @@ G01 Z1 (going to cutting z)\n""",
 		if self.options.active_tab == '"help"' :
 			self.help()
 			return
-		elif self.options.active_tab not in ['"dxfpoints"','"path-to-gcode"', '"area"', '"area_artefacts"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"', '"offset"', '"arrangement"', '"update"']:
-			self.error(_("Select one of the active tabs - Path to Gcode, Area, Engraving, DXF points, Orientation, Offset, Lathe or Tools library."),"error")
+		elif self.options.active_tab not in ['"dxfpoints"','"path-to-gcode"', '"area"', '"area_artefacts"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"', '"offset"', '"arrangement"', '"update"', '"graffiti"']:
+			self.error(_("Select one of the action tabs - Path to Gcode, Area, Engraving, DXF points, Orientation, Offset, Lathe or Tools library."),"error")
 		else:
 			# Get all Gcodetools data from the scene.
 			self.get_info()
-			if self.options.active_tab in ['"dxfpoints"','"path-to-gcode"', '"area"', '"area_artefacts"', '"engraving"', '"lathe"']:
+			if self.options.active_tab in ['"dxfpoints"','"path-to-gcode"', '"area"', '"area_artefacts"', '"engraving"', '"lathe"', '"graffiti"']:
 				if self.orientation_points == {} :
 					self.error(_("Orientation points have not been defined! A default set of orientation points has been automatically added."),"warning")
 					self.orientation( self.layers[min(1,len(self.layers)-1)] )		
@@ -4541,6 +4723,8 @@ G01 Z1 (going to cutting z)\n""",
 				self.engraving()		
 			elif self.options.active_tab == '"orientation"': 
 				self.orientation()		
+			elif self.options.active_tab == '"graffiti"': 
+				self.graffiti()		
 			elif self.options.active_tab == '"tools_library"': 
 				if self.options.tools_library_type != "check":
 					self.tools_library()
@@ -4588,6 +4772,12 @@ G01 Z1 (going to cutting z)\n""",
 				print_("Total offsets count %s"%offsets_count)				
 			elif self.options.active_tab == '"arrangement"': 
 				self.arrangement()
+
+		print_("------------------------------------------")
+		print_("Done in %f seconds"%(time.time()-start_time))
+		print_("End at %s."%time.strftime("%d.%m.%Y %H:%M:%S"))
+		
+		
 #						
 e = Gcodetools()
 e.affect()					

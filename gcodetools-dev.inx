@@ -150,6 +150,7 @@ maintained aspect ratio X/Y)</_option>
 <_option value="3">3-points mode
 (move, rotate and mirror, 
 different X/Y scale)</_option>
+<_option value="graffiti">Add graffiti points</_option>
 			</param>
 			<param name="Zsurface" type="float" precision="5" min="-1000" max="1000" _gui-text="Z surface">0</param>
 			<param name="Zdepth" type="float" precision="5" min="-1000" max="1000" _gui-text="Z depth">-1</param>
@@ -182,6 +183,8 @@ Now press apply to create control points (independent set for each layer).
 <_option value='plasma cutter'>plasma</_option>
 <_option value='tangent knife'>tangent knife</_option>
 <_option value='lathe cutter'>lathe cutter</_option>
+<_option value='graffiti'>graffiti</_option>
+
 
 <_option value='check'>Just check tools</_option>
 
@@ -229,6 +232,15 @@ Press Apply to create new tool.
 	<param name='arrangement-population-count' type="int" min="0" max="1000000" _gui-text='Genetic algorithm populations count'>100</param>
 	</page>
 <!-- Gcodetools: /arrangement block -->
+
+
+
+<!-- Gcodetools: graffiti block -->
+	<page name='graffiti' _gui-text='Graffiti'>	
+		<param name="graffiti-max-seg-length" type="float" precision="5" min="0" max="1000" _gui-text="Maximum segment length">10</param>
+	</page>
+<!-- Gcodetools: /graffiti block -->
+
 
 <!-- Gcodetools: update block -->
 	<page name='update' _gui-text='Check for updates'>	
