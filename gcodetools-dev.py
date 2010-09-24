@@ -4260,9 +4260,9 @@ G01 Z1 (going to cutting z)\n""",
 				"diameter":10,
 				"penetration feed":100,
 				"feed":400,
-				"gcode before path":"""M03 (Turn spray on)\n""",
-				"gcode after path":"M05 (Turn spray off)\n",
-				"tool change gcode":"(Add G00 here to chenge sprayer if needed)\n",
+				"gcode before path":"""M03 (Turn spray on)\n """,
+				"gcode after path":"M05 (Turn spray off)\n ",
+				"tool change gcode":"(Add G00 here to change sprayer if needed)\n",
 				
 			}
 
@@ -4650,8 +4650,8 @@ G01 Z1 (going to cutting z)\n""",
 					for polyline in polylines :
 						last_real_pos, g = get_gcode_coordinates(polyline[0],layer)
 						last_pos = polyline[0]
-						gcode += self.tool['gcode before path']
 						gcode += "G00 " + g + "\n"
+						gcode += self.tool['gcode before path']+"\n"
 						for point in polyline :
 							real_pos, g = get_gcode_coordinates(point,layer)
 							
@@ -4662,7 +4662,7 @@ G01 Z1 (going to cutting z)\n""",
 								gcode += "G01 " + g + " F %f\n"%feed
 								last_real_pos = real_pos
 								last_pos = point[:]
-						gcode += self.tool['gcode after path']
+						gcode += self.tool['gcode after path']+"\n"
 						
 		self.export_gcode(gcode, no_headers=True)				
 	
