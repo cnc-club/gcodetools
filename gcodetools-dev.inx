@@ -238,6 +238,11 @@ Press Apply to create new tool.
 <!-- Gcodetools: graffiti block -->
 	<page name='graffiti' _gui-text='Graffiti'>	
 		<param name="graffiti-max-seg-length" type="float" precision="5" min="0" max="1000" _gui-text="Maximum segment length">10</param>
+		<param name="graffiti-min-radius" type="float" precision="5" min="0" max="1000" _gui-text="Minimal connector radius">10</param>
+		<param name="graffiti-create-preview" type="boolean" _gui-text="Create preview">true</param>
+		<param name="graffiti-preview-size" type="int" min="100" max="10000" _gui-text="Preview's size (px)">800</param>
+		<param name="graffiti-preview-emmit" type="int" min="100" max="10000" _gui-text="Preview's paint emmit (pts/s)">1000</param>
+		
 	</page>
 <!-- Gcodetools: /graffiti block -->
 
