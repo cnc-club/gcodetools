@@ -2909,7 +2909,7 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--postprocessor-custom",		action="store", type="string", 		dest="postprocessor_custom", default='',	help="Postprocessor custom command.")
 	
 		self.OptionParser.add_option("",   "--graffiti-max-seg-length",		action="store", type="float", 		dest="graffiti_max_seg_length", default=1.,	help="Ggraffiti maximum segment length.")
-		self.OptionParser.add_option("",   "--graffiti-min-radius",			action="store", type="float", 		dest="graffiti_min_raius", default=10.,	help="Ggraffiti minimal connector's radius.")
+		self.OptionParser.add_option("",   "--graffiti-min-radius",			action="store", type="float", 		dest="graffiti_min_radius", default=10.,	help="Ggraffiti minimal connector's radius.")
 		self.OptionParser.add_option("",   "--graffiti-create-preview",		action="store", type="inkbool", 	dest="graffiti_create_preview", default=True,	help="Ggraffiti create preview.")
 		self.OptionParser.add_option("",   "--graffiti-preview-size",		action="store", type="int", 		dest="graffiti_preview_size", default=800,	help="Ggraffiti preview's size.")
 		self.OptionParser.add_option("",   "--graffiti-preview-emmit",		action="store", type="int", 		dest="graffiti_preview_emmit", default=800,	help="Preview's paint emmit (pts/s).")
@@ -4601,11 +4601,9 @@ G01 Z1 (going to cutting z)\n""",
 			# Emit = dots per second
 			l = math.sqrt(sum([(start[i]-end[i])**2 for i in range(len(start))]))
 			time_ = l/feed
-			print_(self.graffiti_reference_points) 
 			c1,c2 = self.graffiti_reference_points[layer][0][0],self.graffiti_reference_points[layer][1][0]
 			d = math.sqrt( (c1[0]-c2[0])**2 + (c1[1]-c2[1])**2 )
 			if d == 0 : raise ValueError, "Error! Reference points should not be the same!"
-			print_("!!!",time_)
 			for i in range(int(time_*emmit+1)) :
 				t = i/(time_*emmit)
 				r1,r2 = start[0]*(1-t) + end[0]*t, start[1]*(1-t) + end[1]*t
@@ -4622,12 +4620,49 @@ G01 Z1 (going to cutting z)\n""",
 				x = x1 if y1<y2 else x2
 				y = min(y1,y2)			
 				x,y = graffiti_preview_transform(x,y)
-				print_(x,y)
 				graffiti_preview_draw_point(x,y,color)
 			
+		def create_connector(p1,p2,t1,t2):
+			P1,P2 = P(p1), P(p2)
+			N1, N2  = P(rotate_ccw(t1)), P(rotate_ccw(t2))
+			r = self.options.graffiti_min_radius
+			C1,C2 = P1+N1*r, P2+N2*r
+			# Get closest possible centers of arcs, also we define that arcs are both ccw or both not. 
+			dc, N1, N2, m = (
+					(
+						(((P2-N1*r) - (P1-N2*r)).l2(),-N1,-N2, 1)
+							 if  vectors_ccw(t1,t2) else
+						(((P2+N1*r) - (P1+N2*r)).l2(), N1, N2,-1) 
+					)
+					 if vectors_ccw((P1-C1).to_list(),t1) == vectors_ccw((P2-C2).to_list(),t2) else
+					(
+						(((P2+N1*r) - (P1-N2*r)).l2(), N1,-N2, 1) 
+							 if vectors_ccw(t1,t2) else
+						(((P2-N1*r) - (P1+N2*r)).l2(),-N1, N2, 1)
+					)	 
+				)
+			dc = math.sqrt(dc)
+			C1,C2 = P1+N1*r, P2+N2*r
+			Dc = C2-C1 
+			
+			if dc == 0 :
+				# can be joined by one arc
+				return csp_from_arc(p1, p2, C1.to_list(), r, t1)
 
-		
-		
+			cos, sin = Dc.x/dc, Dc.y/dc
+			#csp_draw(self.transform_csp([[ [[C1.x-r*sin,C1.y+r*cos]]*3,[[C2.x-r*sin,C2.y+r*cos]]*3 ]],layer,reverse=True), color = "#00ff00;" )
+			#draw_pointer(self.transform(C1.to_list(),layer,reverse=True))
+			#draw_pointer(self.transform(C2.to_list(),layer,reverse=True))
+			
+			p1_end = [C1.x-r*sin*m,C1.y+r*cos*m]
+			p2_st  = [C2.x-r*sin*m,C2.y+r*cos*m]
+			if point_to_point_d2(p1,p1_end)<0.0001 and point_to_point_d2(p2,p2_st)<0.0001 :
+				return ([[p1,p1,p1],[p2,p2,p2]])
+			
+			arc1 = csp_from_arc(p1, p1_end, C1.to_list(), r, t1)
+			arc2 = csp_from_arc(p2_st, p2, C2.to_list(), r, [cos,sin])
+			return csp_concat_subpaths(arc1,arc2)
+
 		if not self.check_dir() : return
 		if self.selected_paths == {} and self.options.auto_select_paths:
 			paths=self.paths
@@ -4678,7 +4713,7 @@ G01 Z1 (going to cutting z)\n""",
 			self.graffiti_preview_transform = [minx,miny,maxx,maxy]
 
 
-		
+		last_sp1, last_sp2 = [[0.,0.],[0.,0.],[0.,0.]], [[10.,10.],[10.,10.],[10.,10.]]
 		for layer in self.layers :
 			if layer in paths :
 				self.set_tool(layer)
@@ -4687,50 +4722,75 @@ G01 Z1 (going to cutting z)\n""",
 				# better to change it even if the tool has not been changed)
 				gcode += ( "(Change tool to %s)\n" % re.sub("\"'\(\)\\\\"," ",self.tool["name"]) ) + self.tool["tool change gcode"] + "\n"
 				
-
+				subpaths = []				
 				for path in paths[layer]:
 					# Rebuild the paths to polyline.
 					csp = cubicsuperpath.parsePath(path.get("d"))
 					csp = self.apply_transforms(path, csp)
 					csp = self.transform_csp(csp, layer)
-					polylines = []
-					for subpath in csp:
-						polyline = []
-						spl = None
-						for sp1, sp2 in zip(subpath,subpath[1:]) :
-							
-							if spl != None and cross( csp_normalized_slope(spl,sp1,1.),csp_normalized_slope(sp1,sp2,0.) ) > 0.01 :
-								# We've got sharp angle at sp1.
-								polyline += [sp1[1]]
-								polylines += [polyline]
-								polyline = []
-							# Split segments into straight lines having length less than 
-							# max_segment_length 
-							l = cspseglength(sp1,sp2)
-							parts = int(math.ceil(l/self.options.graffiti_max_seg_length))
-							polyline += [sp1[1]]
-							for i in range(1,parts):
-								polyline += [csp_at_length(sp1,sp2,float(i)/parts) ]
-							spl = sp1
-						polyline += [sp2[1]]	
-						polylines += [polyline]
-						
-					d = ""
+					subpaths += csp 
+				while len(subpaths)>0:
+					i = min( [( point_to_point_d2(last_sp2[1],subpaths[i][0][1]),i) for i in range(len(subpaths))] )[1]
+					subpath = subpaths[i][:]
+					del subpaths[i]
+					polylines = [ 
+									['connector', create_connector(
+													last_sp2[1],
+													subpath[0][1],
+													csp_normalized_slope(last_sp1,last_sp2,1.),
+													csp_normalized_slope(subpath[0],subpath[1],0.),
+									)]
+								]
+					polyline = []
+					spl = None
+					
+					#  remove zerro length segments
+					i = 0
+					while i<len(subpath)-1:
+						if 	(cspseglength(subpath[i],subpath[i+1])<0.00000001 ) : 
+							subpath[i][2] = subpath[i+1][2]
+							del subpath[i+1]
+						else :
+							i += 1
+					
+					for sp1, sp2 in zip(subpath,subpath[1:]) :
+						if spl != None and abs(cross( csp_normalized_slope(spl,sp1,1.),csp_normalized_slope(sp1,sp2,0.) )) > 0.05 :
+							# We've got sharp angle at sp1.
+							polyline += [sp1]
+							polylines += [['draw',polyline]]
+							polylines += [ 
+											['connector', create_connector(
+													sp1[1],
+													sp1[1],
+													csp_normalized_slope(spl,sp1,1.),
+													csp_normalized_slope(sp1,sp2,0.),
+											)]
+										]
+							polyline = []
+						# max_segment_length 
+						polyline += [sp1]
+						spl = sp1
+					polyline += [sp2]	
+					polylines += [['draw',polyline]]
+					last_sp1, last_sp2 = sp1,sp2
+					
+					
+					def asdsadas():
+						l = cspseglength(sp1,sp2)
+						parts = int(math.ceil(l/self.options.graffiti_max_seg_length))
+						for i in range(1,parts):
+							polyline += [csp_at_length(sp1,sp2,float(i)/parts) ]
+
+
+					
 					t = 0
 					for i in polylines:
 						t += 1
-						d = "M %s,%s " % tuple( self.transform(i[0],layer,reverse=True) )
-						for i1 in i :
-							d += "L %s,%s " % tuple( self.transform(i1,layer,reverse=True) )
-					
-						inkex.etree.SubElement( 
-							layer, inkex.addNS("path","svg"), 
-							{	"d":d,
-								"style": "fill:none; stroke-width:0.2500000;stroke:%s"%("#ff00ff;" if t%2 else "#ffff00;"),
-								"gcodetools": "Preview",
-							}
-						)
-					
+						csp_draw(self.transform_csp([i[1]],layer,reverse=True), color = "#00cc00;" if i[0]=='draw' else "#ff0000;")
+
+					continue
+					return 
+				
 					# Export polyline to gcode
 					# we are making trnsform from XYZA coordinates to R1...Rn
 					# where R1...Rn are radius vectors from grafiti reference points
@@ -4745,8 +4805,8 @@ G01 Z1 (going to cutting z)\n""",
 							gcode += " %s %f"%(ref_point[1], c)
 							pos += [c]
 						return pos, gcode
-					
-					
+				
+				
 					for polyline in polylines :
 						last_real_pos, g = get_gcode_coordinates(polyline[0],layer)
 						last_pos = polyline[0]
@@ -4764,7 +4824,7 @@ G01 Z1 (going to cutting z)\n""",
 								last_real_pos = real_pos
 								last_pos = point[:]
 						gcode += self.tool['gcode after path']+"\n"
-						
+					
 		self.export_gcode(gcode, no_headers=True)				
 		if self.options.graffiti_create_preview :
 			try :
