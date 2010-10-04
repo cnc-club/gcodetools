@@ -24,7 +24,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 """
 
 ###
-###		Gcodetools v 1.7 dev 
+###		Gcodetools v 1.7 dev
 ###
 gcodetools_current_version = "1.7"
 
@@ -1270,26 +1270,42 @@ def atan2(*arg):
 	else :
 		raise ValueError, "Bad argumets for atan! (%s)" % arg  
 
+def get_text(node) :
+	value = None
+	if node.text!=None : value = value +"\n" + node.text if value != None else node.text
+	for k in node :
+		if k.tag == inkex.addNS('tspan','svg'):
+			if k.text!=None : value = value +"\n" + k.text if value != None else k.text
+	return value
 
-def draw_text(text,x,y,style = None, font_size = 20) :
+
+
+def draw_text(text,x,y, group = None, style = None, font_size = 10, gcodetools_tag = None) :
 	if style == None : 
-		style = "font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;"
+		style = "font-family:DejaVu Sans;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:DejaVu Sans;fill:#000000;fill-opacity:1;stroke:none;"
 	style += "font-size:%fpx;"%font_size
-	t = inkex.etree.SubElement(	options.doc_root, inkex.addNS('text','svg'), {	
-							'x':	str(x),
+	attributes = {			'x':	str(x),
 							inkex.addNS("space","xml"):"preserve",
-							'y':	str(y)
-						})
+							'y':	str(y),
+							'style' : style
+						}
+	if gcodetools_tag!=None : 
+		attributes["gcodetools"] = str(gcodetools_tag)
+ 
+	if group == None:
+		group = options.doc_root
+
+	t = inkex.etree.SubElement(	group, inkex.addNS('text','svg'), attributes)
 	text = str(text).split("\n")
 	for s in text :
 		span = inkex.etree.SubElement( t, inkex.addNS('tspan','svg'), 
 						{
 							'x':	str(x),
-							'y':	str(+y),
+							'y':	str(y),
 							inkex.addNS("role","sodipodi"):"line",
 						})					
 		y += font_size
-		span.text = s
+		span.text = str(s)
 			
 
 def draw_pointer(x,color = "#f00", figure = "cross", comment = "", width = .1) :
@@ -2694,8 +2710,10 @@ class Gcodetools(inkex.Effect):
 				postprocessor.process(self.options.postprocessor)
 			if self.options.postprocessor_custom != "" :
 				postprocessor.process(self.options.postprocessor_custom)
+
 		if not no_headers :
 			postprocessor.gcode = self.header + postprocessor.gcode + self.footer
+
 		f = open(self.options.directory+self.options.file, "w")	
 		f.write(postprocessor.gcode)
 		f.close()							
@@ -3118,8 +3136,13 @@ class Gcodetools(inkex.Effect):
 					max_n = max(max_n,int(r.group(1)))
 			filename = name + "_" + ( "0"*(4-len(str(max_n+1))) + str(max_n+1) ) + ext
 			self.options.file = filename
-		
-		print_("Testing writing rights on '%s'"%(self.options.directory+self.options.file))
+
+		if self.options.directory[-1] not in ["/","\\"]:
+			if "\\" in self.options.directory :
+				self.options.directory += "\\"
+			else :
+				self.options.directory += "/"
+
 		try: 	
 			f = open(self.options.directory+self.options.file, "w")	
 			f.close()							
@@ -3462,7 +3485,7 @@ class Gcodetools(inkex.Effect):
 				if node.get('gcodetools') == "Gcodetools orientation point arrow":
 					point[0] = self.apply_transforms(node,cubicsuperpath.parsePath(node.get("d")))[0][0][1]
 				if node.get('gcodetools') == "Gcodetools orientation point text":
-					r = re.match(r'(?i)\s*\(\s*(-?\s*\d*(?:,|\.)*\d*)\s*;\s*(-?\s*\d*(?:,|\.)*\d*)\s*;\s*(-?\s*\d*(?:,|\.)*\d*)\s*\)\s*',node.text)
+					r = re.match(r'(?i)\s*\(\s*(-?\s*\d*(?:,|\.)*\d*)\s*;\s*(-?\s*\d*(?:,|\.)*\d*)\s*;\s*(-?\s*\d*(?:,|\.)*\d*)\s*\)\s*',get_text(node))
 					point[1] = [float(r.group(1)),float(r.group(2)),float(r.group(3))]
 			if point[0]!=[] and point[1]!=[]:	points += [point]
 		if len(points)==len(p2)==2 or len(points)==len(p3)==3 : return points
@@ -3474,7 +3497,7 @@ class Gcodetools(inkex.Effect):
 				if node.get('gcodetools') == "Gcodetools graffiti reference point arrow":
 					point[0] = self.apply_transforms(node,cubicsuperpath.parsePath(node.get("d")))[0][0][1]
 				if node.get('gcodetools') == "Gcodetools graffiti reference point text":
-					point[1] = node.text;
+					point[1] = get_text(node)
 			if point[0]!=[] and point[1]!='' : return point
 			else : return []
 
@@ -3490,11 +3513,9 @@ class Gcodetools(inkex.Effect):
 				value = None
 				for j in i:
 					if j.get("gcodetools") == "Gcodetools tool defention field name":
-						key = j.text
+						key = get_text(j)
 					if j.get("gcodetools") == "Gcodetools tool defention field value":
-						for k in j :
-							if k.tag == inkex.addNS('tspan','svg') and k.get("gcodetools") == "Gcodetools tool defention field value":
-								if k.text!=None : value = value +"\n" + k.text if value != None else k.text
+						value = get_text(j)
 				if value == None or key == None: continue
 				#print_("Found tool parameter '%s':'%s'" % (key,value))
 				if key in self.default_tool.keys() :
@@ -4132,15 +4153,9 @@ class Gcodetools(inkex.Effect):
 					'd':'m %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z z' % (graffiti_reference_points_count*100, 0),
 					'gcodetools': "Gcodetools graffiti reference point arrow"
 				})
-			t = inkex.etree.SubElement(	g, inkex.addNS('text','svg'), 
-				{
-					'style':	"font-size:10px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
-					inkex.addNS("space","xml"):"preserve",
-					'x':	str(graffiti_reference_points_count*100+10),
-					'y':	"-10",
-					'gcodetools': "Gcodetools graffiti reference point text"
-				})
-			t.text = axis
+			
+
+			draw_text(axis,graffiti_reference_points_count*100+10,-10, group = g, gcodetools_tag = "Gcodetools graffiti reference point text")
 
 				
 		else :
@@ -4175,16 +4190,9 @@ class Gcodetools(inkex.Effect):
 						'd':'m %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z z' % (si[0], -si[1]+doc_height),
 						'gcodetools': "Gcodetools orientation point arrow"
 					})
-				t = inkex.etree.SubElement(	g, inkex.addNS('text','svg'), 
-					{
-						'style':	"font-size:10px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
-						inkex.addNS("space","xml"):"preserve",
-						'x':	str(si[0]+10),
-						'y':	str(-si[1]-10+doc_height),
-						'gcodetools': "Gcodetools orientation point text"
-					})
-				t.text = "(%s; %s; %s)" % (i[0],i[1],i[2])
-	
+
+				draw_text("(%s; %s; %s)" % (i[0],i[1],i[2]), (si[0]+10), (-si[1]-10+doc_height), group = g, gcodetools_tag = "Gcodetools orientation point text")
+
 		
 ################################################################################
 ###
@@ -4293,34 +4301,11 @@ G01 Z1 (going to cutting z)\n""",
 		for key in keys :
 			g = inkex.etree.SubElement(tools_group, inkex.addNS('g','svg'), {'gcodetools': "Gcodetools tool parameter"})
 		
-			t = inkex.etree.SubElement(	g, inkex.addNS('text','svg'), 
-					{
-						'style':	("font-size:10px;" if key!="name" else "font-size:20px;") +	"font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
-						inkex.addNS("space","xml"):"preserve",							
-						'x':	str(0),
-						'y':	str(y),
-						'gcodetools': "Gcodetools tool defention field name"
-					})
-			t.text = str(key)
+			draw_text(key, 0, y, group = g, gcodetools_tag = "Gcodetools tool defention field name", font_size = 10 if key!='name' else 20)
+			draw_text(tool[key], 150, y, group = g, gcodetools_tag = "Gcodetools tool defention field value", font_size = 10 if key!='name' else 20)
 			v = str(tool[key]).split("\n")
-			t = inkex.etree.SubElement(	g, inkex.addNS('text','svg'), 
-					{
-						'style':	("font-size:10px;" if key!="name" else "font-size:20px;") + "font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;fill:#000000;fill-opacity:1;stroke:none;",
-						'x':	str(150),
-						inkex.addNS("space","xml"):"preserve",
-						'y':	str(y),
-						'gcodetools': "Gcodetools tool defention field value"
-					})
-			for s in v :
-				span = inkex.etree.SubElement( t, inkex.addNS('tspan','svg'), 
-					{
-						'x':	str(150),
-						'y':	str(+y),
-						inkex.addNS("role","sodipodi"):"line",
-						'gcodetools': "Gcodetools tool defention field value"
-					})					
-				y += 15 if key!='name' else 20
-				span.text = s
+			y += 15*len(v) if key!='name' else 20*len(v)
+
 		bg.set('d',"m -20,-20 l 400,0 0,%f -400,0 z " % (y+50))
 		tool = []
 		tools_group.set("transform", simpletransform.formatTransform([ [1,0,self.view_center[0]-150 ], [0,1,self.view_center[1]] ] ))
@@ -4729,9 +4714,11 @@ G01 Z1 (going to cutting z)\n""",
 
 				r = re.match("\s*\(\s*([0-9\-,.]+)\s*;\s*([0-9\-,.]+)\s*\)\s*",self.options.graffiti_start_pos)
 				if r :
-					start_point = self.transform([float(r.group(1)),float(r.group(2))], layer)
-					last_sp1 = [start_point for i in range(3)]	
-					last_sp2 = [[start_point[0],start_point[1]-10] for i in range(3)]
+					start_point = [float(r.group(1)),float(r.group(2))]
+				else :
+					start_point = [0.,0.]
+				last_sp1 = [[start_point[0],start_point[1]-10] for i in range(3)]	
+				last_sp2 = [start_point for i in range(3)]
 
 				self.set_tool(layer)
 				self.tool = self.tools[layer][0]
@@ -4746,11 +4733,12 @@ G01 Z1 (going to cutting z)\n""",
 					csp = self.apply_transforms(path, csp)
 					csp = self.transform_csp(csp, layer)
 					subpaths += csp 
+				polylines = []
 				while len(subpaths)>0:
 					i = min( [( point_to_point_d2(last_sp2[1],subpaths[i][0][1]),i) for i in range(len(subpaths))] )[1]
 					subpath = subpaths[i][:]
 					del subpaths[i]
-					polylines = [ 
+					polylines += [ 
 									['connector', create_connector(
 													last_sp2[1],
 													subpath[0][1],
@@ -4792,69 +4780,67 @@ G01 Z1 (going to cutting z)\n""",
 						spl = sp1
 					polyline += [ sp2 ]	
 					polylines += [ ['draw',polyline[:]] ]
-					print_("polylines",polylines)
 
 					last_sp1, last_sp2 = sp1,sp2
 					
-					print_("polylines",polylines)
 					
-					# Add return to start_point
-					if polylines == [] : continue
-					polylines += [ ["connect1",  [ [polylines[-1][1][-1][1] for i in range(3)],[start_point for i in range(3)] ] ] ]
-					
+				# Add return to start_point
+				if polylines == [] : continue
+				polylines += [ ["connect1",  [ [polylines[-1][1][-1][1] for i in range(3)],[start_point for i in range(3)] ] ] ]
+				
+				# Make polilynes from polylines. They are still csp.
+				for i in range(len(polylines)) :
+					polyline = []
+					l = 0
 					print_("polylines",polylines)
-					# Make polilynes from polylines. They are still csp.
-					for i in range(len(polylines)) :
-						polyline = []
-						l = 0
-						print_("polylines",polylines)
-						print_(polylines[i])
-						for sp1,sp2 in zip(polylines[i][1],polylines[i][1][1:]) :
-							print_(sp1,sp2)
-							l = cspseglength(sp1,sp2)
-							if l>0.00000001 : 
-								polyline += [sp1[1]]
-								parts = int(math.ceil(l/self.options.graffiti_max_seg_length))
-								for j in range(1,parts):
-									polyline += [csp_at_length(sp1,sp2,float(j)/parts) ]
-						if l>0.00000001 :
-							polyline += [sp2[1]]
-						print_(i)
-						polylines[i][1] = polyline
-										
-					t = 0
-					for polyline_ in polylines:
-						polyline = polyline_[1]
-						# Draw linearization
-						if self.options.graffiti_create_linearization_preview :
-							t += 1
-							csp = [ [polyline[i],polyline[i],polyline[i]] for i in range(len(polyline))]
-							csp_draw(self.transform_csp([csp],layer,reverse=True), color = "#00cc00;" if polyline_[0]=='draw' else "#ff5555;")
+					print_(polylines[i])
+					for sp1,sp2 in zip(polylines[i][1],polylines[i][1][1:]) :
+						print_(sp1,sp2)
+						l = cspseglength(sp1,sp2)
+						if l>0.00000001 : 
+							polyline += [sp1[1]]
+							parts = int(math.ceil(l/self.options.graffiti_max_seg_length))
+							for j in range(1,parts):
+								polyline += [csp_at_length(sp1,sp2,float(j)/parts) ]
+					if l>0.00000001 :
+						polyline += [sp2[1]]
+					print_(i)
+					polylines[i][1] = polyline
+									
+				t = 0
+				last_state = None
+				for polyline_ in polylines:
+					polyline = polyline_[1]
+					# Draw linearization
+					if self.options.graffiti_create_linearization_preview :
+						t += 1
+						csp = [ [polyline[i],polyline[i],polyline[i]] for i in range(len(polyline))]
+						csp_draw(self.transform_csp([csp],layer,reverse=True), color = "#00cc00;" if polyline_[0]=='draw' else "#ff5555;")
 
-		
-					# Export polyline to gcode
-					# we are making trnsform from XYZA coordinates to R1...Rn
-					# where R1...Rn are radius vectors from grafiti reference points
-					# to current (x,y) point. Also we need to assign custom feed rate 
-					# for each segment. And we'll use only G01 gcode.
-						last_real_pos, g = get_gcode_coordinates(polyline[0],layer)
-						last_pos = polyline[0]
-						if polyline_[0] == "draw" :
-							gcode += self.tool['gcode before path']+"\n"
-						for point in polyline :
-							real_pos, g = get_gcode_coordinates(point,layer)
-							real_l = sum([(real_pos[i]-last_real_pos[i])**2 for i in range(len(last_real_pos))])
-							l = (last_pos[0]-point[0])**2 + (last_pos[1]-point[1])**2 
-							if l!=0:
-								feed = self.tool['feed']*math.sqrt(real_l/l)
-								gcode += "G01 " + g + " F %f\n"%feed
-								if self.options.graffiti_create_preview :			
-									draw_graffiti_segment(layer,real_pos,last_real_pos,feed,color=(0,0,255,200),emmit=self.options.graffiti_preview_emmit)
-								last_real_pos = real_pos
-								last_pos = point[:]
-						if polyline_[0] == "draw" :
-							gcode += self.tool['gcode after path']+"\n"
-					
+	
+				# Export polyline to gcode
+				# we are making trnsform from XYZA coordinates to R1...Rn
+				# where R1...Rn are radius vectors from grafiti reference points
+				# to current (x,y) point. Also we need to assign custom feed rate 
+				# for each segment. And we'll use only G01 gcode.
+					last_real_pos, g = get_gcode_coordinates(polyline[0],layer)
+					last_pos = polyline[0]
+					if polyline_[0] == "draw" and last_state!="draw":
+						gcode += self.tool['gcode before path']+"\n"
+					for point in polyline :
+						real_pos, g = get_gcode_coordinates(point,layer)
+						real_l = sum([(real_pos[i]-last_real_pos[i])**2 for i in range(len(last_real_pos))])
+						l = (last_pos[0]-point[0])**2 + (last_pos[1]-point[1])**2 
+						if l!=0:
+							feed = self.tool['feed']*math.sqrt(real_l/l)
+							gcode += "G01 " + g + " F %f\n"%feed
+							if self.options.graffiti_create_preview :			
+								draw_graffiti_segment(layer,real_pos,last_real_pos,feed,color=(0,0,255,200) if polyline_[0] == "draw" else (255,0,0,200),emmit=self.options.graffiti_preview_emmit)
+							last_real_pos = real_pos
+							last_pos = point[:]
+					if polyline_[0] == "draw" and last_state!="draw" :
+						gcode += self.tool['gcode after path']+"\n"
+					last_state = polyline_[0]
 		self.export_gcode(gcode, no_headers=True)				
 		if self.options.graffiti_create_preview :
 			try :
