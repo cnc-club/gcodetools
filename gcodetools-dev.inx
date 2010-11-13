@@ -95,7 +95,7 @@ The segment will be split into two segments if the distance between path's segme
 		<page name='area' _gui-text='Area'>	
 			<param name="max-area-curves" type="int" min="0" max="1000" _gui-text="Maximum area cutting curves:">100</param>
 			<param name="area-inkscape-radius" type="float" min="-1000" max="1000" _gui-text="Area width:">-10</param>
-			<param name="area-tool-overlap" type="float" min="0" max="1" _gui-text="Area tool overlap (0..1):">0</param>
+			<param name="area-tool-overlap" type="float" min="0" max="0.9" _gui-text="Area tool overlap (0..0.9):">0</param>
 
 			<_param name="help" type="description">
 "Create area offset": creates several Inkscape path offsets to fill original path's area up to "Area radius" value. 
