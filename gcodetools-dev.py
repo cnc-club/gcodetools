@@ -2877,7 +2877,8 @@ class Gcodetools(inkex.Effect):
 
 		self.OptionParser.add_option("",   "--tool-diameter",				action="store", type="float", 		dest="tool_diameter", default="3",					help="Tool diameter used for area cutting")		
 		self.OptionParser.add_option("",   "--max-area-curves",				action="store", type="int", 		dest="max_area_curves", default="100",				help="Maximum area curves for each area")
-		self.OptionParser.add_option("",   "--area-inkscape-radius",		action="store", type="float", 		dest="area_inkscape_radius", default="-10",			help="Radius for preparing curves using inkscape")
+		self.OptionParser.add_option("",   "--area-inkscape-radius",		action="store", type="float", 		dest="area_inkscape_radius", default="0",			help="Area curves overlaping (depends on tool diameter [0,1])")
+		self.OptionParser.add_option("",   "--area-tool-overlap",			action="store", type="float", 		dest="area_tool_overlap", default="-10",			help="Radius for preparing curves using inkscape")
 		self.OptionParser.add_option("",   "--unit",						action="store", type="string", 		dest="unit", default="G21 (All units in mm)",		help="Units")
 		self.OptionParser.add_option("",   "--active-tab",					action="store", type="string", 		dest="active_tab", default="",						help="Defines which tab is active")
 
@@ -3840,7 +3841,7 @@ class Gcodetools(inkex.Effect):
 					print_("Tool diameter = %s, r = %s" % (tool_d, r))
 
 					for i in range(self.options.max_area_curves):
-						radius = - tool_d * (i+0.5) * sign
+						radius = - tool_d * (i*(1-self.options.area_tool_overlap)+0.5) * sign
 						if abs(radius)>abs(r): 
 							radius = -r
 						
