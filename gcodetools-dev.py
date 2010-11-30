@@ -2874,6 +2874,8 @@ class Gcodetools(inkex.Effect):
 
 		self.OptionParser.add_option("",   "--biarc-tolerance",				action="store", type="float", 		dest="biarc_tolerance", default="1",				help="Tolerance used when calculating biarc interpolation.")				
 		self.OptionParser.add_option("",   "--biarc-max-split-depth",		action="store", type="int", 		dest="biarc_max_split_depth", default="4",			help="Defines maximum depth of splitting while approximating using biarcs.")				
+		self.OptionParser.add_option("",   "--path-to-gcode-order",			action="store", type="string", 		dest="path_to_gcode_order", default="path by path",	help="Defines cutting order path by path or layer by layer.")				
+
 
 		self.OptionParser.add_option("",   "--tool-diameter",				action="store", type="float", 		dest="tool_diameter", default="3",					help="Tool diameter used for area cutting")		
 		self.OptionParser.add_option("",   "--max-area-curves",				action="store", type="int", 		dest="max_area_curves", default="100",				help="Maximum area curves for each area")
@@ -3105,7 +3107,7 @@ class Gcodetools(inkex.Effect):
 		print_("Checking direcrory: '%s'"%self.options.directory)
 		if (os.path.isdir(self.options.directory)):
 			if (os.path.isfile(self.options.directory+'header')):
-				f = open(self.options.directory+slash+'header', 'r')
+				f = open(self.options.directory+'header', 'r')
 				self.header = f.read()
 				f.close()
 			else:
@@ -3279,6 +3281,7 @@ class Gcodetools(inkex.Effect):
 				self.error(_("Orientation points for '%s' layer have not been found! Please add orientation points using Orientation tab!") % layer.get(inkex.addNS('label','inkscape')),"no_orientation_points")
 			elif self.layers[i] in self.transform_matrix :
 				self.transform_matrix[layer] = self.transform_matrix[self.layers[i]]
+				self.Zcoordinates[layer] = self.Zcoordinates[self.layers[i]]
 			else :
 				orientation_layer = self.layers[i]
 				if len(self.orientation_points[orientation_layer])>1 : 
@@ -3659,6 +3662,7 @@ class Gcodetools(inkex.Effect):
 		for layer in self.layers :
 #			print_(("processing layer",layer," of layers:",self.layers))
 			if layer in paths :
+				
 #				print_(("layer ",layer, " is in paths:",paths))
 				print_(("layer",layer))
 				self.set_tool(layer)
@@ -3680,12 +3684,22 @@ class Gcodetools(inkex.Effect):
 						p += csp
 				dxfpoints=sort_dxfpoints(dxfpoints)
 				gcode+=print_dxfpoints(dxfpoints)
-				curve = self.parse_curve(p, layer)
-				self.draw_curve(curve, layer, biarc_group)
-				if self.tools[layer][0]["depth step"] == 0 : self.tools[layer][0]["depth step"] = 1
-				for step in range( 0,  int(math.ceil( abs( (self.Zcoordinates[layer][1]-self.Zcoordinates[layer][0])/self.tools[layer][0]["depth step"] )) ) ):
-					Zpos = max(		self.Zcoordinates[layer][1],		 self.Zcoordinates[layer][0] - abs(self.tools[layer][0]["depth step"]*(step+1))	)
-					gcode += self.generate_gcode(curve, layer, Zpos)
+
+				if self.options.path_to_gcode_order != 'path by path':
+					p = [p]
+				else: 
+					p = [ [p1] for p1 in p]
+				
+				for sub_p in p : 	
+					curve = self.parse_curve(sub_p, layer)
+					
+					self.draw_curve(curve, layer, biarc_group)
+					if self.tools[layer][0]["depth step"] == 0 : self.tools[layer][0]["depth step"] = 1
+
+					for step in range( 0,  int(math.ceil( abs( (self.Zcoordinates[layer][1]-self.Zcoordinates[layer][0])/self.tools[layer][0]["depth step"] )) ) ):
+						Zpos = max(		self.Zcoordinates[layer][1],		 self.Zcoordinates[layer][0] - abs(self.tools[layer][0]["depth step"]*(step+1))	)
+						gcode += self.generate_gcode(curve, layer, Zpos)
+					
 			
 		self.export_gcode(gcode)
 	
@@ -4277,7 +4291,7 @@ G01 Z1 (going to cutting z)\n""",
 				"diameter":10,
 				"penetration feed":100,
 				"feed":400,
-				"gcode before path":"""M03 (Turn spray on)\n """,
+				"gcode before path":"""M03 S1(Turn spray on)\n """,
 				"gcode after path":"M05 (Turn spray off)\n ",
 				"tool change gcode":"(Add G00 here to change sprayer if needed)\n",
 				
@@ -4760,7 +4774,7 @@ G01 Z1 (going to cutting z)\n""",
 							i += 1
 					
 					for sp1, sp2 in zip(subpath,subpath[1:]) :
-						if spl != None and abs(cross( csp_normalized_slope(spl,sp1,1.),csp_normalized_slope(sp1,sp2,0.) )) > 0.05 :
+						if spl != None and abs(cross( csp_normalized_slope(spl,sp1,1.),csp_normalized_slope(sp1,sp2,0.) )) > 0.1 : # TODO add coefficient into inx
 							# We've got sharp angle at sp1.
 							polyline += [sp1]
 							polylines += [['draw',polyline[:]]]

@@ -85,6 +85,10 @@ Also you can manually select object, open XML editor (Shift+Ctrl+X) and add or r
 		<page name='path-to-gcode' _gui-text='Path to Gcode'>	
 				<param name="biarc-tolerance" type='float' precision="5" _gui-text='Biarc interpolation tolerance:'>1</param>
 				<param name="biarc-max-split-depth" type="int" _gui-text="Maximum splitting depth:">4</param>
+				<param name="path-to-gcode-order"  _gui-text="Cutting order" type="optiongroup" appearance="minimal">
+					<option value="path by path">Path by path</option>
+					<option value="layer by layer">Layer by layer</option>
+				</param>
 				<_param name="help" type="description">
 Biarc interpolation tolerance is the maximum distance between path and its approximation.
 The segment will be split into two segments if the distance between path's segment and it's approximation exceeds biarc interpolation tolerance.
