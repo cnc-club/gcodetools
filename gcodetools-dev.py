@@ -3853,7 +3853,10 @@ class Gcodetools(inkex.Effect):
 					r = self.options.area_inkscape_radius * scale
 					sign=1 if r>0 else -1
 					print_("Tool diameter = %s, r = %s" % (tool_d, r))
-
+					
+					# avoiding infinite loops
+					if self.options.area_tool_overlap>0.9 : self.options.area_tool_overlap = .9
+			
 					for i in range(self.options.max_area_curves):
 						radius = - tool_d * (i*(1-self.options.area_tool_overlap)+0.5) * sign
 						if abs(radius)>abs(r): 
