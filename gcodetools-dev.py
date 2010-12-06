@@ -4473,21 +4473,24 @@ G01 Z1 (going to cutting z)\n""",
 						fine_cut = subpath[:]
 						if self.options.lathe_fine_cut_width>0 :
 							r = self.options.lathe_fine_cut_width
-							# Close the path to make offset correct 
-							bound = csp_simple_bound([subpath])
-							minx,miny,maxx,maxy = csp_true_bounds([subpath])
-							offsetted_subpath = csp_subpath_line_to(subpath[:], [ [subpath[-1][1][0], miny[1]-r*10 ], [subpath[0][1][0], miny[1]-r*10 ], [subpath[0][1][0], subpath[0][1][1] ]  ])
-							left,right = subpath[-1][1][0], subpath[0][1][0]
-							if left>right : left, right = right,left
-							offsetted_subpath = csp_offset([offsetted_subpath], r if not csp_subpath_ccw(offsetted_subpath) else -r ) 
-							offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [left,10], [left,0] )
-							offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [right,0], [right,10] )
-							offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [0, miny[1]-r], [10, miny[1]-r] )
-							#csp_draw(self.transform_csp(offsetted_subpath,layer,True), color = "Green", width = 1)
-							# Join offsetted_subpath together 
-							# Hope there wont be any cicles
-							subpath = csp_join_subpaths(offsetted_subpath)[0]
-							
+							if self.options.lathe_create_fine_cut_using == "Move path" :
+								subpath = [ [  [i2[0],i2[1]+r]  for i2 in i1]  for i1 in subpath]
+							else :
+								# Close the path to make offset correct 
+								bound = csp_simple_bound([subpath])
+								minx,miny,maxx,maxy = csp_true_bounds([subpath])
+								offsetted_subpath = csp_subpath_line_to(subpath[:], [ [subpath[-1][1][0], miny[1]-r*10 ], [subpath[0][1][0], miny[1]-r*10 ], [subpath[0][1][0], subpath[0][1][1] ]  ])
+								left,right = subpath[-1][1][0], subpath[0][1][0]
+								if left>right : left, right = right,left
+								offsetted_subpath = csp_offset([offsetted_subpath], r if not csp_subpath_ccw(offsetted_subpath) else -r ) 
+								offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [left,10], [left,0] )
+								offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [right,0], [right,10] )
+								offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [0, miny[1]-r], [10, miny[1]-r] )
+								#csp_draw(self.transform_csp(offsetted_subpath,layer,True), color = "Green", width = 1)
+								# Join offsetted_subpath together 
+								# Hope there wont be any cicles
+								subpath = csp_join_subpaths(offsetted_subpath)[0]
+						
 						# Create solid object from path and lathe_width 
 						bound = csp_simple_bound([subpath])
 						top_start, top_end = [subpath[0][1][0], self.options.lathe_width+self.options.Zsafe+self.options.lathe_fine_cut_width], [subpath[-1][1][0], self.options.lathe_width+self.options.Zsafe+self.options.lathe_fine_cut_width]
