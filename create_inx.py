@@ -30,7 +30,7 @@ def main():
 		args = [	
 					"DXF Points: dxfpoints no_options",
 					"Path to Gcode: ptg",
-					"Area: area area_artefacts ptg",
+					"Area: area area_fill area_artefacts ptg",
 					"Engraving: engraving",
 					"Tools library: tools_library no_options no_preferences",
 					"Orientation points: orientation no_options no_preferences",

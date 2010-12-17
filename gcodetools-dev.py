@@ -2886,6 +2886,7 @@ class Gcodetools(inkex.Effect):
 
 		self.OptionParser.add_option("",   "--area-fill-angle",				action="store", type="float", 		dest="area_fill_angle", default="0",					help="Fill area with lines heading this angle")
 		self.OptionParser.add_option("",   "--area-fill-shift",				action="store", type="float", 		dest="area_fill_shift", default="0",					help="Shift the lines by tool d * shift")
+		self.OptionParser.add_option("",   "--area-fill-method",			action="store", type="string", 		dest="area_fill_method", default="zig-zag",					help="Filling method either zig-zag or spiral")
 
 		self.OptionParser.add_option("",   "--area-find-artefacts-diameter",action="store", type="float", 		dest="area_find_artefacts_diameter", default="1",					help="Artefacts seeking radius")
 		self.OptionParser.add_option("",   "--area-find-artefacts-action",	action="store", type="string",	 	dest="area_find_artefacts_action", default="mark with an arrow",	help="Artefacts action type")
@@ -3884,6 +3885,8 @@ class Gcodetools(inkex.Effect):
 
 
 	def area_fill(self):
+		# convert degrees into rad
+		self.options.area_fill_angle = self.options.area_fill_angle * math.pi / 180
 		if len(self.selected_paths)<=0:
 			self.error(_("This extension requires at least one selected path."),"warning")
 			return
@@ -3894,6 +3897,7 @@ class Gcodetools(inkex.Effect):
 					self.error(_("Tool diameter must be > 0 but tool's diameter on '%s' layer is not!") % layer.get(inkex.addNS('label','inkscape')),"area_tools_diameter_error")
 				tool = self.tools[layer][0]
 				for path in self.selected_paths[layer]:
+					lines = []
 					print_(("doing path",	path.get("style"), path.get("d")))
 					area_group = inkex.etree.SubElement( path.getparent(), inkex.addNS('g','svg') )
 					d = path.get('d')
@@ -3907,31 +3911,93 @@ class Gcodetools(inkex.Effect):
 					#maxx = max([x,y,i,j,root],maxx)
 					
 					# rotate the path to get bounds in defined direction.
-					a = - self.options.aria_fill_angle
+					a = - self.options.area_fill_angle
 					rotated_path = [   [ [ [point[0]*math.cos(a) - point[1]*math.sin(a), point[0]*math.sin(a)+point[1]*math.cos(a)]  for point in sp] for sp in subpath] for subpath in csp  ]
 					bounds =  csp_true_bounds(rotated_path)
 					
-					# we need to get the segment's point of miny and maxy of the rotated path
-					i, j, t = bounds[1][2], bounds[1][3], bounds[1][4]
-					st = csp_at_t(csp[i][j-1],csp[i][j],t)
-					i, j = bounds[3][2], bounds[3][3], bounds[3][4]
-					end = csp_at_t(csp[i][j-1],csp[i][j],t)
-					d = point_to_point_d(start,end)
-					if d == 0 : continue
+					# Draw the lines 
+					# Get path's bounds
+					b = [0.0, 0.0, 0.0, 0.0] # [minx,miny,maxx,maxy]
+					for k in range(4):
+						i, j, t = bounds[k][2], bounds[k][3], bounds[k][4]
+						b[k] = csp_at_t(rotated_path[i][j-1],rotated_path[i][j],t)[k%2]
+
+						
+					# Zig-zag
+					r = tool['diameter']*(1-self.options.area_tool_overlap)
+					if r<=0 :
+						self.error('Tools diameter must be greater than 0!', 'error')
+						return
+
+					lines += [ [] ]
+
+					if self.options.area_fill_method == 'zig-zag' :
+						i = b[0] - self.options.area_fill_shift
+						top = True
+						last_one = True
+						while (i<b[2] or last_one) : 
+							if i<b[2] : last_one = False
+							if lines[-1] == [] :
+								lines[-1] += [  [[i,b[3]] for k in range(3)] ]
+
+							if top :
+								lines[-1] += [  	
+												[[i,b[1]] for k in range(3)],											
+												[[i+r,b[1]] for k in range(3)],											
+											]
+
+							else :
+									lines[-1] += [  	
+												[ [i,b[3]] for k in range(3) ],											
+												[[i+r,b[3]] for k in range(3)],											
+											]
+							top = not top
+							i += r
+					else :
 					
-					#and we'll also need path's 'width' in the angle direction
-					i, j, t = bounds[0][2], bounds[0][3], bounds[0][4]
-					minx = csp_at_t(csp[i][j-1],csp[i][j],t)
-					i, j, t = bounds[2][2], bounds[2][3], bounds[2][4]
-					maxx = csp_at_t(csp[i][j-1],csp[i][j],t)
-					w = point_to_point_d(minx,maxx)
+						w, h  = b[2]-b[0], b[3]-b[1]
+						x,y = b[0],b[1]
+						lines[-1] += [  [[x,y] for k in range(3)] ]
+						stage = 0
+						start = True
+						while w>0 and h>0 :
+							stage = (stage+1)%4
+							if   stage == 0 :
+								y -= h
+								if not start:
+									h -= r/2
+								start = False	
+							elif stage == 1:
+								x += w
+								w -=r/2
+							elif stage == 2 :
+								y += h
+								h -= r/2
+							elif stage == 3:
+								x -= w
+								w -=r/2
+							
+							lines[-1] += [  [[x,y] for k in range(3)] ]
+
+						stage = (stage+1)%4							
+						if w <= 0 :
+							y = y-h if stage == 0 else y+h  
+						if h <= 0 :
+							x = x-w if stage == 3 else x+w  
+						lines[-1] += [  [[x,y] for k in range(3)] ]
+					# Rotate created paths back
+					a =  self.options.area_fill_angle
+					csp_draw(rotated_path)
+					csp_draw(lines)
+
+					lines = [   [ [ [point[0]*math.cos(a) - point[1]*math.sin(a), point[0]*math.sin(a)+point[1]*math.cos(a)]  for point in sp] for sp in subpath] for subpath in lines  ]
+				
+					# and apply back transrormations to draw them	
+					lines = self.transform_csp(lines, layer, True)
+					csp_draw(lines)
+#					csp_draw(lines)
 					
-					
-					i = - self.options.area_fill_shift
-					lines = []
-					while (i<d)
-						lines += [ [  [ []  ], []  ] ]
-					
+
 
 					 					
 
@@ -4622,6 +4688,13 @@ G01 Z1 (going to cutting z)\n""",
 		
 		self.export_gcode(gcode)
 
+################################################################################
+###
+### Update function
+###
+###	Gets file containing version information from the web and compaares it with.
+###	current version.
+################################################################################
 	
 	def update(self) :
 		try :
@@ -4974,12 +5047,12 @@ G01 Z1 (going to cutting z)\n""",
 		if self.options.active_tab == '"help"' :
 			self.help()
 			return
-		elif self.options.active_tab not in ['"dxfpoints"','"path-to-gcode"', '"area"', '"area_artefacts"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"', '"offset"', '"arrangement"', '"update"', '"graffiti"']:
-			self.error(_("Select one of the action tabs - Path to Gcode, Area, Engraving, DXF points, Orientation, Offset, Lathe or Tools library."),"error")
+		elif self.options.active_tab not in ['"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"', '"offset"', '"arrangement"', '"update"', '"graffiti"']:
+			self.error(_("Select one of the action tabs - Path to Gcode, Area, Engraving, DXF points, Orientation, Offset, Lathe or Tools library.\n Current active tab id is %s" % self.options.active_tab),"error")
 		else:
 			# Get all Gcodetools data from the scene.
 			self.get_info()
-			if self.options.active_tab in ['"dxfpoints"','"path-to-gcode"', '"area"', '"area_artefacts"', '"engraving"', '"lathe"', '"graffiti"']:
+			if self.options.active_tab in ['"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"lathe"', '"graffiti"']:
 				if self.orientation_points == {} :
 					self.error(_("Orientation points have not been defined! A default set of orientation points has been automatically added."),"warning")
 					self.orientation( self.layers[min(1,len(self.layers)-1)] )		
@@ -4991,6 +5064,8 @@ G01 Z1 (going to cutting z)\n""",
 					self.get_info()
 			if self.options.active_tab == '"path-to-gcode"': 
 				self.path_to_gcode()		
+			elif self.options.active_tab == '"area_fill"': 
+				self.area_fill()		
 			elif self.options.active_tab == '"area"': 
 				self.area()		
 			elif self.options.active_tab == '"area_artefacts"': 
