@@ -2884,8 +2884,11 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--unit",						action="store", type="string", 		dest="unit", default="G21 (All units in mm)",		help="Units")
 		self.OptionParser.add_option("",   "--active-tab",					action="store", type="string", 		dest="active_tab", default="",						help="Defines which tab is active")
 
-		self.OptionParser.add_option("",   "--area-find-artefacts-diameter",action="store", type="float", 		dest="area_find_artefacts_diameter", default="1",					help="artefacts seeking radius")
-		self.OptionParser.add_option("",   "--area-find-artefacts-action",	action="store", type="string",	 	dest="area_find_artefacts_action", default="mark with an arrow",	help="artefacts action type")
+		self.OptionParser.add_option("",   "--area-fill-angle",				action="store", type="float", 		dest="area_fill_angle", default="0",					help="Fill area with lines heading this angle")
+		self.OptionParser.add_option("",   "--area-fill-shift",				action="store", type="float", 		dest="area_fill_shift", default="0",					help="Shift the lines by tool d * shift")
+
+		self.OptionParser.add_option("",   "--area-find-artefacts-diameter",action="store", type="float", 		dest="area_find_artefacts_diameter", default="1",					help="Artefacts seeking radius")
+		self.OptionParser.add_option("",   "--area-find-artefacts-action",	action="store", type="string",	 	dest="area_find_artefacts_action", default="mark with an arrow",	help="Artefacts action type")
 
 		self.OptionParser.add_option("",   "--auto_select_paths",			action="store", type="inkbool",		dest="auto_select_paths", default=True,				help="Select all paths if nothing is selected.")		
 
@@ -3871,6 +3874,66 @@ class Gcodetools(inkex.Effect):
 										})
 						print_(("adding curve",area_group,d,styles["biarc_style_i"]['area']))
 						if radius == -r : break 
+
+################################################################################
+###
+###		Area fill 
+###
+###		Fills area with lines
+################################################################################
+
+
+	def area_fill(self):
+		if len(self.selected_paths)<=0:
+			self.error(_("This extension requires at least one selected path."),"warning")
+			return
+		for layer in self.layers :
+			if layer in self.selected_paths :
+				self.set_tool(layer)
+				if self.tools[layer][0]['diameter']<=0 : 
+					self.error(_("Tool diameter must be > 0 but tool's diameter on '%s' layer is not!") % layer.get(inkex.addNS('label','inkscape')),"area_tools_diameter_error")
+				tool = self.tools[layer][0]
+				for path in self.selected_paths[layer]:
+					print_(("doing path",	path.get("style"), path.get("d")))
+					area_group = inkex.etree.SubElement( path.getparent(), inkex.addNS('g','svg') )
+					d = path.get('d')
+					if d==None:
+						print_("omitting non-path")
+						self.error(_("Warning: omitting non-path"),"selection_contains_objects_that_are_not_paths")
+						continue
+					csp = cubicsuperpath.parsePath(d)
+					csp = self.apply_transforms(path, csp)
+					csp = self.transform_csp(csp, layer)
+					#maxx = max([x,y,i,j,root],maxx)
+					
+					# rotate the path to get bounds in defined direction.
+					a = - self.options.aria_fill_angle
+					rotated_path = [   [ [ [point[0]*math.cos(a) - point[1]*math.sin(a), point[0]*math.sin(a)+point[1]*math.cos(a)]  for point in sp] for sp in subpath] for subpath in csp  ]
+					bounds =  csp_true_bounds(rotated_path)
+					
+					# we need to get the segment's point of miny and maxy of the rotated path
+					i, j, t = bounds[1][2], bounds[1][3], bounds[1][4]
+					st = csp_at_t(csp[i][j-1],csp[i][j],t)
+					i, j = bounds[3][2], bounds[3][3], bounds[3][4]
+					end = csp_at_t(csp[i][j-1],csp[i][j],t)
+					d = point_to_point_d(start,end)
+					if d == 0 : continue
+					
+					#and we'll also need path's 'width' in the angle direction
+					i, j, t = bounds[0][2], bounds[0][3], bounds[0][4]
+					minx = csp_at_t(csp[i][j-1],csp[i][j],t)
+					i, j, t = bounds[2][2], bounds[2][3], bounds[2][4]
+					maxx = csp_at_t(csp[i][j-1],csp[i][j],t)
+					w = point_to_point_d(minx,maxx)
+					
+					
+					i = - self.options.area_fill_shift
+					lines = []
+					while (i<d)
+						lines += [ [  [ []  ], []  ] ]
+					
+
+					 					
 
 
 ################################################################################
