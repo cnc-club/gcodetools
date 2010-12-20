@@ -170,6 +170,79 @@ styles = {
 ###		Cubic Super Path additional functions
 ################################################################################
 
+
+def csp_from_polyline(line) :
+	return [ [ [point[:] for k in range(3) ] for point in subline ]  for subline in line ]
+	
+	
+
+
+def point_inside_csp(p,csp, on_the_path = True) :
+	# we'll do the raytracing and see how many intersections are there on the ray's way. 
+	# if number of intersections is even then point is outside.
+	# ray will be x=p.x and y=>p.y
+	# you can assing any value to on_the_path, by dfault if point is on the path 
+	# function will return thai it's inside the path. 
+	x,y = p
+	ray_intersections_count = 0
+	for subpath in csp :
+		
+		for i in range(1, len(subpath)) :
+			sp1, sp2 = subpath[i-1], subpath[i]
+			ax,ay,bx,by,cx,cy,dx,dy = csp_parameterize(sp1,sp2)
+		 	if  ax==0 and bx==0 and cx==0 and dx==x : 
+		 		#we've got a special case here
+		 		b = csp_true_bounds( [[sp1,sp2]])
+		 		if  b[1][1]<=y<=b[3][1] :
+		 			# points is on the path 
+			 		return on_the_path
+			 	else :
+			 		# we can skip this segment because it wont influence the answer.
+			 		pass	
+		 	else: 
+	 			for t in csp_line_intersection([x,y],[x,y+5],sp1,sp2) :
+	 				if t == 0 or t == 1 :
+	 					#we've got another special case here
+		 				x1,y1 = csp_at_t(sp1,sp2,t)
+		 				if y1==y : 
+		 					# the point is on the path 
+		 					return on_the_path
+	 					# if t == 0 we sould have considered this case previously. 
+	 					if t == 1 :
+							# we have to check the next segmant if it is on the same side of the ray
+							st_d = csp_normalized_slope(sp1,sp2,1)[0]
+							if st_d == 0 : st_d = csp_normalized_slope(sp1,sp2,0.99)[0]
+							
+							for j in range(1, len(subpath)+1):
+								if (i+j) % len(subpath) == 0  : continue # skip the closing segment 
+								sp11,sp22 = subpath[(i-1+j) % len(subpath)], subpath[(i+j) % len(subpath)]
+								ax1,ay1,bx1,by1,cx1,cy1,dx1,dy1 = csp_parameterize(sp1,sp2)
+		 						if  ax1==0 and bx1==0 and cx1==0 and dx1==x : continue # this segment parallel to the ray, so skip it 
+								en_d = csp_normalized_slope(sp11,sp22,0)[0]
+								if en_d == 0 : en_d = csp_normalized_slope(sp11,sp22,0.01)[0]
+								if st_d*en_d <=0 : 
+			 						ray_intersections_count += 1
+			 						break 
+	 				else :	
+		 				x1,y1 = csp_at_t(sp1,sp2,t)
+		 				if y1==y : 
+		 					# the point is on the path 
+		 					return on_the_path
+		 				else :
+		 					if y1>y and 3*ax*t**2 + 2*bx*t + cx !=0 : # if it's 0 the path only touches the ray
+		 						ray_intersections_count += 1 	
+	return ray_intersections_count%2 == 1 				
+
+def csp_close_all_subpaths(csp, tolerance = 0.000001):
+	for i in range(len(csp)):
+		if point_to_point_d2(csp[i][0][1] , csp[i][-1][1])> tolerance**2 :
+			csp[i][-1][2] = csp[i][-1][1][:] 
+			csp[i] += [ [csp[i][0][1][:] for j in range(3)] ]
+		else: 
+			if csp[i][0][1] != csp[i][-1][1] : 
+				csp[i][-1][1] = csp[i][0][1][:]
+	return csp
+
 def csp_simple_bound(csp):
 	minx,miny,maxx,maxy = None,None,None,None
 	for subpath in csp:
@@ -332,6 +405,7 @@ def csp_split(sp1,sp2,t=.5) :
 	x = x1223+(x2334-x1223)*t
 	y = y1223+(y2334-y1223)*t
 	return [sp1[0],sp1[1],[x12,y12]], [[x1223,y1223],[x,y],[x2334,y2334]], [[x34,y34],sp2[1],sp2[2]]
+	
 	
 def csp_true_bounds(csp) :
 	# Finds minx,miny,maxx,maxy of the csp and return their (x,y,i,j,t) 
@@ -1308,14 +1382,14 @@ def draw_text(text,x,y, group = None, style = None, font_size = 10, gcodetools_t
 		span.text = str(s)
 			
 
-def draw_pointer(x,color = "#f00", figure = "cross", comment = "", width = .1) :
+def draw_pointer(x,color = "#f00", figure = "cross", comment = "", width = .1, size = 1) :
 	if figure ==  "line" :
 		s = ""
 		for i in range(1,len(x)/2) :
 			s+= " %s, %s " %(x[i*2],x[i*2+1])
 		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "M %s,%s L %s"%(x[0],x[1],s), "style":"fill:none;stroke:%s;stroke-width:%f;"%(color,width),"comment":str(comment)} )
 	else :
-		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l 10,10 -20,-20 10,10 -10,10, 20,-20"%(x[0],x[1]), "style":"fill:none;stroke:%s;stroke-width:%f;"%(color,width),"comment":str(comment)} )
+		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l %f,%f %f,%f %f,%f %f,%f , %f,%f"%(x[0],x[1], size,size, -2*size,-2*size, size,size, size,-size, -2*size,2*size ), "style":"fill:none;stroke:%s;stroke-width:%f;"%(color,width),"comment":str(comment)} )
 
 
 def straight_segments_intersection(a,b, true_intersection = True) : # (True intersection means check ta and tb are in [0,1])
@@ -3907,6 +3981,7 @@ class Gcodetools(inkex.Effect):
 						continue
 					csp = cubicsuperpath.parsePath(d)
 					csp = self.apply_transforms(path, csp)
+					csp = csp_close_all_subpaths(csp)
 					csp = self.transform_csp(csp, layer)
 					#maxx = max([x,y,i,j,root],maxx)
 					
@@ -3932,69 +4007,114 @@ class Gcodetools(inkex.Effect):
 					lines += [ [] ]
 
 					if self.options.area_fill_method == 'zig-zag' :
-						i = b[0] - self.options.area_fill_shift
+						i = b[0] - self.options.area_fill_shift*r
 						top = True
 						last_one = True
 						while (i<b[2] or last_one) : 
-							if i<b[2] : last_one = False
+							if i>=b[2] : last_one = False
 							if lines[-1] == [] :
-								lines[-1] += [  [[i,b[3]] for k in range(3)] ]
+								lines[-1] += [  [i,b[3]]  ]
 
 							if top :
-								lines[-1] += [  	
-												[[i,b[1]] for k in range(3)],											
-												[[i+r,b[1]] for k in range(3)],											
-											]
+								lines[-1] += [ [i,b[1]],[i+r,b[1]] ]
 
 							else :
-									lines[-1] += [  	
-												[ [i,b[3]] for k in range(3) ],											
-												[[i+r,b[3]] for k in range(3)],											
-											]
+									lines[-1] += [ [i,b[3]], [i+r,b[3]] ]
+
 							top = not top
 							i += r
 					else :
 					
-						w, h  = b[2]-b[0], b[3]-b[1]
-						x,y = b[0],b[1]
-						lines[-1] += [  [[x,y] for k in range(3)] ]
+						w, h  = b[2]-b[0] + self.options.area_fill_shift*r , b[3]-b[1] +  self.options.area_fill_shift*r
+						x,y = b[0] - self.options.area_fill_shift*r, b[1] - self.options.area_fill_shift*r
+						lines[-1] += [  [x,y] ]
 						stage = 0
 						start = True
 						while w>0 and h>0 :
 							stage = (stage+1)%4
 							if   stage == 0 :
 								y -= h
-								if not start:
-									h -= r/2
-								start = False	
+								h -= r
 							elif stage == 1:
 								x += w
-								w -=r/2
+								if not start:
+									w -= r
+								start = False	
 							elif stage == 2 :
 								y += h
-								h -= r/2
+								h -= r
 							elif stage == 3:
 								x -= w
-								w -=r/2
+								w -=r
 							
-							lines[-1] += [  [[x,y] for k in range(3)] ]
+							lines[-1] += [ [x,y] ]
 
 						stage = (stage+1)%4							
-						if w <= 0 :
+						if w <= 0 and h>0 :
 							y = y-h if stage == 0 else y+h  
-						if h <= 0 :
+						if h <= 0  and w>0 :
 							x = x-w if stage == 3 else x+w  
-						lines[-1] += [  [[x,y] for k in range(3)] ]
+						lines[-1] += [ [x,y] ]
 					# Rotate created paths back
 					a =  self.options.area_fill_angle
-					csp_draw(rotated_path)
-					csp_draw(lines)
+					lines = [ [ [point[0]*math.cos(a) - point[1]*math.sin(a), point[0]*math.sin(a)+point[1]*math.cos(a)] for point in subpath] for subpath in lines  ]
 
-					lines = [   [ [ [point[0]*math.cos(a) - point[1]*math.sin(a), point[0]*math.sin(a)+point[1]*math.cos(a)]  for point in sp] for sp in subpath] for subpath in lines  ]
-				
-					# and apply back transrormations to draw them	
-					lines = self.transform_csp(lines, layer, True)
-					csp_draw(lines)
+					# get the intersection points
+					
+					splitted_line = [ [lines[0][0]] ]
+					intersections = {}
+					for l1,l2, in zip(lines[0],lines[0][1:]): 
+						ints = []
+						
+						if l1[0]==l2[0] and l1[1]==l2[1] : continue
+						for i in range(len(csp)) :
+							for j in range(1,len(csp[i]))  :
+								sp1,sp2 = csp[i][j-1], csp[i][j]
+								roots = csp_line_intersection(l1,l2,sp1,sp2)
+								for t in roots :
+									p = tuple(csp_at_t(sp1,sp2,t))
+									if l1[0]==l2[0] :
+										t1 = (p[1]-l1[1])/(l2[1]-l1[1])
+									else :
+										t1 = (p[0]-l1[0])/(l2[0]-l1[0])
+									if 0<=t1<=1	:
+										ints += [[t1, p[0],p[1], i,j,t]]
+										if p in intersections :
+											intersections[p]  += [ [i,j,t] ]  
+										else : 	
+											intersections[p]  = [ [i,j,t] ]  
+										#p = self.transform(p,layer,True)
+										#draw_pointer(p)
+						ints.sort()
+						for i in ints:
+							splitted_line[-1] +=[ [ i[1], i[2]] ]
+							splitted_line += [ [ [ i[1], i[2]] ] ]
+						splitted_line[-1] += [  l2  ]
+						i = 0
+					print_(splitted_line)
+					while i < len(splitted_line) :
+						# check if the middle point of the first lines segment is inside the path.
+						# and remove the subline if not.
+						l1,l2 = splitted_line[i][0],splitted_line[i][1]
+						p = [(l1[0]+l2[0])/2, (l1[1]+l2[1])/2]
+						if not point_inside_csp(p, csp):
+							#i +=1 						
+							del splitted_line[i]
+						else :
+							i += 1
+					
+					
+					
+					# if we've used spiral method we'll try to save the order of cutting
+					do_not_change_order = self.options.area_fill_method == 'spiral' 
+					# now let's try connect splitted lines
+					#while len(splitted_line)>0 :
+					#TODO	
+					
+					# and apply back transrormations to draw them
+					csp_line = csp_from_polyline(splitted_line)
+					csp_line = self.transform_csp(csp_line, layer, True)
+					csp_draw(csp_line)
 #					csp_draw(lines)
 					
 
