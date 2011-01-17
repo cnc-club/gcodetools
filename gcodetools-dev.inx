@@ -230,10 +230,18 @@ Press Apply to create new tool.
 		</param>
 		<param name="lathe-x-axis-remap" type="string" _gui-text="Lathe X axis remap:">X</param>
 		<param name="lathe-z-axis-remap" type="string" _gui-text="Lathe Z axis remap:">Z</param>
-
-		
 	</page>
 <!-- Gcodetools: /lathe block -->
+
+<!-- Gcodetools: lathe_modify_path block -->
+	<page name='lathe_modify_path' _gui-text='Lathe modify path'>	
+		<_param name="help" type="description">	
+			This function modifies path so it will be able to be cut with the rectangular cutter.
+		</_param>
+		<param name="lathe-rectangular-cutter-width" type="float" precision="5" min="0" max="1000" _gui-text="Lathe width:">4</param>
+	</page>
+
+<!-- Gcodetools: /lathe_modify_path block -->
 
 
 <!-- Gcodetools: offset block -->

@@ -36,7 +36,7 @@ def main():
 					"Orientation points: orientation no_options no_preferences",
 					"All in one: ptg area area_artefacts engraving dxfpoints tools_library orientation",
 					"Offset: offset no_options", 
-					"Lathe: lathe ptg",
+					"Lathe: lathe lathe_modify_path ptg",
 					"Arrangement: arrangement no_options",
 					"Graffiti: graffiti orientation",
 					"Check for updates: update no_options no_preferences",

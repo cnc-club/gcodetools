@@ -1381,6 +1381,23 @@ def draw_text(text,x,y, group = None, style = None, font_size = 10, gcodetools_t
 		y += font_size
 		span.text = str(s)
 			
+def draw_csp(csp, stroke = "#f00", fill = "none", comment = "", width = .1, group = None, style = None, gcodetools_tag = None) :
+	if style == None : 
+		style = "fill:%s;fill-opacity:1;stroke:%s;stroke-width:%s"%(fill,stroke,width)
+	attributes = {			'd':	cubicsuperpath.formatPath(csp),
+							'style' : style
+				}
+	if comment != '':
+		attributes['comment'] = comment
+	if group == None :
+		group = options.doc_root
+		
+	return inkex.etree.SubElement( group, inkex.addNS('path','svg'), attributes) 
+	
+
+
+
+
 
 def draw_pointer(x,color = "#f00", figure = "cross", comment = "", width = .1, size = 1) :
 	if figure ==  "line" :
@@ -2986,6 +3003,8 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--lathe-x-axis-remap",			action="store", type="string", 		dest="lathe_x_axis_remap", default="X",						help="Lathe X axis remap")
 		self.OptionParser.add_option("",   "--lathe-z-axis-remap",			action="store", type="string", 		dest="lathe_z_axis_remap", default="Z",						help="Lathe Z axis remap")
 
+		self.OptionParser.add_option("",   "--lathe-rectangular-cutter-width",action="store", type="float", 		dest="lathe_rectangular_cutter_width", default="4",		help="Rectangular cutter width")
+
 		self.OptionParser.add_option("",   "--create-log",					action="store", type="inkbool", 	dest="log_create_log", default=False,				help="Create log files")
 		self.OptionParser.add_option("",   "--log-filename",				action="store", type="string", 		dest="log_filename", default='',					help="Create log files")
 
@@ -3091,6 +3110,25 @@ class Gcodetools(inkex.Effect):
 #					print_((-f(w[k][i-1]),-f(w[k][i]), [i1[5] for i1 in l1]) )
 				c += [ [ [subpath[-1][1][0],subpath[-1][1][1]]  ,'end',0,0] ]
 			return c
+
+
+################################################################################
+### 	Draw csp 
+################################################################################
+
+	def draw_csp(self, csp, layer=None, group=None, fill='none', stroke='#178ade', width='1.0', style=None):
+		if layer!=None :
+			csp = self.transform_csp(csp,layer,reverse=True)
+		if group==None and layer==None:
+			group = self.document.getroot()
+		elif group==None and layer!=None :
+			group = layer
+		if style!=None :
+			return draw_csp(csp, group=group, style=style)
+		else :
+			return draw_csp(csp, group=group, fill=fill, stroke=stroke, width=width)
+				
+
 
 
 	def draw_curve(self, curve, layer, group=None, style=styles["biarc_style"]):
@@ -4804,10 +4842,66 @@ G01 Z1 (going to cutting z)\n""",
 							gcode += ("G01 %s %f F %f \n" % (z, top_start[1], self.tool["passing feed"]) )
 							gcode += ("G01 %s %f %s %f F %f \n" % (x, top_start[0], z, top_start[1], self.tool["passing feed"]) )
 	
-		
-		
 		self.export_gcode(gcode)
+		
+################################################################################
+###
+###		Lathe modify path 
+### 	Modifies path to fit current cutter. As for now straight rect cutter.
+###
+################################################################################
 
+	def lathe_modify_path(self):
+		if self.selected_paths == {} and self.options.auto_select_paths:
+			paths=self.paths
+			self.error(_("No paths are selected! Trying to work on all available paths."),"warning")
+		else :
+			paths = self.selected_paths
+
+		for layer in self.layers :
+			if layer in paths :
+				width = self.transform([self.options.lathe_rectangular_cutter_width,0],layer, reverse=True)
+				self.set_tool(layer)
+				for path in paths[layer]:
+					csp = self.transform_csp(cubicsuperpath.parsePath(path.get("d")),layer)
+					new_csp = []
+					for subpath in csp: 
+						orientation = 1 if subpath[-1][1][0]>subpath[0][1][0] else -1
+						last_n = None
+						last_o = 0
+						new_subpath = []
+						for sp1, sp2 in zip(subpath[:],subpath[1:]):
+							ax,ay,bx,by,cx,cy,dx,dy = csp_parameterize(sp1,sp2)
+							
+							r = cubic_solver(0, 3*ax, 2*bx, cx)	 + [0,1]
+							roots = []
+							for root in r :
+								if ((type(root) is complex and abs(root.imag)<1e-10 and 0.0001<root.real<0.9999) or
+									(type(root) is float and 0.0001<root<0.9999) ) :
+									roots += [root]
+							self.error("%s"%roots,'warning')		
+							if len(roots) == 2 :
+								sp1,sp2,sp3,sp4 = csp_split_by_two_points(sp1,sp2,roots[0],roots[1])	
+								new_subpath = csp_concat_subpaths(new_subpath, [sp1,sp2,sp3,sp4])
+							elif len(roots) == 1 :
+								sp1,sp2,sp3 = csp_split(sp1,sp2,roots[0])
+								new_subpath = csp_concat_subpaths(new_subpath, [sp1,sp2,sp3])
+							else :
+								if new_subpath!= []:
+									new_subpath += [sp2] 		
+								else : 
+									new_subpath = [sp1,sp2]
+								
+					new_csp += [new_subpath]	
+					self.draw_csp(new_csp,layer)
+#								n = csp_normalized_normal(sp1,sp2,0) 	
+#								o = (1 if cross(n, [0,1])>0 else -1)*orientation
+#								new_subpath += [  [sp1[i][0] - width*o,sp1[i][1]] for i in range(3)  ]
+#							n = csp_normalized_normal(sp1,sp2,1) 
+#							o = (1 if cross(n, [0,1])>0 else -1)*orientation
+#							new_subpath += [  [sp2[i][0] - width*o,sp2[i][1]] for i in range(3)  ]
+							
+							
 ################################################################################
 ###
 ### Update function
@@ -5167,7 +5261,7 @@ G01 Z1 (going to cutting z)\n""",
 		if self.options.active_tab == '"help"' :
 			self.help()
 			return
-		elif self.options.active_tab not in ['"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"', '"offset"', '"arrangement"', '"update"', '"graffiti"']:
+		elif self.options.active_tab not in ['"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"', '"offset"', '"arrangement"', '"update"', '"graffiti"', '"lathe_modify_path"']:
 			self.error(_("Select one of the action tabs - Path to Gcode, Area, Engraving, DXF points, Orientation, Offset, Lathe or Tools library.\n Current active tab id is %s" % self.options.active_tab),"error")
 		else:
 			# Get all Gcodetools data from the scene.
@@ -5205,6 +5299,8 @@ G01 Z1 (going to cutting z)\n""",
 					self.check_tools_and_op()
 			elif self.options.active_tab == '"lathe"': 
 				self.lathe()
+			elif self.options.active_tab == '"lathe_modify_path"': 
+				self.lathe_modify_path()
 			elif self.options.active_tab == '"update"': 
 				self.update()
 			elif self.options.active_tab == '"offset"': 
