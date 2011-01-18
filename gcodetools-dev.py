@@ -791,6 +791,20 @@ def csp_split_by_two_points(sp1,sp2,t1,t2) :
 		sp2,sp3,sp4 = csp_split(sp2,sp3,(t2-t1)/(1-t1) )
 		return [sp1,sp2,sp3,sp4]
 
+def csp_seg_split(sp1,sp2, points):
+	# points is float=t or list [t1, t2, ..., tn]
+	if type(points) is float :
+		points = [points]
+	points.sort()
+	res = [sp1,sp2]
+	last_t = 0
+	for t in points: 
+		if 1e-10<t<1.-1e-10 :
+			sp3,sp4,sp5 = csp_split(res[-2],res[-1], (t-last_t)/(1-last_t))
+			last_t = t
+			res[-2:] = [sp3,sp4,sp5]
+	return res		
+
 
 def csp_subpath_split_by_points(subpath, points) :
 	# points are [[i,t]...] where i-segment's number
@@ -1432,7 +1446,19 @@ def isinf(x): inf = 1e5000; return x == inf or x == -inf
 def between(c,x,y):
 		return x-straight_tolerance<=c<=y+straight_tolerance or y-straight_tolerance<=c<=x+straight_tolerance
 
-
+def cubic_solver_real(a,b,c,d):
+	# returns only real roots of a cubic equation.
+	roots = cubic_solver(a,b,c,d)
+	res = []
+	for root in roots :
+		if type(root) is complex :	
+			if -1e-10<root.imag<1e-10 :
+				res.append(root.real)
+		else :
+			res.append(root)
+	return res 
+	
+	
 def cubic_solver(a,b,c,d):	
 	if a!=0:
 		#	Monics formula see http://en.wikipedia.org/wiki/Cubic_function#Monic_formula_of_roots
@@ -3387,6 +3413,8 @@ class Gcodetools(inkex.Effect):
 			simpletransform.applyTransformToPath(trans, csp)
 		return csp
 
+	def transform_scalar(self,x,layer,reverse=False):
+		return self.transform([x,0],layer,reverse)[0] - self.transform([0,0],layer,reverse)[0]
 
 	def transform(self,source_point, layer, reverse=False):
 		if layer not in self.transform_matrix:
@@ -3492,6 +3520,7 @@ class Gcodetools(inkex.Effect):
 						active_layer_already_has_tool
 						active_layer_already_has_orientation_points
 					"""
+		s = "%s"%s
 		if type_.lower() in re.split("[\s\n,\.]+", errors.lower()) :
 			print_(s)
 			inkex.errormsg(s+"\n")		
@@ -4860,41 +4889,56 @@ G01 Z1 (going to cutting z)\n""",
 
 		for layer in self.layers :
 			if layer in paths :
-				width = self.transform([self.options.lathe_rectangular_cutter_width,0],layer, reverse=True)
-				self.set_tool(layer)
+				width = self.options.lathe_rectangular_cutter_width
+				#self.set_tool(layer)
 				for path in paths[layer]:
 					csp = self.transform_csp(cubicsuperpath.parsePath(path.get("d")),layer)
 					new_csp = []
 					for subpath in csp: 
-						orientation = 1 if subpath[-1][1][0]>subpath[0][1][0] else -1
+						orientation = subpath[-1][1][0]>subpath[0][1][0]
 						last_n = None
 						last_o = 0
 						new_subpath = []
+
+						# Split segment at x' and y' == 0
 						for sp1, sp2 in zip(subpath[:],subpath[1:]):
 							ax,ay,bx,by,cx,cy,dx,dy = csp_parameterize(sp1,sp2)
-							
-							r = cubic_solver(0, 3*ax, 2*bx, cx)	 + [0,1]
-							roots = []
-							for root in r :
-								if ((type(root) is complex and abs(root.imag)<1e-10 and 0.0001<root.real<0.9999) or
-									(type(root) is float and 0.0001<root<0.9999) ) :
-									roots += [root]
-							self.error("%s"%roots,'warning')		
-							if len(roots) == 2 :
-								sp1,sp2,sp3,sp4 = csp_split_by_two_points(sp1,sp2,roots[0],roots[1])	
-								new_subpath = csp_concat_subpaths(new_subpath, [sp1,sp2,sp3,sp4])
-							elif len(roots) == 1 :
-								sp1,sp2,sp3 = csp_split(sp1,sp2,roots[0])
-								new_subpath = csp_concat_subpaths(new_subpath, [sp1,sp2,sp3])
-							else :
-								if new_subpath!= []:
-									new_subpath += [sp2] 		
-								else : 
-									new_subpath = [sp1,sp2]
+							roots = cubic_solver_real(0, 3*ax, 2*bx, cx)
+							roots += cubic_solver_real(0, 3*ay, 2*by, cy)
+							new_subpath = csp_concat_subpaths(new_subpath, csp_seg_split(sp1,sp2,roots))
+						subpath = new_subpath
+						new_subpath = []
+						first_seg = True
+						for sp1, sp2 in zip(subpath[:],subpath[1:]):
+							n = csp_normalized_normal(sp1,sp2,0)
+							a  = math.atan2(n[0],n[1])
+							if a == 0 or a == math.pi :
+								n = csp_normalized_normal(sp1,sp2,1)
+							a  = math.atan2(n[0],n[1])							
+							if a!=0 and a!=math.pi:
+								o = 0 if 0<a<=math.pi/2 or -math.pi<a<-math.pi/2 else 1
+								if not orientation: o = 1-o
 								
+								# Add first horisontal straight line if needed
+								if not first_seg and new_subpath==[] : new_subpath = [ [[subpath[0][i][0] - width*o ,subpath[0][i][1]] for i in range(3)] ]
+								
+								new_subpath = csp_concat_subpaths(
+										new_subpath,
+										[
+											[[sp1[i][0] - width*o ,sp1[i][1]] for i in range(3)],
+											[[sp2[i][0] - width*o ,sp2[i][1]] for i in range(3)]
+										]
+									)
+							first_seg = False
+							
+						# Add last horisontal straigth line if needed
+						if a==0 or a==math.pi :
+							new_subpath +=  [ [[subpath[-1][i][0] - width*o ,subpath[-1][i][1]] for i in range(3)] ]
+
+						
 					new_csp += [new_subpath]	
 					self.draw_csp(new_csp,layer)
-#								n = csp_normalized_normal(sp1,sp2,0) 	
+#								
 #								o = (1 if cross(n, [0,1])>0 else -1)*orientation
 #								new_subpath += [  [sp1[i][0] - width*o,sp1[i][1]] for i in range(3)  ]
 #							n = csp_normalized_normal(sp1,sp2,1) 
