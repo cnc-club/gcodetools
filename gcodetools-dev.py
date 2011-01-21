@@ -85,6 +85,9 @@ straight_tolerance = 0.0001
 straight_distance_tolerance = 0.0001
 engraving_tolerance = 0.0001
 loft_lengths_tolerance = 0.0000001
+
+EMC_TOLERANCE_EQUAL = 0.00001
+
 options = {}
 defaults = {
 'header': """%
@@ -2018,7 +2021,22 @@ def biarc(sp1, sp2, z1, z2, depth=0):
 	else:
 		if R2.mag()*a2 == 0 : zm = z2
 		else : zm  = z1 + (z2-z1)*(abs(R1.mag()*a1))/(abs(R2.mag()*a2)+abs(R1.mag()*a1)) 
-		return [	[ sp1[1], 'arc', [R1.x,R1.y], a1, [P2.x,P2.y], [z1,zm] ], [ [P2.x,P2.y], 'arc', [R2.x,R2.y], a2, [P4.x,P4.y], [zm,z2] ]		]
+
+		l = (P0-P2).l2()
+		if  l < EMC_TOLERANCE_EQUAL**2 or l<EMC_TOLERANCE_EQUAL**2 * R1.l2() /100 :
+			# arc should be straight otherwise it could be threated as full circle
+			arc1 = [ sp1[1], 'line', 0, 0, [P2.x,P2.y], [z1,zm] ] 
+		else :
+			arc1 = [ sp1[1], 'arc', [R1.x,R1.y], a1, [P2.x,P2.y], [z1,zm] ] 
+
+		l = (P4-P2).l2()
+		if  l < EMC_TOLERANCE_EQUAL**2 or l<EMC_TOLERANCE_EQUAL**2 * R2.l2() /100 :
+			# arc should be straight otherwise it could be threated as full circle
+			arc2 = [ [P2.x,P2.y], 'line', 0, 0, [P4.x,P4.y], [zm,z2] ] 
+		else :
+			arc2 = [ [P2.x,P2.y], 'arc', [R2.x,R2.y], a2, [P4.x,P4.y], [zm,z2] ]
+		
+		return [ arc1, arc2 ]
 
 
 def biarc_curve_segment_length(seg):
