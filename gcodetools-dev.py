@@ -2386,12 +2386,13 @@ class Polygon:
 	
 	
 	def rotate_(self,sin,cos) :
-		for i in range(len(self.polygon)) :
-			for j in range(len(self.polygon[i])) :
-				x,y = self.polygon[i][j][0], self.polygon[i][j][1] 
-				self.polygon[i][j][0] = x*cos - y*sin
-				self.polygon[i][j][1] = x*sin + y*cos
-		
+		self.polygon = [
+				[
+					[point[0]*cos - point[1]*sin,point[0]*sin + point[1]*cos] for point in subpoly
+				]			
+				for subpoly in self.polygon
+			]
+
 	
 	def rotate(self, a):
 		cos, sin = math.cos(a), math.sin(a)
@@ -2478,9 +2479,10 @@ class Polygon:
 		self.move(0, -dist)		
 		
 					
-	def draw(self,color="#075",width=.1) :
-		for poly in self.polygon :
-			csp_draw( [csp_subpath_line_to([],poly+[poly[0]])], color=color,width=width )
+	def draw(self,color="#075",width=.1, group = None) :
+		csp = [csp_subpath_line_to([],poly+[poly[0]]) for poly in self.polygon]
+		csp_draw( csp, color=color,width=width, group = group)
+			
 			
 	
 	def add(self, add) :
@@ -2799,6 +2801,7 @@ class Arangement_Genetic:
 
 	
 	def test(self,test_function): 
+		time_ = time.time()
 		for i in range(len(self.population)) :
 			if self.population[i][0] == None :
 				surface = test_function(self.population[i][1])
@@ -2808,13 +2811,13 @@ class Arangement_Genetic:
 
 
 	def test_spiece_centroid(self,spiece) : 
-		poly = Polygon(copy.deepcopy(self.polygons[spiece[0][0]].polygon))
+		poly = Polygon(	self.polygons[spiece[0][0]].polygon[:])
 		poly.rotate(spiece[0][2]*math.pi2)
 		surface  = Polygon(poly.polygon)
 		i = 0
 		for p in spiece[1:] :
 			i += 1
-			poly = Polygon(copy.deepcopy(self.polygons[p[0]].polygon))
+			poly = Polygon(self.polygons[p[0]].polygon[:])
 			poly.rotate(p[2]*math.pi2)
 			c = surface.centroid()
 			c1 = poly.centroid()
@@ -2892,6 +2895,7 @@ class Gcodetools(inkex.Effect):
 		
 		
 		print_("Genetic alhorithm start at %s"%(time_))
+		start_time = time.time()
 		time_ = time.time()
 		
 	
@@ -2916,6 +2920,7 @@ class Gcodetools(inkex.Effect):
 			population.move_mutation_factor = 1.
 			population.mutation_genes_count = [1,2]
 			population.populate_species(250, 20)
+			print_("Populate done at %s"%(time.time()-time_))			
 			"""
 			randomize = i%100 < 40
 			if 	i%100 < 40 : 
@@ -2928,6 +2933,7 @@ class Gcodetools(inkex.Effect):
 				population.populate_species(250, 10)
 			"""
 			population.test(population.test_spiece_centroid)
+			print_("Test done at %s"%(time.time()-time_))
 			draw_new_champ = False
 			print_()
 			for x in population.population[:10]:
@@ -2943,6 +2949,8 @@ class Gcodetools(inkex.Effect):
 			#	k += "%s   " % population.population[j][0]
 			print_("Cicle %s done in %s"%(i,time.time()-time_))
 			time_ = time.time()
+			
+			
 			print_("%s incests been found"%population.inc)
 			print_()
 			#print_(k)
@@ -2955,9 +2963,9 @@ class Gcodetools(inkex.Effect):
 				x,y = 400* (champions_count%10), 700*int(champions_count/10)
 				surface.move(x-b[0],y-b[1])
 				surface.draw(width=2, color=colors[0])
-				draw_text("Step = %s\nSquare = %f"%(i,(b[2]-b[0])*(b[3]-b[1])),x,y-40)
+				draw_text("Step = %s\nSquare = %f\nTime from start = %f"%(i,(b[2]-b[0])*(b[3]-b[1]),time.time()-start_time),x,y-40)
 				champions_count += 1
-
+				"""
 				spiece = population.population[0][1]
 				poly = Polygon(copy.deepcopy(population.polygons[spiece[0][0]].polygon))
 				poly.rotate(spiece[0][2]*math.pi2)
@@ -2990,7 +2998,7 @@ class Gcodetools(inkex.Effect):
 					poly.drop_into_direction(direction,surface)
 					surface.add(poly)
 				
-				
+				"""
 		# Now we'll need apply transforms to original paths
 		
 		
