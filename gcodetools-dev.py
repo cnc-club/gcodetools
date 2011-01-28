@@ -2751,7 +2751,8 @@ class Arangement_Genetic:
 				self.incest_mutation_multiplyer = 2. 
 				self.incest_mutation_count_multiplyer = 2. 
 			else :
-				if random.random()<.01 : print_(self.species_distance2(parent1, parent2))	
+				pass
+#				if random.random()<.01 : print_(self.species_distance2(parent1, parent2))	
 			start_gene = random.randint(0,self.genes_count)
 			end_gene = (max(1,random.randint(0,self.genes_count),int(self.genes_count/4))+start_gene) % self.genes_count
 			if end_gene<start_gene : 
@@ -2809,23 +2810,81 @@ class Arangement_Genetic:
 				self.population[i][0] = (b[3]-b[1])*(b[2]-b[0])
 		self.population.sort() 				
 
-
 	def test_spiece_centroid(self,spiece) : 
 		poly = Polygon(	self.polygons[spiece[0][0]].polygon[:])
-		poly.rotate(spiece[0][2]*math.pi2)
+		poly.rotate(spiece[0][1]*math.pi2)
 		surface  = Polygon(poly.polygon)
-		i = 0
 		for p in spiece[1:] :
-			i += 1
 			poly = Polygon(self.polygons[p[0]].polygon[:])
-			poly.rotate(p[2]*math.pi2)
 			c = surface.centroid()
+			surface.move(-c[0],-c[1])
 			c1 = poly.centroid()
-			direction = [math.cos(p[1]*math.pi2), -math.sin(p[1]*math.pi2)]
-			poly.move(c[0]-c1[0]-direction[0]*100,c[1]-c1[1]-direction[1]*100)
-			poly.drop_into_direction(direction,surface)
+			poly.move(-c1[0],-c1[1])
+			poly.rotate(p[1]*math.pi2+p[2]*math.pi2)
+			surface.rotate(p[2]*math.pi2)
+			poly.drop_down(surface)
 			surface.add(poly)
+			surface.rotate(-p[2]*math.pi2)
 		return surface
+		
+				
+	def test_inline(self) : 
+		###
+		###	Fast test function using weave's from scipy inline function
+		###
+		try :
+			converters is None 
+		except :	
+			try:
+				from scipy import weave
+				from scipy.weave import converters
+			except:
+				options.self.error("For this function Scipy is needed. See http://www.cnc-club.ru/gcodetools for details.","error")		
+	
+		# Prepare vars 
+		poly_, subpoly_, points_ = [], [], []
+		for  poly in self.polygons :
+			p = poly.polygon
+			poly_ += [len(subpoly_), len(subpoly_)+len(p)*2]
+			for subpoly in p :
+				subpoly_ += [len(points_), len(points_)+len(subpoly)*2+2]
+				for point in subpoly :
+					points_ += point
+				points_ += subpoly[0] # Close subpolygon
+
+		test_ = []
+		population_ = []
+		for spiece in self.population:
+			test_.append( spiece[0] if spiece[0] != None else -1)
+			for sp in spiece[1]:
+				population_ += sp
+			
+		lp_, ls_, l_, lt_ = len(poly_), len(subpoly_), len(points_), len(test_)
+		 
+		f = open('inline_test.c', 'r')
+		code = f.read()
+		f.close()
+		
+		f = open('inline_test_functions.c', 'r')
+		functions = f.read()
+		f.close()
+		
+		stdout_ = sys.stdout
+		s = ''		
+		sys.stdout = s 
+
+		test = weave.inline(
+							code,
+							['points_','subpoly_','poly_', 'lp_', 'ls_', 'l_', 'lt_','test_', 'population_'],
+							compiler='gcc',
+							support_code = functions,
+							)
+		if s!='' : options.self.error(s,"warning")		
+		sys.stdout = stdout_
+		
+		for i in range(len(test_)):
+			self.population[i][0] = test_[i]
+		
 		
 		
 		
@@ -2906,7 +2965,7 @@ class Gcodetools(inkex.Effect):
 		time_ = time.time()
 		pop = copy.deepcopy(population)
 		population_count = self.options.arrangement_population_count
-		last_champ = []
+		last_champ = -1
 		champions_count = 0
 		
 		
@@ -2932,29 +2991,27 @@ class Gcodetools(inkex.Effect):
 				population.order_mutation_factor = 1./(i%100-79) if 80<=i%100<100 else 1.
 				population.populate_species(250, 10)
 			"""
-			population.test(population.test_spiece_centroid)
+			if self.options.arrangement_inline_test :
+				population.test_inline()
+			else:		
+				population.test(population.test_spiece_centroid)
+				
 			print_("Test done at %s"%(time.time()-time_))
 			draw_new_champ = False
 			print_()
-			for x in population.population[:10]:
-				print_(x[0])
+
 			
 			if population.population[0][0]!= last_champ : 
 				draw_new_champ = True
+				improve = last_champ-population.population[0][0]
 				last_champ = population.population[0][0]*1
-			
 
-			k = ""			
-			#for j in range(10) :
-			#	k += "%s   " % population.population[j][0]
+			
 			print_("Cicle %s done in %s"%(i,time.time()-time_))
 			time_ = time.time()
-			
-			
 			print_("%s incests been found"%population.inc)
 			print_()
-			#print_(k)
-			#print_()
+
 			if i == 0  or i == population_count-1 or draw_new_champ :
 				colors = ["blue"]
 				
@@ -2963,7 +3020,7 @@ class Gcodetools(inkex.Effect):
 				x,y = 400* (champions_count%10), 700*int(champions_count/10)
 				surface.move(x-b[0],y-b[1])
 				surface.draw(width=2, color=colors[0])
-				draw_text("Step = %s\nSquare = %f\nTime from start = %f"%(i,(b[2]-b[0])*(b[3]-b[1]),time.time()-start_time),x,y-40)
+				draw_text("Step = %s\nSquare = %f\nSquare improvement = %f\nTime from start = %f"%(i,(b[2]-b[0])*(b[3]-b[1]),improve,time.time()-start_time),x,y-50)
 				champions_count += 1
 				"""
 				spiece = population.population[0][1]
@@ -3074,16 +3131,18 @@ class Gcodetools(inkex.Effect):
 	
 		self.OptionParser.add_option("",   "--arrangement-material-width",	action="store", type="float",		dest="arrangement_material_width", default=500,		help="Materials width for arrangement")		
 		self.OptionParser.add_option("",   "--arrangement-population-count",action="store", type="int",			dest="arrangement_population_count", default=100,	help="Genetic algorithm populations count")		
+		self.OptionParser.add_option("",   "--arrangement-inline-test",		action="store", type="inkbool", 	dest="arrangement_inline_test", default=False,	help="Use C-inline test (some additional packets will be needed)")
+
 
 		self.OptionParser.add_option("",   "--postprocessor",				action="store", type="string", 		dest="postprocessor", default='',			help="Postprocessor command.")
 		self.OptionParser.add_option("",   "--postprocessor-custom",		action="store", type="string", 		dest="postprocessor_custom", default='',	help="Postprocessor custom command.")
 	
-		self.OptionParser.add_option("",   "--graffiti-max-seg-length",		action="store", type="float", 		dest="graffiti_max_seg_length", default=1.,	help="Ggraffiti maximum segment length.")
-		self.OptionParser.add_option("",   "--graffiti-min-radius",			action="store", type="float", 		dest="graffiti_min_radius", default=10.,	help="Ggraffiti minimal connector's radius.")
-		self.OptionParser.add_option("",   "--graffiti-start-pos",			action="store", type="string", 		dest="graffiti_start_pos", default="(0;0)",	help="Ggraffiti Start position (x;y).")
+		self.OptionParser.add_option("",   "--graffiti-max-seg-length",		action="store", type="float", 		dest="graffiti_max_seg_length", default=1.,	help="Graffiti maximum segment length.")
+		self.OptionParser.add_option("",   "--graffiti-min-radius",			action="store", type="float", 		dest="graffiti_min_radius", default=10.,	help="Graffiti minimal connector's radius.")
+		self.OptionParser.add_option("",   "--graffiti-start-pos",			action="store", type="string", 		dest="graffiti_start_pos", default="(0;0)",	help="Graffiti Start position (x;y).")
 		self.OptionParser.add_option("",   "--graffiti-create-linearization-preview",	action="store", type="inkbool", 	dest="graffiti_create_linearization_preview", default=True,	help="Ggraffiti create linearization preview.")
-		self.OptionParser.add_option("",   "--graffiti-create-preview",		action="store", type="inkbool", 	dest="graffiti_create_preview", default=True,	help="Ggraffiti create preview.")
-		self.OptionParser.add_option("",   "--graffiti-preview-size",		action="store", type="int", 		dest="graffiti_preview_size", default=800,	help="Ggraffiti preview's size.")
+		self.OptionParser.add_option("",   "--graffiti-create-preview",		action="store", type="inkbool", 	dest="graffiti_create_preview", default=True,	help="Graffiti create preview.")
+		self.OptionParser.add_option("",   "--graffiti-preview-size",		action="store", type="int", 		dest="graffiti_preview_size", default=800,	help="Graffiti preview's size.")
 		self.OptionParser.add_option("",   "--graffiti-preview-emmit",		action="store", type="int", 		dest="graffiti_preview_emmit", default=800,	help="Preview's paint emmit (pts/s).")
 
 
