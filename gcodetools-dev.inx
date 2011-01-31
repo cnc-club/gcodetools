@@ -86,12 +86,18 @@ Also you can manually select object, open XML editor (Shift+Ctrl+X) and add or r
 				<param name="biarc-tolerance" type='float' precision="5" _gui-text='Biarc interpolation tolerance:'>1</param>
 				<param name="biarc-max-split-depth" type="int" _gui-text="Maximum splitting depth:">4</param>
 				<param name="path-to-gcode-order"  _gui-text="Cutting order" type="optiongroup" appearance="minimal">
+					<option value="subpath by subpath">Subpath by subpath</option>
 					<option value="path by path">Path by path</option>
-					<option value="layer by layer">Layer by layer</option>
+					<option value="pass by pass">Pass by Pass</option>
 				</param>
+				
+				<param name="path-to-gcode-depth-function" type="string" _gui-text="Depth function:">d</param>			
+				<param name="path-to-gcode-sort-paths" type="boolean" _gui-text="Sort paths to reduse rapid distance">True</param>			
+				
 				<_param name="help" type="description">
 Biarc interpolation tolerance is the maximum distance between path and its approximation.
 The segment will be split into two segments if the distance between path's segment and it's approximation exceeds biarc interpolation tolerance.
+For depth function c=color intensity from 0.0 (white) to 1.0 (black), d is the depth defined by orientation points, s - surface defined by orientation points. 
 </_param>
 		</page>
 <!-- Gcodetools: /ptg block -->

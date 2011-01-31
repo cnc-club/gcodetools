@@ -2008,7 +2008,7 @@ def biarc(sp1, sp2, z1, z2, depth=0):
 		alpha =  (p2a - p0a) % (2*math.pi)					
 		if (p0a<p2a and  (p1a<p0a or p2a<p1a))	or	(p2a<p1a<p0a) : 
 			alpha = -2*math.pi+alpha 
-		if abs(R.x)>1000000 or abs(R.y)>1000000  or (R-P0).mag<options.min_arc_radius :
+		if abs(R.x)>1000000 or abs(R.y)>1000000  or (R-P0).mag<options.min_arc_radius**2 :
 			return None, None
 		else :	
 			return  R, alpha
@@ -3075,6 +3075,9 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--biarc-tolerance",				action="store", type="float", 		dest="biarc_tolerance", default="1",				help="Tolerance used when calculating biarc interpolation.")				
 		self.OptionParser.add_option("",   "--biarc-max-split-depth",		action="store", type="int", 		dest="biarc_max_split_depth", default="4",			help="Defines maximum depth of splitting while approximating using biarcs.")				
 		self.OptionParser.add_option("",   "--path-to-gcode-order",			action="store", type="string", 		dest="path_to_gcode_order", default="path by path",	help="Defines cutting order path by path or layer by layer.")				
+		self.OptionParser.add_option("",   "--path-to-gcode-depth-function",action="store", type="string", 		dest="path_to_gcode_depth_function", default="zd",	help="Path to gcode depth function.")				
+		self.OptionParser.add_option("",   "--path-to-gcode-sort-paths",	action="store", type="inkbool",		dest="path_to_gcode_sort_paths", default=True,		help="Sort paths to reduse rapid distance.")		
+
 
 
 		self.OptionParser.add_option("",   "--tool-diameter",				action="store", type="float", 		dest="tool_diameter", default="3",					help="Tool diameter used for area cutting")		
@@ -3112,7 +3115,7 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--lathe-x-axis-remap",			action="store", type="string", 		dest="lathe_x_axis_remap", default="X",						help="Lathe X axis remap")
 		self.OptionParser.add_option("",   "--lathe-z-axis-remap",			action="store", type="string", 		dest="lathe_z_axis_remap", default="Z",						help="Lathe Z axis remap")
 
-		self.OptionParser.add_option("",   "--lathe-rectangular-cutter-width",action="store", type="float", 		dest="lathe_rectangular_cutter_width", default="4",		help="Rectangular cutter width")
+		self.OptionParser.add_option("",   "--lathe-rectangular-cutter-width",action="store", type="float", 	dest="lathe_rectangular_cutter_width", default="4",		help="Rectangular cutter width")
 
 		self.OptionParser.add_option("",   "--create-log",					action="store", type="inkbool", 	dest="log_create_log", default=False,				help="Create log files")
 		self.OptionParser.add_option("",   "--log-filename",				action="store", type="string", 		dest="log_filename", default='',					help="Create log files")
@@ -3458,7 +3461,7 @@ class Gcodetools(inkex.Effect):
 					current_a = current_a+s[3]
 				else : axis4 = ""
 				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + penetration_feed + "\n"				
-				if (r[0]**2 + r[1]**2)>self.options.min_arc_radius:
+				if (r[0]**2 + r[1]**2)>self.options.min_arc_radius**2:
 					r1, r2 = (P(s[0])-P(s[2])), (P(si[0])-P(s[2]))
 					if abs(r1.mag()-r2.mag()) < 0.001 :
 						g += ("G02" if s[3]<0 else "G03") + c(si[0]+[ s[5][1]+depth, (s[2][0]-s[0][0]),(s[2][1]-s[0][1])  ]) + feed + axis4 + "\n"
@@ -3870,6 +3873,26 @@ class Gcodetools(inkex.Effect):
 			
 			return minimal_way
 
+		def sort_lines(lines):
+			if len(lines) == 0 : return []
+			lines = [ [key]+lines[key] for key in range(len(lines))]			
+			keys = [0]
+			end_point = lines[0][3:]
+			print_("!!!",lines,"\n",end_point)
+			del lines[0]
+			while len(lines)>0:
+				dist = [ [point_to_point_d2(end_point,lines[i][1:3]),i] for i in range(len(lines))]
+				i = min(dist)[1]
+				keys.append(lines[i][0])
+				end_point = lines[i][3:]
+				del lines[i]
+			return keys
+			
+		def sort_curves(curves):
+			lines = []
+			for curve in curves:
+				lines += [curve[0][0][0] + curve[-1][-1][0]]
+			return sort_lines(lines)
 		
 		def print_dxfpoints(points):
 			gcode=""
@@ -3889,21 +3912,31 @@ class Gcodetools(inkex.Effect):
 		biarc_group = inkex.etree.SubElement( self.selected_paths.keys()[0] if len(self.selected_paths.keys())>0 else self.layers[0], inkex.addNS('g','svg') )
 		print_(("self.layers=",self.layers))
 		print_(("paths=",paths))
+		colors = {}
 		for layer in self.layers :
-#			print_(("processing layer",layer," of layers:",self.layers))
 			if layer in paths :
-				
-#				print_(("layer ",layer, " is in paths:",paths))
 				print_(("layer",layer))
+
+				# transform simple path to get all var about orientation
+				self.transform_csp([ [ [[0,0],[0,0],[0,0]],  [[0,0],[0,0],[0,0]] ] ], layer)
+			
 				self.set_tool(layer)
-				p = []	
+				curves = []
 				dxfpoints = []
+				try :
+					depth_func = eval('lambda c,zd,zs: ' + self.options.path_to_gcode_depth_function.strip('"'))				
+				except:
+					self.error("Bad depth function! Enter correct function at Path to Gcode tab!") 
+					
 				for path in paths[layer] :
 					if "d" not in path.keys() : 
 						self.error(_("Warning: One or more paths dont have 'd' parameter, try to Ungroup (Ctrl+Shift+G) and Object to Path (Ctrl+Shift+C)!"),"selection_contains_objects_that_are_not_paths")
 						continue					
 					csp = cubicsuperpath.parsePath(path.get("d"))
 					csp = self.apply_transforms(path, csp)
+					id_ = path.get("id") 
+					style = simplestyle.parseStyle(path.get("style"))
+					colors[id_] = simplestyle.parseColor(style['stroke'] if "stroke" in style else "#000")
 					if path.get("dxfpoint") == "1":
 						tmp_curve=self.transform_csp(csp, layer)
 						x=tmp_curve[0][0][0][0]
@@ -3911,26 +3944,60 @@ class Gcodetools(inkex.Effect):
 						print_("got dxfpoint (scaled) at (%f,%f)" % (x,y))
 						dxfpoints += [[x,y]]
 					else:
-						p += csp
+						
+						zd,zs = self.Zcoordinates[layer][1],	self.Zcoordinates[layer][0]
+						c = 1. - float(sum(colors[id_]))/255/3
+						curves += 	[
+										 [  
+										 	[id_, depth_func(c,zd,zs)],
+										 	[ self.parse_curve([subpath], layer) for subpath in csp  ]
+										 ]
+									]
+									
 				dxfpoints=sort_dxfpoints(dxfpoints)
 				gcode+=print_dxfpoints(dxfpoints)
-
-				if self.options.path_to_gcode_order != 'path by path':
-					p = [p]
-				else: 
-					p = [ [p1] for p1 in p]
 				
-				for sub_p in p : 	
-					curve = self.parse_curve(sub_p, layer)
+				
+				for curve in curves :
+					for subcurve in curve[1] :
+						self.draw_curve(subcurve, layer)
 					
-					self.draw_curve(curve, layer, biarc_group)
-					if self.tools[layer][0]["depth step"] == 0 : self.tools[layer][0]["depth step"] = 1
+				if self.options.path_to_gcode_order == 'subpath by subpath':
+					curves = [ [curve[0],[subcurve]]  for subcurve in curve[1] for curve in curves ]
+					self.options.path_to_gcode_order != 'path by path'
+					
+				if self.options.path_to_gcode_order == 'path by path':
+					if self.options.path_to_gcode_sort_paths :
+						keys = sort_curves( [curve[1] for curve in curves] )
+					else :
+						keys = range(len(curves))
+					for key in keys:
+						d = curves[key][0][1]
+						for step in range( 0,  int(math.ceil( abs((zs-d)/self.tools[layer][0]["depth step"] )) ) ):
+							z = max(d, zs - abs(self.tools[layer][0]["depth step"]*(step+1)))
+							for curve in curves[key][1]:
+								gcode += self.generate_gcode(curve, layer, z)
+							
+				else:	# pass by pass
+					mind = min( [curve[0][1] for curve in curves] )	
+					for step in range( 0,  int(math.ceil( abs((zs-mind)/self.tools[layer][0]["depth step"] )) ) ):
+						z = zs - abs(self.tools[layer][0]["depth step"]*(step))
+						curves_ = []
+						for curve in curves:
+							if curve[0][1]<z : 
+								curves_.append(curve)
 
-					for step in range( 0,  int(math.ceil( abs( (self.Zcoordinates[layer][1]-self.Zcoordinates[layer][0])/self.tools[layer][0]["depth step"] )) ) ):
-						Zpos = max(		self.Zcoordinates[layer][1],		 self.Zcoordinates[layer][0] - abs(self.tools[layer][0]["depth step"]*(step+1))	)
-						gcode += self.generate_gcode(curve, layer, Zpos)
-					
-			
+						z = zs - abs(self.tools[layer][0]["depth step"]*(step+1))
+						gcode += "\n(Pass at depth %s)\n"%z
+
+						if self.options.path_to_gcode_sort_paths :
+							keys = sort_curves( [curve[1] for curve in curves_] )		
+						else :
+							keys = range(len(curves_))
+						for key in keys:
+							for subcurve in curves_[key][1]:
+								gcode += self.generate_gcode(subcurve, layer, max(z,curves_[key][0][1]))
+							
 		self.export_gcode(gcode)
 	
 ################################################################################
@@ -4826,7 +4893,7 @@ G01 Z1 (going to cutting z)\n""",
 				gcode += ("G01 %s %f %s %f" % (x, s[4][0], z, s[4][1]) ) + feed + "\n"
 			elif s[1] == 'arc':
 				r = [(s[2][0]-s[0][0]), (s[2][1]-s[0][1])]
-				if (r[0]**2 + r[1]**2)>self.options.min_arc_radius:
+				if (r[0]**2 + r[1]**2)>self.options.min_arc_radius**2:
 					r1, r2 = (P(s[0])-P(s[2])), (P(s[4])-P(s[2]))
 					if abs(r1.mag()-r2.mag()) < 0.001 :
 						gcode += ("G02" if s[3]*flip_angle<0 else "G03") + (" %s %f %s %f %s %f %s %f" % (x,s[4][0],z,s[4][1],i_,(s[2][0]-s[0][0]), k_, (s[2][1]-s[0][1]) ) ) + feed + "\n"
