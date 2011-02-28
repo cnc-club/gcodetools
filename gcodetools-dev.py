@@ -2137,10 +2137,11 @@ class Postprocessor():
 		gcode = self.gcode.split("\n")
 		self.gcode = ""
 		try :
-			for line in range(len(gcode)) :
-				self.gcode += eval( "re.sub(%s,line)"%parameters)
-		except :	
-			self.error("Bad parameters for regexp. They should be as re.sub pattern and replacement parameters! For example: r'G0(\d)', r'G\\1' \n(Parameters: '%s')"%(parameters), "error")				
+			for line in gcode :
+				self.gcode += eval( "re.sub(%s,line)"%parameters) +"\n"
+
+		except Exception as ex :	
+			self.error("Bad parameters for regexp. They should be as re.sub pattern and replacement parameters! For example: r\"G0(\d)\", r\"G\\1\" \n(Parameters: '%s')\n %s"%(parameters, ex), "error")				
 		
 	
 	def remapi(self,parameters):
