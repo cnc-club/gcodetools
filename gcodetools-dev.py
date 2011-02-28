@@ -2104,7 +2104,8 @@ class Postprocessor():
 					"flip"		: self.flip_axis,
 					"flip_axis"	: self.flip_axis,
 					"round"		: self.round_coordinates,
-					"parameterize"		: self.parameterize,
+					"parameterize"	: self.parameterize,
+					"regex"			: self.re_sub_on_gcode_lines
 					}
 	
 			
@@ -2132,11 +2133,14 @@ class Postprocessor():
 			self.error("Unrecognized function '%s' while postprocessing.\n(Command: '%s')"%(function,command), "error")
 	
 	
-	def re_sub_on_gcode_lines(self, pattern,replacemant):
+	def re_sub_on_gcode_lines(self, parameters):
 		gcode = self.gcode.split("\n")
 		self.gcode = ""
-		for i in range(len(gcode)) :
-			self.gcode += re.sub(pattern,replacement,gcode[i])
+		try :
+			for line in range(len(gcode)) :
+				self.gcode += eval( "re.sub(%s,line)"%parameters)
+		except :	
+			self.error("Bad parameters for regexp. They should be as re.sub pattern and replacement parameters! For example: r'G0(\d)', r'G\\1' \n(Parameters: '%s')"%(parameters), "error")				
 		
 	
 	def remapi(self,parameters):
@@ -2960,7 +2964,7 @@ class Gcodetools(inkex.Effect):
 	
 
 		population.add_random_species(50)
-		population.test(population.test_spiece_centroid)
+		#population.test(population.test_spiece_centroid)
 		print_("Initial population done in %s"%(time.time()-time_))
 		time_ = time.time()
 		pop = copy.deepcopy(population)
@@ -3924,7 +3928,7 @@ class Gcodetools(inkex.Effect):
 				curves = []
 				dxfpoints = []
 				try :
-					depth_func = eval('lambda c,zd,zs: ' + self.options.path_to_gcode_depth_function.strip('"'))				
+					depth_func = eval('lambda c,d,s: ' + self.options.path_to_gcode_depth_function.strip('"'))				
 				except:
 					self.error("Bad depth function! Enter correct function at Path to Gcode tab!") 
 					
