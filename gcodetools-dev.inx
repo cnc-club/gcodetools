@@ -56,6 +56,7 @@ Gcodetools ver. 1.6
 				<item value="parameterize();">Parameterize Gcode</item>
 				<item value="flip(y);parameterize();">Flip y axis and parameterize Gcode</item>
 				<item value="round(4);">Round all values to 4 digits</item>
+				<item value='regex("G01 Z([0-9\.\-]+).*\(Penetrate\)", lambda match: "G00 Z%f (Fast pre-penetrate)\n%s" %(float(match.group(1))+5, match.group(0)));'>Fast pre-penetrate</item>
 			</param>
 			<param name="postprocessor-custom" type="string" _gui-text="Additional post-processor:"></param>			
 			

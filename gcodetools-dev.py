@@ -3449,7 +3449,7 @@ class Gcodetools(inkex.Effect):
 					a = calculate_angle(a, current_a)
 					g+="G01 A%s\n" % (a*tool['4th axis scale']+tool['4th axis offset'])
 					current_a = a
-				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + penetration_feed +"\n"	
+				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + penetration_feed +"(Penetrate)\n"	
 				g += "G01" +c(si[0]+[s[5][1]+depth]) + feed + "\n"
 				lg = 'G01'
 			elif s[1] == 'arc':
@@ -3465,7 +3465,7 @@ class Gcodetools(inkex.Effect):
 					axis4 = " A%s"%((current_a+s[3])*tool['4th axis scale']+tool['4th axis offset'])
 					current_a = current_a+s[3]
 				else : axis4 = ""
-				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + penetration_feed + "\n"				
+				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + penetration_feed + "(Penetrate)\n"				
 				if (r[0]**2 + r[1]**2)>self.options.min_arc_radius**2:
 					r1, r2 = (P(s[0])-P(s[2])), (P(si[0])-P(s[2]))
 					if abs(r1.mag()-r2.mag()) < 0.001 :
