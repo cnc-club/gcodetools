@@ -4002,8 +4002,11 @@ class Gcodetools(inkex.Effect):
 						else :
 							keys = range(len(curves_))
 						for key in keys:
+							gcode += "(Start cutting path id: %s)\n"%curves[key][0][0]
 							for subcurve in curves_[key][1]:
 								gcode += self.generate_gcode(subcurve, layer, max(z,curves_[key][0][1]))
+							gcode += "(End cutting path id: %s)\n"%curves[key][0][0]
+
 							
 		self.export_gcode(gcode)
 	
