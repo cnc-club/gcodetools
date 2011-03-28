@@ -3940,7 +3940,7 @@ class Gcodetools(inkex.Effect):
 						continue					
 					csp = cubicsuperpath.parsePath(path.get("d"))
 					csp = self.apply_transforms(path, csp)
-					id_ = path.get("id") 
+					id_ = re.sub(r"[\(\)\\\n\r]",".",path.get("id"))
 					style = simplestyle.parseStyle(path.get("style"))
 					colors[id_] = simplestyle.parseColor(style['stroke'] if "stroke" in style else "#000")
 					if path.get("dxfpoint") == "1":
@@ -3970,7 +3970,7 @@ class Gcodetools(inkex.Effect):
 					
 				if self.options.path_to_gcode_order == 'subpath by subpath':
 					curves = [ [curve[0],[subcurve]]  for subcurve in curve[1] for curve in curves ]
-					self.options.path_to_gcode_order != 'path by path'
+					self.options.path_to_gcode_order = 'path by path'
 					
 				if self.options.path_to_gcode_order == 'path by path':
 					if self.options.path_to_gcode_sort_paths :
@@ -3981,9 +3981,10 @@ class Gcodetools(inkex.Effect):
 						d = curves[key][0][1]
 						for step in range( 0,  int(math.ceil( abs((zs-d)/self.tools[layer][0]["depth step"] )) ) ):
 							z = max(d, zs - abs(self.tools[layer][0]["depth step"]*(step+1)))
+							gcode += "(Start cutting path id: %s)\n"%curves[key][0][0]
 							for curve in curves[key][1]:
 								gcode += self.generate_gcode(curve, layer, z)
-							
+							gcode += "(End cutting path id: %s)\n"%curves[key][0][0]
 				else:	# pass by pass
 					mind = min( [curve[0][1] for curve in curves] )	
 					for step in range( 0,  int(math.ceil( abs((zs-mind)/self.tools[layer][0]["depth step"] )) ) ):
