@@ -37,6 +37,8 @@ Gcodetools ver. 1.6
 			<param name="Zoffset" type="float" precision="5" min="-100000" max="100000" _gui-text="Offset along Z axis:">0.0</param>
 			<param name="auto_select_paths" type="boolean" _gui-text="Select all paths if nothing is selected">true</param>
 			<param name="min-arc-radius" type="float" precision="5" min="-1000" max="1000"  _gui-text="Minimum arc radius:">0.05</param>
+			<param name="comment-gcode" type="string" _gui-text="Comment Gcode:"></param>
+			
 		</page>
 <!-- Gcodetools: /options block -->
 <!-- Gcodetools: preferences block -->

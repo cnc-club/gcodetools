@@ -3082,6 +3082,7 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--path-to-gcode-order",			action="store", type="string", 		dest="path_to_gcode_order", default="path by path",	help="Defines cutting order path by path or layer by layer.")				
 		self.OptionParser.add_option("",   "--path-to-gcode-depth-function",action="store", type="string", 		dest="path_to_gcode_depth_function", default="zd",	help="Path to gcode depth function.")				
 		self.OptionParser.add_option("",   "--path-to-gcode-sort-paths",	action="store", type="inkbool",		dest="path_to_gcode_sort_paths", default=True,		help="Sort paths to reduse rapid distance.")		
+		self.OptionParser.add_option("",   "--comment-gcode",				action="store", type="string", 		dest="comment_gcode", default="",					help="Commetn Gcode:")				
 
 
 
@@ -3795,7 +3796,7 @@ class Gcodetools(inkex.Effect):
 ###
 ################################################################################
 	def path_to_gcode(self) :
-
+		from functools import partial
 		def get_boundaries(points):
 			minx,miny,maxx,maxy=None,None,None,None
 			out=[[],[],[],[]]
@@ -3940,9 +3941,20 @@ class Gcodetools(inkex.Effect):
 						continue					
 					csp = cubicsuperpath.parsePath(path.get("d"))
 					csp = self.apply_transforms(path, csp)
-					id_ = re.sub(r"[\(\)\\\n\r]",".",path.get("id"))
+					id_ = path.get("id")
+					id_literal = re.sub(r"[\(\)\\\n\r]",".",id_)
+					
+					def set_comment(match, path):
+						if match.group(1) in path.keys() :
+							return re.sub(r"[\(\)\\\n\r]",".",path.get(match.group(1)))
+						else: 
+							return "None"
+					comment = re.sub("\[([A-Za-z_\-\:]+)\]", partial(set_comment, path=path), self.options.comment_gcode)
+					comment = "(" + comment.replace("\n",")\n(") +")"
+					comment = comment.replace(":newline:",")\n(") 
+
 					style = simplestyle.parseStyle(path.get("style"))
-					colors[id_] = simplestyle.parseColor(style['stroke'] if "stroke" in style else "#000")
+					colors[id_] = simplestyle.parseColor(style['stroke'] if "stroke"  in style and style['stroke']!='none' else "#000")
 					if path.get("dxfpoint") == "1":
 						tmp_curve=self.transform_csp(csp, layer)
 						x=tmp_curve[0][0][0][0]
@@ -3955,7 +3967,7 @@ class Gcodetools(inkex.Effect):
 						c = 1. - float(sum(colors[id_]))/255/3
 						curves += 	[
 										 [  
-										 	[id_, depth_func(c,zd,zs)],
+										 	[id_, depth_func(c,zd,zs), id_literal, comment],
 										 	[ self.parse_curve([subpath], layer) for subpath in csp  ]
 										 ]
 									]
@@ -3981,10 +3993,12 @@ class Gcodetools(inkex.Effect):
 						d = curves[key][0][1]
 						for step in range( 0,  int(math.ceil( abs((zs-d)/self.tools[layer][0]["depth step"] )) ) ):
 							z = max(d, zs - abs(self.tools[layer][0]["depth step"]*(step+1)))
-							gcode += "(Start cutting path id: %s)\n"%curves[key][0][0]
+							gcode += "(Start cutting path id: %s)\n"%curves[key][0][2]
+							if curves[key][0][2] != "()" :
+								gcode += curves[key][0][3] # add comment
 							for curve in curves[key][1]:
 								gcode += self.generate_gcode(curve, layer, z)
-							gcode += "(End cutting path id: %s)\n"%curves[key][0][0]
+							gcode += "(End cutting path id: %s)\n"%curves[key][0][2]
 				else:	# pass by pass
 					mind = min( [curve[0][1] for curve in curves] )	
 					for step in range( 0,  int(math.ceil( abs((zs-mind)/self.tools[layer][0]["depth step"] )) ) ):
@@ -4002,10 +4016,12 @@ class Gcodetools(inkex.Effect):
 						else :
 							keys = range(len(curves_))
 						for key in keys:
-							gcode += "(Start cutting path id: %s)\n"%curves[key][0][0]
+							gcode += "(Start cutting path id: %s)\n"%curves[key][0][2]
+							if curves[key][0][2] != "()" :
+								gcode += curves[key][0][3] # add comment
 							for subcurve in curves_[key][1]:
 								gcode += self.generate_gcode(subcurve, layer, max(z,curves_[key][0][1]))
-							gcode += "(End cutting path id: %s)\n"%curves[key][0][0]
+							gcode += "(End cutting path id: %s)\n"%curves[key][0][2]
 
 							
 		self.export_gcode(gcode)
