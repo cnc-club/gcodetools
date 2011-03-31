@@ -3615,6 +3615,7 @@ class Gcodetools(inkex.Effect):
 		notes = "Note "
 		warnings = """
 						Warning tools_warning
+						orientation_warning
 						bad_orientation_points_in_some_layers
 						more_than_one_orientation_point_groups
 						more_than_one_tool
@@ -3726,6 +3727,27 @@ class Gcodetools(inkex.Effect):
 				
 					
 		recursive_search(self.document.getroot(),self.document.getroot())
+
+		if len(self.layers) == 1 : 
+			self.error(_("Document has no layers! Add at least one layer ustig layes panel (Ctrl+Shift+L)"),"error")
+		root = self.document.getroot() 
+
+		if  root in self.selected_paths or root in self.paths :
+			self.error(_("Warning! There are some paths in the root of the document, but not in any layer! Using bottom most layer's for them."), "tools_warning" )
+
+		if  root in self.selected_paths :
+			if self.layers[-1] in self.selected_paths :
+				self.selected_paths[self.layers[-1]] += self.selected_paths[root][:]
+			else :	
+				self.selected_paths[self.layers[-1]] = self.selected_paths[root][:]
+			del self.selected_paths[root]
+			
+		if root in self.paths :	
+			if self.layers[-1] in self.paths :
+				self.paths[self.layers[-1]] += self.paths[root][:]
+			else :
+				self.paths[self.layers[-1]] = self.paths[root][:]
+			del self.paths[root]
 
 
 	def get_orientation_points(self,g):
@@ -3938,7 +3960,7 @@ class Gcodetools(inkex.Effect):
 					done = True	
 				node =	node.getparent()
 			return res
-			
+
 		if self.selected_paths == {} and self.options.auto_select_paths:
 			paths=self.paths
 			self.error(_("No paths are selected! Trying to work on all available paths."),"warning")
@@ -3946,7 +3968,7 @@ class Gcodetools(inkex.Effect):
 			paths = self.selected_paths
 		self.check_dir() 
 		gcode = ""
-
+		
 		biarc_group = inkex.etree.SubElement( self.selected_paths.keys()[0] if len(self.selected_paths.keys())>0 else self.layers[0], inkex.addNS('g','svg') )
 		print_(("self.layers=",self.layers))
 		print_(("paths=",paths))
@@ -3954,18 +3976,18 @@ class Gcodetools(inkex.Effect):
 		for layer in self.layers :
 			if layer in paths :
 				print_(("layer",layer))
-
 				# transform simple path to get all var about orientation
 				self.transform_csp([ [ [[0,0],[0,0],[0,0]],  [[0,0],[0,0],[0,0]] ] ], layer)
 			
 				self.set_tool(layer)
 				curves = []
 				dxfpoints = []
+
 				try :
 					depth_func = eval('lambda c,d,s: ' + self.options.path_to_gcode_depth_function.strip('"'))				
 				except:
 					self.error("Bad depth function! Enter correct function at Path to Gcode tab!") 
-					
+
 				for path in paths[layer] :
 					if "d" not in path.keys() : 
 						self.error(_("Warning: One or more paths do not have 'd' parameter, try to Ungroup (Ctrl+Shift+G) and Object to Path (Ctrl+Shift+C)!"),"selection_contains_objects_that_are_not_paths")
@@ -3989,7 +4011,7 @@ class Gcodetools(inkex.Effect):
 						tags = get_path_properties(path)
 						for tag in tags :
 							comment += gcode_comment_str("%s: %s"%(tag,tags[tag]))
-						 
+
 					style = simplestyle.parseStyle(path.get("style"))
 					colors[id_] = simplestyle.parseColor(style['stroke'] if "stroke"  in style and style['stroke']!='none' else "#000")
 					if path.get("dxfpoint") == "1":
@@ -4008,7 +4030,7 @@ class Gcodetools(inkex.Effect):
 										 	[ self.parse_curve([subpath], layer) for subpath in csp  ]
 										 ]
 									]
-									
+
 				dxfpoints=sort_dxfpoints(dxfpoints)
 				gcode+=print_dxfpoints(dxfpoints)
 				
