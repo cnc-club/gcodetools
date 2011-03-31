@@ -169,6 +169,24 @@ styles = {
 	}
 
 
+
+################################################################################
+###		Gcode additional functions
+################################################################################
+
+def gcode_comment_str(s, replace_new_line = False):
+	if replace_new_line :
+		s = re.sub(r"[\n\r]+", ".", s)
+	res = ""
+	if s[-1] == "\n" : s = s[:-1]
+	for a in s.split("\n") :
+		if a != "" : 
+			res +=  "(" + re.sub(r"[\(\)\\\n\r]", ".", a) + ")\n"
+		else : 	
+			res +=  "\n"
+	return res	
+
+
 ################################################################################
 ###		Cubic Super Path additional functions
 ################################################################################
@@ -3082,7 +3100,8 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--path-to-gcode-order",			action="store", type="string", 		dest="path_to_gcode_order", default="path by path",	help="Defines cutting order path by path or layer by layer.")				
 		self.OptionParser.add_option("",   "--path-to-gcode-depth-function",action="store", type="string", 		dest="path_to_gcode_depth_function", default="zd",	help="Path to gcode depth function.")				
 		self.OptionParser.add_option("",   "--path-to-gcode-sort-paths",	action="store", type="inkbool",		dest="path_to_gcode_sort_paths", default=True,		help="Sort paths to reduse rapid distance.")		
-		self.OptionParser.add_option("",   "--comment-gcode",				action="store", type="string", 		dest="comment_gcode", default="",					help="Commetn Gcode:")				
+		self.OptionParser.add_option("",   "--comment-gcode",				action="store", type="string", 		dest="comment_gcode", default="",					help="Comment Gcode")				
+		self.OptionParser.add_option("",   "--comment-gcode-from-properties",action="store", type="inkbool", 	dest="comment_gcode_from_properties", default=False,help="Get additional comments from Object Properties")				
 
 
 
@@ -3907,6 +3926,18 @@ class Gcodetools(inkex.Effect):
 				gcode +="(drilling dxfpoint)\nG00 Z%f\nG00 X%f Y%f\nG01 Z%f F%f\nG04 P%f\nG00 Z%f\n" % (self.options.Zsafe,point[0],point[1],self.Zcoordinates[layer][1],self.tools[layer][0]["penetration feed"],0.2,self.options.Zsafe) 
 #			print_(("got dxfpoints array=",points))
 			return gcode
+		
+		def get_path_properties(node, recursive=True, tags={inkex.addNS('desc','svg'):"Description",inkex.addNS('title','svg'):"Title"} ) :
+			res = {}
+			done = False
+			root = self.document.getroot()
+			while not done and node != root :
+				for i in node.getchildren():
+					if i.tag in tags:
+						res[tags[i.tag]] = i.text
+					done = True	
+				node =	node.getparent()
+			return res
 			
 		if self.selected_paths == {} and self.options.auto_select_paths:
 			paths=self.paths
@@ -3942,17 +3973,23 @@ class Gcodetools(inkex.Effect):
 					csp = cubicsuperpath.parsePath(path.get("d"))
 					csp = self.apply_transforms(path, csp)
 					id_ = path.get("id")
-					id_literal = re.sub(r"[\(\)\\\n\r]",".",id_)
 					
 					def set_comment(match, path):
 						if match.group(1) in path.keys() :
-							return re.sub(r"[\(\)\\\n\r]",".",path.get(match.group(1)))
+							return path.get(match.group(1))
 						else: 
 							return "None"
-					comment = re.sub("\[([A-Za-z_\-\:]+)\]", partial(set_comment, path=path), self.options.comment_gcode)
-					comment = "(" + comment.replace("\n",")\n(") +")"
-					comment = comment.replace(":newline:",")\n(") 
-
+					if self.options.comment_gcode != "" :
+						comment = re.sub("\[([A-Za-z_\-\:]+)\]", partial(set_comment, path=path), self.options.comment_gcode)
+						comment = comment.replace(":newline:","\n") 
+						comment = gcode_comment_str(comment)
+					else:
+						comment = ""
+					if self.options.comment_gcode_from_properties :
+						tags = get_path_properties(path)
+						for tag in tags :
+							comment += gcode_comment_str("%s: %s"%(tag,tags[tag]))
+						 
 					style = simplestyle.parseStyle(path.get("style"))
 					colors[id_] = simplestyle.parseColor(style['stroke'] if "stroke"  in style and style['stroke']!='none' else "#000")
 					if path.get("dxfpoint") == "1":
@@ -3967,7 +4004,7 @@ class Gcodetools(inkex.Effect):
 						c = 1. - float(sum(colors[id_]))/255/3
 						curves += 	[
 										 [  
-										 	[id_, depth_func(c,zd,zs), id_literal, comment],
+										 	[id_, depth_func(c,zd,zs), comment],
 										 	[ self.parse_curve([subpath], layer) for subpath in csp  ]
 										 ]
 									]
@@ -3993,12 +4030,16 @@ class Gcodetools(inkex.Effect):
 						d = curves[key][0][1]
 						for step in range( 0,  int(math.ceil( abs((zs-d)/self.tools[layer][0]["depth step"] )) ) ):
 							z = max(d, zs - abs(self.tools[layer][0]["depth step"]*(step+1)))
-							gcode += "(Start cutting path id: %s)\n"%curves[key][0][2]
+							
+							gcode += gcode_comment_str("\nStart cutting path id: %s"%curves[key][0][0])
 							if curves[key][0][2] != "()" :
-								gcode += curves[key][0][3] # add comment
+								gcode += curves[key][0][2] # add comment
+								
 							for curve in curves[key][1]:
 								gcode += self.generate_gcode(curve, layer, z)
-							gcode += "(End cutting path id: %s)\n"%curves[key][0][2]
+								
+							gcode += gcode_comment_str("End cutting path id: %s\n\n"%curves[key][0][0])
+							
 				else:	# pass by pass
 					mind = min( [curve[0][1] for curve in curves] )	
 					for step in range( 0,  int(math.ceil( abs((zs-mind)/self.tools[layer][0]["depth step"] )) ) ):
@@ -4016,12 +4057,15 @@ class Gcodetools(inkex.Effect):
 						else :
 							keys = range(len(curves_))
 						for key in keys:
-							gcode += "(Start cutting path id: %s)\n"%curves[key][0][2]
+				
+							gcode += gcode_comment_str("Start cutting path id: %s"%curves[key][0][0])
 							if curves[key][0][2] != "()" :
-								gcode += curves[key][0][3] # add comment
+								gcode += curves[key][0][2] # add comment
+
 							for subcurve in curves_[key][1]:
 								gcode += self.generate_gcode(subcurve, layer, max(z,curves_[key][0][1]))
-							gcode += "(End cutting path id: %s)\n"%curves[key][0][2]
+				
+							gcode += gcode_comment_str("End cutting path id: %s\n\n"%curves[key][0][0])
 
 							
 		self.export_gcode(gcode)
