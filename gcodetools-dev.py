@@ -4040,7 +4040,11 @@ class Gcodetools(inkex.Effect):
 						self.draw_curve(subcurve, layer)
 					
 				if self.options.path_to_gcode_order == 'subpath by subpath':
-					curves = [ [curve[0],[subcurve]]  for subcurve in curve[1] for curve in curves ]
+					curves_ = []
+					for curve in curves :
+						curves_ += [ [curve[0],[subcurve]]  for subcurve in curve[1] ]  
+					curves = curves_	
+
 					self.options.path_to_gcode_order = 'path by path'
 					
 				if self.options.path_to_gcode_order == 'path by path':
