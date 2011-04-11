@@ -1429,19 +1429,33 @@ def draw_csp(csp, stroke = "#f00", fill = "none", comment = "", width = .1, grou
 		
 	return inkex.etree.SubElement( group, inkex.addNS('path','svg'), attributes) 
 	
-
-
-
-
-
-def draw_pointer(x,color = "#f00", figure = "cross", comment = "", width = .1, size = 1) :
-	if figure ==  "line" :
+def draw_pointer(x,color = "#f00", figure = "cross", group = "", comment = "", fill=None, width = .1, size = 10., text = "", font_size=None, pointer_type=None, attrib = None) :
+	size = size/2
+	if attrib == None : attrib = {}
+	if pointer_type == None: 
+		pointer_type = "Pointer"
+	attrib["gcodetools"] = pointer_type
+	if group == None:
+		group = options.self.current_layer
+	if text != None	:
+		if font_size == None : font_size = 7
+		group = inkex.etree.SubElement( group, inkex.addNS('g','svg'), {"gcodetools": pointer_type+" group"} )		
+		draw_text(text,x[0]+size*2.2,x[1]-size, group = group, font_size = font_size) 
+	if figure  == "line" :
 		s = ""
 		for i in range(1,len(x)/2) :
 			s+= " %s, %s " %(x[i*2],x[i*2+1])
-		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "M %s,%s L %s"%(x[0],x[1],s), "style":"fill:none;stroke:%s;stroke-width:%f;"%(color,width),"comment":str(comment)} )
+		attrib.update({"d": "M %s,%s L %s"%(x[0],x[1],s), "style":"fill:none;stroke:%s;stroke-width:%f;"%(color,width),"comment":str(comment)})			
+		inkex.etree.SubElement( group, inkex.addNS('path','svg'), attrib)
+	elif figure == "arrow" :
+		if fill == None : fill = "#12b3ff"
+		fill_opacity = "0.8" 
+		d = "m %s,%s " % (x[0],x[1]) + re.sub("([0-9\-.e]+)",(lambda match: str(float(match.group(1))*size*2.)), "0.88464,-0.40404 c -0.0987,-0.0162 -0.186549,-0.0589 -0.26147,-0.1173 l 0.357342,-0.35625 c 0.04631,-0.039 0.0031,-0.13174 -0.05665,-0.12164 -0.0029,-1.4e-4 -0.0058,-1.4e-4 -0.0087,0 l -2.2e-5,2e-5 c -0.01189,0.004 -0.02257,0.0119 -0.0305,0.0217 l -0.357342,0.35625 c -0.05818,-0.0743 -0.102813,-0.16338 -0.117662,-0.26067 l -0.409636,0.88193 z")
+		attrib.update({"d": d, "style":"fill:%s;stroke:none;fill-opacity:%s;"%(fill,fill_opacity),"comment":str(comment)})			
+		inkex.etree.SubElement( group, inkex.addNS('path','svg'), attrib)
 	else :
-		inkex.etree.SubElement( options.doc_root, inkex.addNS('path','svg'), {"d": "m %s,%s l %f,%f %f,%f %f,%f %f,%f , %f,%f"%(x[0],x[1], size,size, -2*size,-2*size, size,size, size,-size, -2*size,2*size ), "style":"fill:none;stroke:%s;stroke-width:%f;"%(color,width),"comment":str(comment)} )
+		attrib.update({"d": "m %s,%s l %f,%f %f,%f %f,%f %f,%f , %f,%f"%(x[0],x[1], size,size, -2*size,-2*size, size,size, size,-size, -2*size,2*size ), "style":"fill:none;stroke:%s;stroke-width:%f;"%(color,width),"comment":str(comment)})
+		inkex.etree.SubElement( group, inkex.addNS('path','svg'), attrib)
 
 
 def straight_segments_intersection(a,b, true_intersection = True) : # (True intersection means check ta and tb are in [0,1])
@@ -2940,6 +2954,48 @@ class Gcodetools(inkex.Effect):
 
 
 ################################################################################
+###		In/out paths:
+###		TODO move it to the bottom
+################################################################################
+	def in_out_path(self) :
+		if self.options.in_out_path_add_reference_point :
+			draw_pointer(group = self.current_layer, x = self.view_center, figure="arrow", pointer_type = "in-out reference point", text = "in-out point")
+			
+
+		else :
+		
+			if self.selected_paths == {} and self.options.auto_select_paths:
+				paths=self.paths
+				self.error(_("No paths are selected! Trying to work on all available paths."),"warning")
+			else :
+				paths = self.selected_paths
+
+			if self.selected_paths == {}:
+				self.error(_("Noting is selected. Please select something."),"warning")
+			for layer in self.layers :
+				if layer in self.selected_paths :
+					max_dist =	self.transform_scalar(self.options.in_out_path_point_max_dist, layer, reverse=True)
+					l = 		self.transform_scalar(self.options.in_out_path_len, layer, reverse=True)
+					for path in self.selected_paths[layer]:
+						csp = cubicsuperpath.parsePath(path.get("d"))
+						res = []
+						for subpath in csp :
+						# Find closes point to in-out reference point
+						# If subpath is open skip this step 
+							if point_to_point_d2(subpath[0][1], subpath[-1][1]) < 1.e-10 :
+								d = [1e100,1,1,1.]
+								for p in self.in_out_reference_points : 
+									d1 = csp_to_point_distance([subpath], p, dist_bounds = [0,max_dist], tolerance=.01)
+									if d < d1 : d = d1[:]
+								if d[0] < max_dist :
+									d,i,j,t = d
+									sp1,sp2,sp3 = csp_split(subpath[j-1],subpath[j],t)
+									subpath = csp_concat_subpaths([sp2,sp3], subpath[j+1:], subpath[j-1:], [sp1,sp2]) 							
+
+							res += [ subpath ] 
+						draw_csp(res)	
+
+################################################################################
 ###		Arrangement: arranges paths by givven params
 ###		TODO move it to the bottom
 ################################################################################
@@ -3168,12 +3224,16 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--graffiti-max-seg-length",		action="store", type="float", 		dest="graffiti_max_seg_length", default=1.,	help="Graffiti maximum segment length.")
 		self.OptionParser.add_option("",   "--graffiti-min-radius",			action="store", type="float", 		dest="graffiti_min_radius", default=10.,	help="Graffiti minimal connector's radius.")
 		self.OptionParser.add_option("",   "--graffiti-start-pos",			action="store", type="string", 		dest="graffiti_start_pos", default="(0;0)",	help="Graffiti Start position (x;y).")
-		self.OptionParser.add_option("",   "--graffiti-create-linearization-preview",	action="store", type="inkbool", 	dest="graffiti_create_linearization_preview", default=True,	help="Ggraffiti create linearization preview.")
+		self.OptionParser.add_option("",   "--graffiti-create-linearization-preview",	action="store", type="inkbool", 	dest="graffiti_create_linearization_preview", default=True,	help="Graffiti create linearization preview.")
 		self.OptionParser.add_option("",   "--graffiti-create-preview",		action="store", type="inkbool", 	dest="graffiti_create_preview", default=True,	help="Graffiti create preview.")
 		self.OptionParser.add_option("",   "--graffiti-preview-size",		action="store", type="int", 		dest="graffiti_preview_size", default=800,	help="Graffiti preview's size.")
 		self.OptionParser.add_option("",   "--graffiti-preview-emmit",		action="store", type="int", 		dest="graffiti_preview_emmit", default=800,	help="Preview's paint emmit (pts/s).")
 
 
+		self.OptionParser.add_option("",   "--in-out-path-add-reference-point",	action="store", type="inkbool", dest="in_out_path_add_reference_point", default=False,	help="Just add reference in-out point")
+		self.OptionParser.add_option("",   "--in-out-path-point-max-dist",	action="store", type="float", 		dest="in_out_path_point_max_dist", default=10.,	help="In-out path max distance to reference point")
+		self.OptionParser.add_option("",   "--in-out-path-type",			action="store", type="string", 		dest="in_out_path_type", default="Round",	help="In-out path type")
+		self.OptionParser.add_option("",   "--in-out-path-len",				action="store", type="float", 		dest="in_out_path_len", default=10.,	help="In-out path length")
 
 
 		self.default_tool = {
@@ -3681,7 +3741,7 @@ class Gcodetools(inkex.Effect):
 		self.transform_matrix = {}
 		self.transform_matrix_reverse = {}
 		self.Zauto_scale = {}
-		
+		self.in_out_reference_points = []
 		def recursive_search(g, layer, selected=False):
 			items = g.getchildren()
 			items.reverse()
@@ -3717,6 +3777,13 @@ class Gcodetools(inkex.Effect):
 						self.paths[layer] = self.paths[layer] + [i] if layer in self.paths else [i]  
 						if i.get("id") in self.selected :
 							self.selected_paths[layer] = self.selected_paths[layer] + [i] if layer in self.selected_paths else [i]  
+
+				elif i.get("gcodetools") == "In-out reference point group" :
+					items_ = i.getchildren()
+					items_.reverse()
+					for j in items_ :
+						if j.get("gcodetools") == "In-out reference point" :
+							self.in_out_reference_points.append( cubicsuperpath.parsePath(j.get("d")) )
 
 				elif i.tag == inkex.addNS("g",'svg'):
 					recursive_search(i,layer, (i.get("id") in self.selected) )
@@ -5553,12 +5620,12 @@ G01 Z1 (going to cutting z)\n""",
 		if self.options.active_tab == '"help"' :
 			self.help()
 			return
-		elif self.options.active_tab not in ['"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"', '"offset"', '"arrangement"', '"update"', '"graffiti"', '"lathe_modify_path"']:
+		elif self.options.active_tab not in ['"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"', '"offset"', '"arrangement"', '"update"', '"graffiti"', '"lathe_modify_path"', '"in-out-path"']:
 			self.error(_("Select one of the action tabs - Path to Gcode, Area, Engraving, DXF points, Orientation, Offset, Lathe or Tools library.\n Current active tab id is %s" % self.options.active_tab),"error")
 		else:
 			# Get all Gcodetools data from the scene.
 			self.get_info()
-			if self.options.active_tab in ['"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"lathe"', '"graffiti"']:
+			if self.options.active_tab in ['"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"lathe"', '"graffiti"', '"in-out-path"']:
 				if self.orientation_points == {} :
 					self.error(_("Orientation points have not been defined! A default set of orientation points has been automatically added."),"warning")
 					self.orientation( self.layers[min(1,len(self.layers)-1)] )		
@@ -5633,6 +5700,10 @@ G01 Z1 (going to cutting z)\n""",
 				print_("Total offsets count %s"%offsets_count)				
 			elif self.options.active_tab == '"arrangement"': 
 				self.arrangement()
+
+			elif self.options.active_tab == '"in-out-path"': 
+				self.in_out_path()		
+
 
 		print_("------------------------------------------")
 		print_("Done in %f seconds"%(time.time()-start_time))

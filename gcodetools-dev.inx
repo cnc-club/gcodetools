@@ -273,6 +273,22 @@ packets will be needed)">false</param>
 <!-- Gcodetools: /arrangement block -->
 
 
+<!-- Gcodetools: in-out-path block -->
+	<page name='in-out-path' _gui-text='In-out path'>	
+		<param name='in-out-path-add-reference-point' type="boolean" _gui-text="Just add reference in-out point" >False</param>
+		<param name='in-out-path-len' type="float" precision="5" min="0" max="1000000" _gui-text='In-out path length'>10</param>
+		<param name='in-out-path-point-max-dist' type="float" precision="5" min="0" max="1000000" _gui-text='In-out path max distance to reference point'>10</param>
+		<param name="in-out-path-type"  _gui-text="In-out path type" type="optiongroup" appearance="minimal">
+			<_option value="Round">Round</_option>
+			<_option value="Perpendicular">Perpendicular</_option>
+			<_option value="Tangent">Tangent</_option>
+		</param>
+
+	</page>
+<!-- Gcodetools: /in-out-path block -->
+
+
+
 
 <!-- Gcodetools: graffiti block -->
 	<page name='graffiti' _gui-text='Graffiti'>	
