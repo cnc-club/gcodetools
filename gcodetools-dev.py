@@ -111,6 +111,8 @@ intersection_recursion_depth = 10
 intersection_tolerance = 0.00001
 
 styles = {
+		"in_out_path_style" : simplestyle.formatStyle({ 'stroke': '#0072a7', 'fill': 'none', 'stroke-width':'1', 'marker-mid':'url(#InOutPathMarker)' }),
+		
 		"loft_style" : {
 				'main curve':	simplestyle.formatStyle({ 'stroke': '#88f', 'fill': 'none', 'stroke-width':'1', 'marker-end':'url(#Arrow2Mend)' }),
 			},
@@ -195,6 +197,19 @@ def gcode_comment_str(s, replace_new_line = False):
 def csp_from_polyline(line) :
 	return [ [ [point[:] for k in range(3) ] for point in subline ]  for subline in line ]
 	
+def csp_remove_zerro_segments(csp, tolerance = 1e-7):	
+	res = []
+	for subpath in csp:
+		if len(subpath) > 0 :
+			res.append([subpath[0]])
+			for sp1,sp2 in zip(subpath,subpath[1:]) :
+				if point_to_point_d2(sp1[1],sp2[1])<=tolerance and point_to_point_d2(sp1[2],sp2[1])<=tolerance and point_to_point_d2(sp1[1],sp2[0])<=tolerance :
+					res[-1][-1][2] = sp2[2]
+				else :
+					res[-1].append(sp2)
+	return res
+			
+
 	
 
 
@@ -859,6 +874,22 @@ def csp_subpath_split_by_points(subpath, points) :
 	return parts
 
 
+def arc_from_s_r_n_l(s,r,n,l) :
+	if abs(n[0]**2+n[1]**2 - 1) > 1e-10 : n = normalize(n)
+	return arc_from_c_s_l([s[0]+n[0]*r, s[1]+n[1]*r],s,l)
+
+
+def arc_from_c_s_l(c,s,l) :
+	r = point_to_point_d(c,s)
+	if r == 0 : return []
+	alpha = l/r 
+	cos_, sin_ = math.cos(alpha), math.sin(alpha)
+	e = [ c[0] + (s[0]-c[0])*cos_ - (s[1]-c[1])*sin_, c[1] + (s[0]-c[0])*sin_ + (s[1]-c[1])*cos_]
+	n = [c[0]-s[0],c[1]-s[1]]
+	slope = rotate_cw(n) if l>0 else rotate_ccw(n)
+	return csp_from_arc(s, e, c, r, slope)
+
+
 def csp_from_arc(start, end, center, r, slope_st) : 
 	# Creates csp that approximise specified arc
 	r = abs(r)
@@ -1168,16 +1199,25 @@ def csp_clip_by_line(csp,l1,l2) :
 	return result
 
 
-def csp_subpath_line_to(subpath, points) :
+def csp_subpath_line_to(subpath, points, prepend = False) :
 	# Appends subpath with line or polyline.
 	if len(points)>0 :
-		if len(subpath)>0:
-			subpath[-1][2] = subpath[-1][1][:]
-		if type(points[0]) == type([1,1]) :
-			for p in points :
-				subpath += [ [p[:],p[:],p[:]] ]
-		else: 
-			subpath += [ [points,points,points] ]
+		if not prepend : 
+			if len(subpath)>0:
+				subpath[-1][2] = subpath[-1][1][:]
+			if type(points[0]) == type([1,1]) :
+				for p in points :
+					subpath += [ [p[:],p[:],p[:]] ]
+			else: 
+				subpath += [ [points,points,points] ]
+		else : 		
+			if len(subpath)>0:
+				subpath[0][0] = subpath[0][1][:]
+			if type(points[0]) == type([1,1]) :
+				for p in points :
+					subpath = [ [p[:],p[:],p[:]] ] + subpath
+			else: 
+				subpath = [ [points,points,points] ] + subpath
 	return subpath
 
 	
@@ -1312,6 +1352,9 @@ def dot(a,b) :
 def rotate_ccw(d) :
 	return [-d[1],d[0]]
 
+def rotate_cw(d) :
+	return [d[1],-d[0]]
+
 
 def vectors_ccw(a,b):
 	return a[0]*b[1]-b[0]*a[1] < 0
@@ -1429,7 +1472,7 @@ def draw_csp(csp, stroke = "#f00", fill = "none", comment = "", width = .1, grou
 		
 	return inkex.etree.SubElement( group, inkex.addNS('path','svg'), attributes) 
 	
-def draw_pointer(x,color = "#f00", figure = "cross", group = "", comment = "", fill=None, width = .1, size = 10., text = "", font_size=None, pointer_type=None, attrib = None) :
+def draw_pointer(x,color = "#f00", figure = "cross", group = None, comment = "", fill=None, width = .1, size = 10., text = None, font_size=None, pointer_type=None, attrib = None) :
 	size = size/2
 	if attrib == None : attrib = {}
 	if pointer_type == None: 
@@ -2958,42 +3001,95 @@ class Gcodetools(inkex.Effect):
 ###		TODO move it to the bottom
 ################################################################################
 	def in_out_path(self) :
+	
+		def add_arc(sp1,sp2,end = False,l=10.,r=10.) :
+			if not end :
+				n = csp_normalized_normal(sp1,sp2,0.)
+				return csp_reverse([arc_from_s_r_n_l(sp1[1],r,n,-l)])[0]
+			else: 
+				n = csp_normalized_normal(sp1,sp2,1.)
+				return arc_from_s_r_n_l(sp2[1],r,n,l)
+				
+		def add_normal(sp1,sp2,end = False,l=10.,r=10.) :
+			# r is needed only for be compatible with add_arc
+			if not end : 
+				n = csp_normalized_normal(sp1,sp2,0.)
+				p = [n[0]*l+sp1[1][0],n[1]*l+sp1[1][1]]
+				return csp_subpath_line_to([], [p,sp1[1]])
+			else: 
+				n = csp_normalized_normal(sp1,sp2,1.)
+				p = [n[0]*l+sp2[1][0],n[1]*l+sp2[1][1]]
+				return csp_subpath_line_to([], [sp2[1],p])
+				
+		def add_tangent(sp1,sp2,end = False,l=10.,r=10.) :
+			# r is needed only for be compatible with add_arc
+			if not end : 
+				n = csp_normalized_slope(sp1,sp2,0.)
+				p = [-n[0]*l+sp1[1][0],-n[1]*l+sp1[1][1]]
+				return csp_subpath_line_to([], [p,sp1[1]])
+			else: 
+				n = csp_normalized_slope(sp1,sp2,1.)
+				p = [n[0]*l+sp2[1][0],n[1]*l+sp2[1][1]]
+				return csp_subpath_line_to([], [sp2[1],p])
+
 		if self.options.in_out_path_add_reference_point :
-			draw_pointer(group = self.current_layer, x = self.view_center, figure="arrow", pointer_type = "in-out reference point", text = "in-out point")
+			draw_pointer(group = self.current_layer, x = self.view_center, figure="arrow", pointer_type = "In-out reference point", text = "In-out point")
 			
 
 		else :
-		
+			self.set_markers()
+			add_func = {"Round":add_arc, "Perpendicular": add_normal, "Tangent": add_tangent}[self.options.in_out_path_type]
+			if self.options.in_out_path_type == "Round" and self.options.in_out_path_len > self.options.in_out_path_radius*3/2*math.pi :
+				self.error("In-out len is to big for in-out radius will cropp it to be r*3/2*pi!", "warning") 
+			
 			if self.selected_paths == {} and self.options.auto_select_paths:
-				paths=self.paths
+				self.selected_paths = self.paths
 				self.error(_("No paths are selected! Trying to work on all available paths."),"warning")
-			else :
-				paths = self.selected_paths
 
 			if self.selected_paths == {}:
 				self.error(_("Noting is selected. Please select something."),"warning")
 			for layer in self.layers :
 				if layer in self.selected_paths :
+				
 					max_dist =	self.transform_scalar(self.options.in_out_path_point_max_dist, layer, reverse=True)
 					l = 		self.transform_scalar(self.options.in_out_path_len, layer, reverse=True)
+					r = 		self.transform_scalar(self.options.in_out_path_radius, layer, reverse=True)
+					l = min(l,r*3/2*math.pi)
 					for path in self.selected_paths[layer]:
-						csp = cubicsuperpath.parsePath(path.get("d"))
+						csp = self.apply_transforms( path, cubicsuperpath.parsePath(path.get("d")) )
+						csp = csp_remove_zerro_segments(csp)
 						res = []
 						for subpath in csp :
 						# Find closes point to in-out reference point
 						# If subpath is open skip this step 
+
+							
+
 							if point_to_point_d2(subpath[0][1], subpath[-1][1]) < 1.e-10 :
 								d = [1e100,1,1,1.]
 								for p in self.in_out_reference_points : 
 									d1 = csp_to_point_distance([subpath], p, dist_bounds = [0,max_dist], tolerance=.01)
-									if d < d1 : d = d1[:]
+									if d1[0] < d[0] : d = d1[:]
 								if d[0] < max_dist :
 									d,i,j,t = d
 									sp1,sp2,sp3 = csp_split(subpath[j-1],subpath[j],t)
-									subpath = csp_concat_subpaths([sp2,sp3], subpath[j+1:], subpath[j-1:], [sp1,sp2]) 							
+									subpath = csp_concat_subpaths([sp2,sp3], subpath[j:], subpath[:j], [sp1,sp2]) 							
 
+
+							# now let's add in-out paths... 
+							subpath = csp_concat_subpaths(
+												add_func(subpath[0],subpath[1],False,l,r),
+												subpath,
+												add_func(subpath[-2],subpath[-1],True,l,r)
+												)
+
+							
 							res += [ subpath ] 
-						draw_csp(res)	
+							
+						if self.options.in_out_path_replace_original_path :
+							path.set("d", cubicsuperpath.formatPath( self.apply_transforms(path,res,True) ))
+						else:	
+							draw_csp(res, width=1, style=styles["in_out_path_style"] )
 
 ################################################################################
 ###		Arrangement: arranges paths by givven params
@@ -3234,6 +3330,8 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--in-out-path-point-max-dist",	action="store", type="float", 		dest="in_out_path_point_max_dist", default=10.,	help="In-out path max distance to reference point")
 		self.OptionParser.add_option("",   "--in-out-path-type",			action="store", type="string", 		dest="in_out_path_type", default="Round",	help="In-out path type")
 		self.OptionParser.add_option("",   "--in-out-path-len",				action="store", type="float", 		dest="in_out_path_len", default=10.,	help="In-out path length")
+		self.OptionParser.add_option("",   "--in-out-path-replace-original-path",action="store", type="inkbool", dest="in_out_path_replace_original_path", default=False,	help="Replace original path")
+		self.OptionParser.add_option("",   "--in-out-path-radius",			action="store", type="float", 		dest="in_out_path_radius", default=10.,	help="In-out path radius for round path")
 
 
 		self.default_tool = {
@@ -3331,23 +3429,9 @@ class Gcodetools(inkex.Effect):
 
 
 	def draw_curve(self, curve, layer, group=None, style=styles["biarc_style"]):
-	
-		self.get_defs()
-		# Add marker to defs if it doesnot exists
-		if "DrawCurveMarker" not in self.defs : 
-			defs = inkex.etree.SubElement( self.document.getroot(), inkex.addNS("defs","svg"))
-			marker = inkex.etree.SubElement( defs, inkex.addNS("marker","svg"), {"id":"DrawCurveMarker","orient":"auto","refX":"-8","refY":"-2.41063","style":"overflow:visible"})
-			inkex.etree.SubElement( marker, inkex.addNS("path","svg"), 
-					{	"d":"m -6.55552,-2.41063 0,0 L -13.11104,0 c 1.0473,-1.42323 1.04126,-3.37047 0,-4.82126",
-						"style": "fill:#000044; fill-rule:evenodd;stroke-width:0.62500000;stroke-linejoin:round;"	}
-				)
-		if "DrawCurveMarker_r" not in self.defs : 
-			defs = inkex.etree.SubElement( self.document.getroot(), inkex.addNS("defs","svg"))
-			marker = inkex.etree.SubElement( defs, inkex.addNS("marker","svg"), {"id":"DrawCurveMarker_r","orient":"auto","refX":"8","refY":"-2.41063","style":"overflow:visible"})
-			inkex.etree.SubElement( marker, inkex.addNS("path","svg"), 
-					{	"d":"m 6.55552,-2.41063 0,0 L 13.11104,0 c -1.0473,-1.42323 -1.04126,-3.37047 0,-4.82126",
-						"style": "fill:#000044; fill-rule:evenodd;stroke-width:0.62500000;stroke-linejoin:round;"	}
-				)
+
+		self.set_markers()
+
 		for i in [0,1]:
 			style['biarc%s_r'%i] = simplestyle.parseStyle(style['biarc%s'%i])
 			style['biarc%s_r'%i]["marker-start"] = "url(#DrawCurveMarker_r)"
@@ -3580,11 +3664,19 @@ class Gcodetools(inkex.Effect):
 		return trans 
 		
 
-	def apply_transforms(self,g,csp):
+	def apply_transforms(self,g,csp, reverse=False):
 		trans = self.get_transforms(g)
 		if trans != []:
-			simpletransform.applyTransformToPath(trans, csp)
+			if not reverse :
+				simpletransform.applyTransformToPath(trans, csp)
+			else :
+				trans = numpy.array(trans)
+				if numpy.linalg.det(trans)!=0 :
+					trans = numpy.linalg.inv(trans).tolist()		
+				simpletransform.applyTransformToPath(trans, csp)
 		return csp
+		
+		
 
 	def transform_scalar(self,x,layer,reverse=False):
 		return self.transform([x,0],layer,reverse)[0] - self.transform([0,0],layer,reverse)[0]
@@ -3694,7 +3786,7 @@ class Gcodetools(inkex.Effect):
 						active_layer_already_has_tool
 						active_layer_already_has_orientation_points
 					"""
-		s = "%s"%s
+		s = str(s)
 		if type_.lower() in re.split("[\s\n,\.]+", errors.lower()) :
 			print_(s)
 			inkex.errormsg(s+"\n")		
@@ -3709,6 +3801,47 @@ class Gcodetools(inkex.Effect):
 			inkex.errormsg(s)		
 			sys.exit()
 	
+
+################################################################################
+###		Set markers
+################################################################################
+	def set_markers(self) :
+		self.get_defs()
+		# Add marker to defs if it doesnot exists
+		if "CheckToolsAndOPMarker" not in self.defs : 
+			defs = inkex.etree.SubElement( self.document.getroot(), inkex.addNS("defs","svg"))
+			marker = inkex.etree.SubElement( defs, inkex.addNS("marker","svg"), {"id":"CheckToolsAndOPMarker","orient":"auto","refX":"-4","refY":"-1.687441","style":"overflow:visible"})
+			inkex.etree.SubElement( marker, inkex.addNS("path","svg"), 
+	
+					{	"d":"	m -4.588864,-1.687441 0.0,0.0 L -9.177728,0.0 c 0.73311,-0.996261 0.728882,-2.359329 0.0,-3.374882",
+						"style": "fill:#000044; fill-rule:evenodd;stroke:none;"	}
+				)
+
+		if "DrawCurveMarker" not in self.defs : 
+			defs = inkex.etree.SubElement( self.document.getroot(), inkex.addNS("defs","svg"))
+			marker = inkex.etree.SubElement( defs, inkex.addNS("marker","svg"), {"id":"DrawCurveMarker","orient":"auto","refX":"-4","refY":"-1.687441","style":"overflow:visible"})
+			inkex.etree.SubElement( marker, inkex.addNS("path","svg"), 
+					{	"d":"m -4.588864,-1.687441 0.0,0.0 L -9.177728,0.0 c 0.73311,-0.996261 0.728882,-2.359329 0.0,-3.374882",
+						"style": "fill:#000044; fill-rule:evenodd;stroke:none;"	}
+				)
+
+		if "DrawCurveMarker_r" not in self.defs : 
+			defs = inkex.etree.SubElement( self.document.getroot(), inkex.addNS("defs","svg"))
+			marker = inkex.etree.SubElement( defs, inkex.addNS("marker","svg"), {"id":"DrawCurveMarker_r","orient":"auto","refX":"4","refY":"-1.687441","style":"overflow:visible"})
+			inkex.etree.SubElement( marker, inkex.addNS("path","svg"), 
+					{	"d":"m 4.588864,-1.687441 0.0,0.0 L 9.177728,0.0 c -0.73311,-0.996261 -0.728882,-2.359329 0.0,-3.374882",
+						"style": "fill:#000044; fill-rule:evenodd;stroke:none;"	}
+				)
+
+		if "InOutPathMarker" not in self.defs : 
+			defs = inkex.etree.SubElement( self.document.getroot(), inkex.addNS("defs","svg"))
+			marker = inkex.etree.SubElement( defs, inkex.addNS("marker","svg"), {"id":"InOutPathMarker","orient":"auto","refX":"-4","refY":"-1.687441","style":"overflow:visible"})
+			inkex.etree.SubElement( marker, inkex.addNS("path","svg"), 
+					{	"d":"m -4.588864,-1.687441 0.0,0.0 L -9.177728,0.0 c 0.73311,-0.996261 0.728882,-2.359329 0.0,-3.374882",
+						"style": "fill:#0072a7; fill-rule:evenodd;stroke:none;"	}
+				)
+
+
 	
 ################################################################################
 ###		Get defs from svg
@@ -3783,7 +3916,8 @@ class Gcodetools(inkex.Effect):
 					items_.reverse()
 					for j in items_ :
 						if j.get("gcodetools") == "In-out reference point" :
-							self.in_out_reference_points.append( cubicsuperpath.parsePath(j.get("d")) )
+							self.in_out_reference_points.append( self.apply_transforms(j,cubicsuperpath.parsePath(j.get("d")))[0][0][1] )
+
 
 				elif i.tag == inkex.addNS("g",'svg'):
 					recursive_search(i,layer, (i.get("id") in self.selected) )
@@ -4974,15 +5108,9 @@ G01 Z1 (going to cutting z)\n""",
 		#	Set group
 		group = inkex.etree.SubElement( self.selected_paths.keys()[0] if len(self.selected_paths.keys())>0 else self.layers[0], inkex.addNS('g','svg') )
 		trans_ = [[1,0.3,0],[0,0.5,0]]	
-		self.get_defs()
-		# Add marker to defs if it doesnot exists
-		if "CheckToolsAndOPMarker" not in self.defs : 
-			defs = inkex.etree.SubElement( self.document.getroot(), inkex.addNS("defs","svg"))
-			marker = inkex.etree.SubElement( defs, inkex.addNS("marker","svg"), {"id":"CheckToolsAndOPMarker","orient":"auto","refX":"-8","refY":"-2.41063","style":"overflow:visible"})
-			inkex.etree.SubElement( marker, inkex.addNS("path","svg"), 
-					{	"d":"m -6.55552,-2.41063 0,0 L -13.11104,0 c 1.0473,-1.42323 1.04126,-3.37047 0,-4.82126",
-						"style": "fill:#000044; fill-rule:evenodd;stroke-width:0.62500000;stroke-linejoin:round;"	}
-				)
+
+		self.set_markers()
+
 		bounds = [float('inf'),float('inf'),float('-inf'),float('-inf')]
 		tools_bounds = {}
 		for layer in self.layers :
