@@ -1359,6 +1359,12 @@ def rotate_cw(d) :
 def vectors_ccw(a,b):
 	return a[0]*b[1]-b[0]*a[1] < 0
 
+def vector_add(a,b) :
+	return [a[0]+b[0],a[1]+b[1]]
+
+def vector_mul(a,b) :
+	return [a[0]*b,a[1]*b]
+
 
 def vector_from_to_length(a,b):
 	return math.sqrt((a[0]-b[0])*(a[0]-b[0]) + (a[1]-b[1])*(a[1]-b[1]))
@@ -3000,7 +3006,7 @@ class Gcodetools(inkex.Effect):
 ###		In/out paths:
 ###		TODO move it to the bottom
 ################################################################################
-	def in_out_path(self) :
+	def plasma_prepare_path(self) :
 	
 		def add_arc(sp1,sp2,end = False,l=10.,r=10.) :
 			if not end :
@@ -3031,12 +3037,19 @@ class Gcodetools(inkex.Effect):
 				n = csp_normalized_slope(sp1,sp2,1.)
 				p = [n[0]*l+sp2[1][0],n[1]*l+sp2[1][1]]
 				return csp_subpath_line_to([], [sp2[1],p])
+	
+		if not self.options.in_out_path and not self.options.plasma_prepare_corners and self.options.in_out_path_do_not_add_reference_point: 
+			self.error("Warning! Extenstion is not said to do anything! Enable one of Create in-out paths or Prepare corners checkboxes or disable Do not add in-out referense point!")
+			return
 
-		if self.options.in_out_path_add_reference_point :
-			draw_pointer(group = self.current_layer, x = self.view_center, figure="arrow", pointer_type = "In-out reference point", text = "In-out point")
+		# Add in-out-reference point if there is no one yet.		
+		if ( (len(self.in_out_reference_points)==0 and self.options.in_out_path
+			or not self.options.in_out_path and not self.options.plasma_prepare_corners )
+			 and not self.options.in_out_path_do_not_add_reference_point) :
+					self.options.orientation_points_count = "in-out reference point"		
+					self.orientation()
 			
-
-		else :
+		if self.options.in_out_path or self.options.plasma_prepare_corners:
 			self.set_markers()
 			add_func = {"Round":add_arc, "Perpendicular": add_normal, "Tangent": add_tangent}[self.options.in_out_path_type]
 			if self.options.in_out_path_type == "Round" and self.options.in_out_path_len > self.options.in_out_path_radius*3/2*math.pi :
@@ -3048,49 +3061,105 @@ class Gcodetools(inkex.Effect):
 
 			if self.selected_paths == {}:
 				self.error(_("Noting is selected. Please select something."),"warning")
+			a = self.options.plasma_prepare_corners_tolerance
+			corner_tolerance = cross([1.,0.], [math.cos(a),math.sin(a)])
+
 			for layer in self.layers :
 				if layer in self.selected_paths :
-				
 					max_dist =	self.transform_scalar(self.options.in_out_path_point_max_dist, layer, reverse=True)
 					l = 		self.transform_scalar(self.options.in_out_path_len, layer, reverse=True)
+					plasma_l = 	self.transform_scalar(self.options.plasma_prepare_corners_distance, layer, reverse=True)
 					r = 		self.transform_scalar(self.options.in_out_path_radius, layer, reverse=True)
 					l = min(l,r*3/2*math.pi)
+
 					for path in self.selected_paths[layer]:
 						csp = self.apply_transforms( path, cubicsuperpath.parsePath(path.get("d")) )
 						csp = csp_remove_zerro_segments(csp)
 						res = []
+
+
+#		self.OptionParser.add_option("",   "--plasma-prepare-corners-distance", action="store", type="float",	dest="plasma_prepare_corners_distance", default=10.,help="Stepout distance for corners")
+#		self.OptionParser.add_option("",   "--plasma-prepare-corners-tolerance", action="store", type="float",	dest="plasma_prepare_corners_tolerance", default=10.,help="Maximum angle for corner (0-180 deg)")
+						
+						
 						for subpath in csp :
 						# Find closes point to in-out reference point
 						# If subpath is open skip this step 
+							if self.options.in_out_path :
+								# split and reverse path for further add in-out points
+								if point_to_point_d2(subpath[0][1], subpath[-1][1]) < 1.e-10 :
+									d = [1e100,1,1,1.]
+									for p in self.in_out_reference_points : 
+										d1 = csp_to_point_distance([subpath], p, dist_bounds = [0,max_dist], tolerance=.01)
+										if d1[0] < d[0] : 
+											d = d1[:]
+											p_ = p
+									if d[0] < max_dist**2 :
+										# Lets find is there any angles near this point to put in-out path in 
+										# the angle if it's possible 
+										# remove last node to make iterations easier
+										subpath[0][0] = subpath[-1][0]
+										del subpath[-1]
+										max_cross = [-1e100, None]
+										for j in range(len(subpath)) :
+											sp1,sp2,sp3 = subpath[j-2],subpath[j-1],subpath[j]
+											if point_to_point_d2(sp2[1],p_)<max_dist**2:
+												s1,s2 = csp_normalized_slope(sp1,sp2,1.), csp_normalized_slope(sp2,sp3,0.)
+												max_cross = max(max_cross,[cross(s1,s2),j-1])
+										# return back last point		
+										subpath.append(subpath[0])
+										if max_cross[1] !=None  and max_cross[0]>corner_tolerance :
+											# there's an angle near the point
+											j = max_cross[1]
+											if j<0 : j -= 1
+											if j!=0 :
+												subpath	= csp_concat_subpaths(subpath[j:],subpath[:j+1])
+										else :
+											# hawe to cut path's segment
+											d,i,j,t = d
+											sp1,sp2,sp3 = csp_split(subpath[j-1],subpath[j],t)
+											subpath = csp_concat_subpaths([sp2,sp3], subpath[j:], subpath[:j], [sp1,sp2]) 							
 
-							
-
-							if point_to_point_d2(subpath[0][1], subpath[-1][1]) < 1.e-10 :
-								d = [1e100,1,1,1.]
-								for p in self.in_out_reference_points : 
-									d1 = csp_to_point_distance([subpath], p, dist_bounds = [0,max_dist], tolerance=.01)
-									if d1[0] < d[0] : d = d1[:]
-								if d[0] < max_dist :
-									d,i,j,t = d
-									sp1,sp2,sp3 = csp_split(subpath[j-1],subpath[j],t)
-									subpath = csp_concat_subpaths([sp2,sp3], subpath[j:], subpath[:j], [sp1,sp2]) 							
-
-
-							# now let's add in-out paths... 
-							subpath = csp_concat_subpaths(
-												add_func(subpath[0],subpath[1],False,l,r),
-												subpath,
-												add_func(subpath[-2],subpath[-1],True,l,r)
-												)
+							if self.options.plasma_prepare_corners :
+								# prepare corners
+								# find corners and add some nodes
+								# corner at path's start/end is ignored
+								res_ = [subpath[0]]
+								for sp2, sp3 in zip(subpath[1:],subpath[2:]) :
+									sp1 = res_[-1]
+									s1,s2 = csp_normalized_slope(sp1,sp2,1.), csp_normalized_slope(sp2,sp3,0.)
+									if cross(s1,s2) > corner_tolerance :
+										# got a corner to process
+										S1,S2 = P(s1),P(s2)
+										N = (S1-S2).unit()*plasma_l
+										SP = [P(sp2[0]),P(sp2[1]),P(sp2[2])]
+										P1 = (SP[1] + N)
+										res_ += [
+													[sp2[0],sp2[1],  (SP[2]+S1*plasma_l).to_list() ],
+													[ (P1-N.ccw()/2 ).to_list(), P1.to_list(), (P1+N.ccw()/2).to_list()], 
+													[(SP[0]-S2*plasma_l).to_list(), sp2[1],sp2[2]]
+												]
+									else: 
+										res_ += [sp2]
+								res_ += [sp3]
+								subpath = res_
+							if self.options.in_out_path :
+								# finally add let's add in-out paths... 
+								subpath = csp_concat_subpaths(
+													add_func(subpath[0],subpath[1],False,l,r),
+													subpath,
+													add_func(subpath[-2],subpath[-1],True,l,r)
+													)
 
 							
 							res += [ subpath ] 
+							
 							
 						if self.options.in_out_path_replace_original_path :
 							path.set("d", cubicsuperpath.formatPath( self.apply_transforms(path,res,True) ))
 						else:	
 							draw_csp(res, width=1, style=styles["in_out_path_style"] )
-
+		
 ################################################################################
 ###		Arrangement: arranges paths by givven params
 ###		TODO move it to the bottom
@@ -3326,13 +3395,17 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--graffiti-preview-emmit",		action="store", type="int", 		dest="graffiti_preview_emmit", default=800,	help="Preview's paint emmit (pts/s).")
 
 
-		self.OptionParser.add_option("",   "--in-out-path-add-reference-point",	action="store", type="inkbool", dest="in_out_path_add_reference_point", default=False,	help="Just add reference in-out point")
+		self.OptionParser.add_option("",   "--in-out-path",					action="store", type="inkbool", 	dest="in_out_path",	default=True,			help="Create in-out paths")
+		self.OptionParser.add_option("",   "--in-out-path-do-not-add-reference-point",	action="store", type="inkbool", dest="in_out_path_do_not_add_reference_point", default=False,	help="Just add reference in-out point")
 		self.OptionParser.add_option("",   "--in-out-path-point-max-dist",	action="store", type="float", 		dest="in_out_path_point_max_dist", default=10.,	help="In-out path max distance to reference point")
 		self.OptionParser.add_option("",   "--in-out-path-type",			action="store", type="string", 		dest="in_out_path_type", default="Round",	help="In-out path type")
-		self.OptionParser.add_option("",   "--in-out-path-len",				action="store", type="float", 		dest="in_out_path_len", default=10.,	help="In-out path length")
+		self.OptionParser.add_option("",   "--in-out-path-len",				action="store", type="float", 		dest="in_out_path_len", default=10.,		help="In-out path length")
 		self.OptionParser.add_option("",   "--in-out-path-replace-original-path",action="store", type="inkbool", dest="in_out_path_replace_original_path", default=False,	help="Replace original path")
-		self.OptionParser.add_option("",   "--in-out-path-radius",			action="store", type="float", 		dest="in_out_path_radius", default=10.,	help="In-out path radius for round path")
+		self.OptionParser.add_option("",   "--in-out-path-radius",			action="store", type="float", 		dest="in_out_path_radius", default=10.,		help="In-out path radius for round path")
 
+		self.OptionParser.add_option("",   "--plasma-prepare-corners",		action="store", type="inkbool",		dest="plasma_prepare_corners", default=True,	help="Prepare corners")
+		self.OptionParser.add_option("",   "--plasma-prepare-corners-distance", action="store", type="float",	dest="plasma_prepare_corners_distance", default=10.,help="Stepout distance for corners")
+		self.OptionParser.add_option("",   "--plasma-prepare-corners-tolerance", action="store", type="float",	dest="plasma_prepare_corners_tolerance", default=10.,help="Maximum angle for corner (0-180 deg)")
 
 		self.default_tool = {
 					"name": "Default tool",
@@ -4940,7 +5013,9 @@ class Gcodetools(inkex.Effect):
 
 			draw_text(axis,graffiti_reference_points_count*100+10,-10, group = g, gcodetools_tag = "Gcodetools graffiti reference point text")
 
-				
+		elif self.options.orientation_points_count == "in-out reference point" :
+			draw_pointer(group = self.current_layer, x = self.view_center, figure="arrow", pointer_type = "In-out reference point", text = "In-out point")
+	
 		else :
 			print_("Inserting orientation points")
 			if layer == None :
@@ -5748,12 +5823,12 @@ G01 Z1 (going to cutting z)\n""",
 		if self.options.active_tab == '"help"' :
 			self.help()
 			return
-		elif self.options.active_tab not in ['"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"', '"offset"', '"arrangement"', '"update"', '"graffiti"', '"lathe_modify_path"', '"in-out-path"']:
+		elif self.options.active_tab not in ['"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"', '"offset"', '"arrangement"', '"update"', '"graffiti"', '"lathe_modify_path"', '"plasma-prepare-path"']:
 			self.error(_("Select one of the action tabs - Path to Gcode, Area, Engraving, DXF points, Orientation, Offset, Lathe or Tools library.\n Current active tab id is %s" % self.options.active_tab),"error")
 		else:
 			# Get all Gcodetools data from the scene.
 			self.get_info()
-			if self.options.active_tab in ['"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"lathe"', '"graffiti"', '"in-out-path"']:
+			if self.options.active_tab in ['"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"lathe"', '"graffiti"', '"plasma-prepare-path"']:
 				if self.orientation_points == {} :
 					self.error(_("Orientation points have not been defined! A default set of orientation points has been automatically added."),"warning")
 					self.orientation( self.layers[min(1,len(self.layers)-1)] )		
@@ -5829,8 +5904,8 @@ G01 Z1 (going to cutting z)\n""",
 			elif self.options.active_tab == '"arrangement"': 
 				self.arrangement()
 
-			elif self.options.active_tab == '"in-out-path"': 
-				self.in_out_path()		
+			elif self.options.active_tab == '"plasma-prepare-path"': 
+				self.plasma_prepare_path()		
 
 
 		print_("------------------------------------------")
