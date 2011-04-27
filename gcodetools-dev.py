@@ -4539,6 +4539,151 @@ class Gcodetools(inkex.Effect):
 						print_(("adding curve",area_group,d,styles["biarc_style_i"]['area']))
 						if radius == -r : break 
 
+
+################################################################################
+###
+###		Polyline to biarc
+###
+###		Converts Polyline to Biarc
+################################################################################
+	def polyline_to_biarc(self):
+		
+		
+		
+		def biarc(sm, depth=0):
+			def biarc_split(sp1,sp2, z1, z2, depth): 
+				if depth<options.biarc_max_split_depth:
+					sp1,sp2,sp3 = csp_split(sp1,sp2)
+					l1, l2 = cspseglength(sp1,sp2), cspseglength(sp2,sp3)
+					if l1+l2 == 0 : zm = z1
+					else : zm = z1+(z2-z1)*l1/(l1+l2)
+					return biarc(sp1,sp2,z1,zm,depth+1)+biarc(sp2,sp3,zm,z2,depth+1)
+				else: return [ [sp1[1],'line', 0, 0, sp2[1], [z1,z2]] ]
+
+			P0, P4 = P(sp1[1]), P(sp2[1])
+			TS, TE, v = (P(sp1[2])-P0), -(P(sp2[0])-P4), P0 - P4
+			tsa, tea, va = TS.angle(), TE.angle(), v.angle()
+			if TE.mag()<straight_distance_tolerance and TS.mag()<straight_distance_tolerance:	
+				# Both tangents are zerro - line straight
+				return [ [sp1[1],'line', 0, 0, sp2[1], [z1,z2]] ]
+			if TE.mag() < straight_distance_tolerance:
+				TE = -(TS+v).unit()
+				r = TS.mag()/v.mag()*2
+			elif TS.mag() < straight_distance_tolerance:
+				TS = -(TE+v).unit()
+				r = 1/( TE.mag()/v.mag()*2 )
+			else:	
+				r=TS.mag()/TE.mag()
+			TS, TE = TS.unit(), TE.unit()
+			tang_are_parallel = ((tsa-tea)%math.pi<straight_tolerance or math.pi-(tsa-tea)%math.pi<straight_tolerance )
+			if ( tang_are_parallel  and 
+						((v.mag()<straight_distance_tolerance or TE.mag()<straight_distance_tolerance or TS.mag()<straight_distance_tolerance) or
+							1-abs(TS*v/(TS.mag()*v.mag()))<straight_tolerance)	):
+						# Both tangents are parallel and start and end are the same - line straight
+						# or one of tangents still smaller then tollerance
+
+						# Both tangents and v are parallel - line straight
+				return [ [sp1[1],'line', 0, 0, sp2[1], [z1,z2]] ]
+
+			c,b,a = v*v, 2*v*(r*TS+TE), 2*r*(TS*TE-1)
+			if v.mag()==0:
+				return biarc_split(sp1, sp2, z1, z2, depth)
+			asmall, bsmall, csmall = abs(a)<10**-10,abs(b)<10**-10,abs(c)<10**-10 
+			if 		asmall and b!=0:	beta = -c/b
+			elif 	csmall and a!=0:	beta = -b/a 
+			elif not asmall:	 
+				discr = b*b-4*a*c
+				if discr < 0:	raise ValueError, (a,b,c,discr)
+				disq = discr**.5
+				beta1 = (-b - disq) / 2 / a
+				beta2 = (-b + disq) / 2 / a
+				if beta1*beta2 > 0 :	raise ValueError, (a,b,c,disq,beta1,beta2)
+				beta = max(beta1, beta2)
+			elif	asmall and bsmall:	
+				return biarc_split(sp1, sp2, z1, z2, depth)
+			alpha = beta * r
+			ab = alpha + beta 
+			P1 = P0 + alpha * TS
+			P3 = P4 - beta * TE
+			P2 = (beta / ab)  * P1 + (alpha / ab) * P3
+
+
+			def calculate_arc_params(P0,P1,P2):
+				D = (P0+P2)/2
+				if (D-P1).mag()==0: return None, None
+				R = D - ( (D-P0).mag()**2/(D-P1).mag() )*(P1-D).unit()
+				p0a, p1a, p2a = (P0-R).angle()%(2*math.pi), (P1-R).angle()%(2*math.pi), (P2-R).angle()%(2*math.pi)
+				alpha =  (p2a - p0a) % (2*math.pi)					
+				if (p0a<p2a and  (p1a<p0a or p2a<p1a))	or	(p2a<p1a<p0a) : 
+					alpha = -2*math.pi+alpha 
+				if abs(R.x)>1000000 or abs(R.y)>1000000  or (R-P0).mag<options.min_arc_radius**2 :
+					return None, None
+				else :	
+					return  R, alpha
+			R1,a1 = calculate_arc_params(P0,P1,P2)
+			R2,a2 = calculate_arc_params(P2,P3,P4)
+			if R1==None or R2==None or (R1-P0).mag()<straight_tolerance or (R2-P2).mag()<straight_tolerance	: return [ [sp1[1],'line', 0, 0, sp2[1], [z1,z2]] ]
+	
+			d = csp_to_arc_distance(sp1,sp2, [P0,P2,R1,a1],[P2,P4,R2,a2])
+			if d > options.biarc_tolerance and depth<options.biarc_max_split_depth	 : return biarc_split(sp1, sp2, z1, z2, depth)
+			else:
+				if R2.mag()*a2 == 0 : zm = z2
+				else : zm  = z1 + (z2-z1)*(abs(R1.mag()*a1))/(abs(R2.mag()*a2)+abs(R1.mag()*a1)) 
+
+				l = (P0-P2).l2()
+				if  l < EMC_TOLERANCE_EQUAL**2 or l<EMC_TOLERANCE_EQUAL**2 * R1.l2() /100 :
+					# arc should be straight otherwise it could be threated as full circle
+					arc1 = [ sp1[1], 'line', 0, 0, [P2.x,P2.y], [z1,zm] ] 
+				else :
+					arc1 = [ sp1[1], 'arc', [R1.x,R1.y], a1, [P2.x,P2.y], [z1,zm] ] 
+
+				l = (P4-P2).l2()
+				if  l < EMC_TOLERANCE_EQUAL**2 or l<EMC_TOLERANCE_EQUAL**2 * R2.l2() /100 :
+					# arc should be straight otherwise it could be threated as full circle
+					arc2 = [ [P2.x,P2.y], 'line', 0, 0, [P4.x,P4.y], [zm,z2] ] 
+				else :
+					arc2 = [ [P2.x,P2.y], 'arc', [R2.x,R2.y], a2, [P4.x,P4.y], [zm,z2] ]
+		
+				return [ arc1, arc2 ]
+
+		
+		
+		
+		
+		for layer in self.layers :
+			if layer in self.selected_paths :
+				for path in self.selected_paths[layer]:
+					d = path.get('d')
+					if d==None:
+						print_("omitting non-path")
+						self.error(_("Warning: omitting non-path"),"selection_contains_objects_that_are_not_paths")
+						continue
+					csp = cubicsuperpath.parsePath(d)
+					csp = self.apply_transforms(path, csp)
+					csp = self.transform_csp(csp, layer)
+					
+					# lets pretend that csp is a polyline 
+					poly = [ [point[1] for point in subpath] for subpath in csp ]
+					
+					self.draw_csp([ [ [point,point,point] for point in subpoly] for subpoly in poly ],layer)
+					
+					# lets create biarcs 
+					for subpoly in poly :
+						# lets split polyline into different smooth parths. 
+						
+						if len(subpoly)>2 :
+							smooth = [ [subpoly[0],subpoly[1]] ]
+							for p1,p2,p3 in zip(subpoly,subpoly[1:],subpoly[2:]) :
+								# normalize p1p2 and p2p3 to get angle
+								s1,s2 = normalize( p1[0]-p2[0], p1[1]-p2[1]), normalize( p3[0]-p2[0], p3[1]-p2[1]) 
+								if cross(s1,s2) > corner_tolerance :
+									#it's an angle 
+									smooth += [  [p2,p3]  ]
+								else: 
+									smooth[-1].append(p3)							
+							for sm in smooth :
+								smooth_polyline_to_biarc(sm)	
+
 ################################################################################
 ###
 ###		Area fill 
