@@ -74,6 +74,11 @@ def ireplace(self,old,new,count=0):
 	pattern = re.compile(re.escape(old),re.I)
 	return re.sub(pattern,new,self,count) 
 
+def isset(variable):
+	# VARIABLE NAME SHOULD BE A STRING! Like isset("foobar")
+	return variable in locals() or variable in globals()
+	
+	
 ################################################################################
 ###
 ###		Styles and additional parameters
@@ -1165,16 +1170,6 @@ def csp_concat_subpaths(*s):
 		result = concat(result,s1)
 	return result
 
-
-def csp_draw(csp, color="#05f", group = None, style="fill:none;", width = .1, comment = "") :
-	if csp!=[] and csp!=[[]] :
-		if group == None : group = options.doc_root 
-		style += "stroke:"+color+";"+ "stroke-width:%0.4fpx;"%width
-		args = {"d": cubicsuperpath.formatPath(csp), "style":style}
-		if comment!="" : args["comment"] = str(comment)
-		inkex.etree.SubElement( group, inkex.addNS('path','svg'), args )							
-
-	
 def csp_subpaths_end_to_start_distance2(s1,s2):
 	return (s1[-1][1][0]-s2[0][1][0])**2 + (s1[-1][1][1]-s2[0][1][1])**2
 
@@ -1464,8 +1459,8 @@ def draw_text(text,x,y, group = None, style = None, font_size = 10, gcodetools_t
 						})					
 		y += font_size
 		span.text = str(s)
-			
-def draw_csp(csp, stroke = "#f00", fill = "none", comment = "", width = .1, group = None, style = None, gcodetools_tag = None) :
+
+def draw_csp(csp, stroke = "#f00", fill = "none", comment = "", width = 0.354, group = None, style = None, gcodetools_tag = None) :
 	if style == None : 
 		style = "fill:%s;fill-opacity:1;stroke:%s;stroke-width:%s"%(fill,stroke,width)
 	attributes = {			'd':	cubicsuperpath.formatPath(csp),
@@ -1676,7 +1671,7 @@ def csp_offset(csp, r) :
 						else : 
 							pass # ???						
 							#raise ValueError, "Offset curvature clipping error"
-		#csp_draw([result])							
+		#draw_csp([result])							
 		return result					
 	
 						
@@ -1780,7 +1775,7 @@ def csp_offset(csp, r) :
 			r2 = offset_segment_recursion(sp4,sp5,r, depth-1, tolerance)
 			return r1[:-1]+ [[r1[-1][0],r1[-1][1],r2[0][2]]] + r2[1:]
 		else :
-			#csp_draw([[sp1_r,sp2_r]])
+			#draw_csp([[sp1_r,sp2_r]])
 			#draw_pointer(sp1[1]+sp1_r[1], "#057", "line")
 			#draw_pointer(sp2[1]+sp2_r[1], "#705", "line")
 			return [sp1_r,sp2_r]
@@ -1840,8 +1835,8 @@ def csp_offset(csp, r) :
 				prev_l = len(subpath_offset)
 			else : 
 				prev, arc, next = csp_join_offsets(subpath_offset[-prev_l:],segment_offset,sp1,sp2,sp1_l,sp2_l,r)
-				#csp_draw([prev],"Blue")
-				#csp_draw([arc],"Magenta")
+				#draw_csp([prev],"Blue")
+				#draw_csp([arc],"Magenta")
 				subpath_offset = csp_concat_subpaths(subpath_offset[:-prev_l+1],prev,arc,next)
 				prev_l = len(next)				
 			sp1_l, sp2_l = sp1[:], sp2[:]
@@ -1851,9 +1846,9 @@ def csp_offset(csp, r) :
 		prev, arc, next = csp_join_offsets(subpath_offset[-prev_l:], subpath_offset[:2], subpath[0], subpath[1], sp1_l,sp2_l, r)
 		subpath_offset[:2] = next[:]
 		subpath_offset = csp_concat_subpaths(subpath_offset[:-prev_l+1],prev,arc)
-		#csp_draw([prev],"Blue")
-		#csp_draw([arc],"Red")
-		#csp_draw([next],"Red")
+		#draw_csp([prev],"Blue")
+		#draw_csp([arc],"Red")
+		#draw_csp([next],"Red")
 
 		# Collect subpath's offset and save it to unclipped offset list. 	
 		unclipped_offset[i] = subpath_offset[:]	
@@ -1866,7 +1861,7 @@ def csp_offset(csp, r) :
 	time_ = time.time()
 	
 	#for i in range(len(unclipped_offset)):
-	#	csp_draw([unclipped_offset[i]], color = ["Green","Red","Blue"][i%3], width = .1)
+	#	draw_csp([unclipped_offset[i]], color = ["Green","Red","Blue"][i%3], width = .1)
 	#return []
 	############################################################################
 	# Now to the clipping. 
@@ -1938,7 +1933,7 @@ def csp_offset(csp, r) :
 			splitted_offset += [subpath[:]]
 	
 	#for i in range(len(splitted_offset)):
-	#	csp_draw([splitted_offset[i]], color = ["Green","Red","Blue"][i%3])
+	#	draw_csp([splitted_offset[i]], color = ["Green","Red","Blue"][i%3])
 	print_("Splitted in %s"%(time.time()-time_))
 	time_ = time.time()
 
@@ -1964,7 +1959,7 @@ def csp_offset(csp, r) :
 		if not clip :
 			result += [s1[:]]
 		elif options.offset_draw_clippend_path :
-			csp_draw([s1],color="Red",width=.1)
+			draw_csp([s1],color="Red",width=.1)
 			draw_pointer( csp_at_t(s2[-2],s2[-1],1.)+
 				(P(csp_at_t(s2[-2],s2[-1],1.))+ P(csp_normalized_normal(s2[-2],s2[-1],1.))*10).to_list(),"Green", "line"  )
 			draw_pointer( csp_at_t(s1[0],s1[1],0.)+
@@ -1973,14 +1968,14 @@ def csp_offset(csp, r) :
 	# Now join all together and check closure and orientation of result
 	joined_result = csp_join_subpaths(result)
 	# Check if each subpath from joined_result is closed
-	#csp_draw(joined_result,color="Green",width=1)
+	#draw_csp(joined_result,color="Green",width=1)
 
 	
 	for s in joined_result[:] :
 		if csp_subpaths_end_to_start_distance2(s,s) > 0.001 :
 			# Remove open parts
 			if options.offset_draw_clippend_path:
-				csp_draw([s],color="Orange",width=1)
+				draw_csp([s],color="Orange",width=1)
 				draw_pointer(s[0][1], comment= csp_subpaths_end_to_start_distance2(s,s))
 				draw_pointer(s[-1][1], comment = csp_subpaths_end_to_start_distance2(s,s))
 			joined_result.remove(s)
@@ -2003,7 +1998,7 @@ def csp_offset(csp, r) :
 		if not r1 < dist[0] < r2 : 
 			joined_result.remove(s)
 			if options.offset_draw_clippend_path:
-				csp_draw([s], comment = math.sqrt(dist[0]))
+				draw_csp([s], comment = math.sqrt(dist[0]))
 				draw_pointer(csp_at_t(csp[dist[1]][dist[2]-1],csp[dist[1]][dist[2]],dist[3])+s[int(len(s)/2)][1],"blue", "line", comment = [math.sqrt(dist[0]),i,j,sp]  )
 
 	print_("-----------------------------")
@@ -2567,7 +2562,7 @@ class Polygon:
 					
 	def draw(self,color="#075",width=.1, group = None) :
 		csp = [csp_subpath_line_to([],poly+[poly[0]]) for poly in self.polygon]
-		csp_draw( csp, color=color,width=width, group = group)
+		draw_csp( csp, color=color,width=width, group = group)
 			
 			
 	
@@ -3486,13 +3481,14 @@ class Gcodetools(inkex.Effect):
 ### 	Draw csp 
 ################################################################################
 
-	def draw_csp(self, csp, layer=None, group=None, fill='none', stroke='#178ade', width='1.0', style=None):
+	def draw_csp(self, csp, layer=None, group=None, fill='none', stroke='#178ade', width=0.354, style=None):
 		if layer!=None :
 			csp = self.transform_csp(csp,layer,reverse=True)
 		if group==None and layer==None:
 			group = self.document.getroot()
 		elif group==None and layer!=None :
 			group = layer
+		csp = self.apply_transforms(group,csp, reverse=True)
 		if style!=None :
 			return draw_csp(csp, group=group, style=style)
 		else :
@@ -3502,7 +3498,6 @@ class Gcodetools(inkex.Effect):
 
 
 	def draw_curve(self, curve, layer, group=None, style=styles["biarc_style"]):
-
 		self.set_markers()
 
 		for i in [0,1]:
@@ -3512,9 +3507,18 @@ class Gcodetools(inkex.Effect):
 			style['biarc%s_r'%i] = simplestyle.formatStyle(style['biarc%s_r'%i])
 		
 		if group==None:
-			group = inkex.etree.SubElement( self.layers[min(1,len(self.layers)-1)], inkex.addNS('g','svg'), {"gcodetools": "Preview group"} )
+			if "preview_groups" not in dir(self) :
+				self.preview_groups = { layer: inkex.etree.SubElement( self.layers[min(1,len(self.layers)-1)], inkex.addNS('g','svg'), {"gcodetools": "Preview group"} ) }
+			elif layer not in self.preview_groups :
+				self.preview_groups[layer] = inkex.etree.SubElement( self.layers[min(1,len(self.layers)-1)], inkex.addNS('g','svg'), {"gcodetools": "Preview group"} )
+			group = self.preview_groups[layer]
+
 		s, arcn = '', 0
 		
+		transform = self.get_transforms(group)
+		if transform != [] : 
+			transform = self.reverse_transform(transform)
+			transform = simpletransform.formatTransform(transform)
 		
 		a,b,c = [0.,0.], [1.,0.], [0.,1.]
 		k = (b[0]-a[0])*(c[1]-a[1])-(c[0]-a[0])*(b[1]-a[1])
@@ -3527,13 +3531,13 @@ class Gcodetools(inkex.Effect):
 			
 			if s!='':
 				if s[1] == 'line':
-					inkex.etree.SubElement(	group, inkex.addNS('path','svg'), 
-							{
-								'style': style['line'],
+					attr = {	'style': style['line'],
 								'd':'M %s,%s L %s,%s' % (s[0][0], s[0][1], si[0][0], si[0][1]),
 								"gcodetools": "Preview",
 							}
-						)
+					if transform != [] :
+						attr["transform"] = transform		
+					inkex.etree.SubElement(	group, inkex.addNS('path','svg'),  attr	)
 				elif s[1] == 'arc':
 					arcn += 1
 					sp = s[0]
@@ -3554,8 +3558,8 @@ class Gcodetools(inkex.Effect):
 						a_end = a_st*1
 						a_st = a_st+a
 						st = style['biarc%s_r'%(arcn%2)]
-					inkex.etree.SubElement(	group, inkex.addNS('path','svg'), 
-						 {
+					
+					attr = {
 							'style': st,
 							 inkex.addNS('cx','sodipodi'):		str(c[0]),
 							 inkex.addNS('cy','sodipodi'):		str(c[1]),
@@ -3565,8 +3569,12 @@ class Gcodetools(inkex.Effect):
 							 inkex.addNS('end','sodipodi'):		str(a_end),
 							 inkex.addNS('open','sodipodi'):	'true',
 							 inkex.addNS('type','sodipodi'):	'arc',
-							"gcodetools": "Preview",
-						})
+							 "gcodetools": "Preview",
+							}	
+						
+					if transform != [] :
+						attr["transform"] = transform	
+					inkex.etree.SubElement(	group, inkex.addNS('path','svg'), attr)
 			s = si
 	
 
@@ -3735,6 +3743,14 @@ class Gcodetools(inkex.Effect):
 				print_(trans)
 			g=g.getparent()
 		return trans 
+	
+	def reverse_transform(self,transform):
+		trans = numpy.array(transform + [[0,0,1]])
+		if numpy.linalg.det(trans)!=0 :
+			trans = numpy.linalg.inv(trans).tolist()[:2]		
+			return trans
+		else :
+		 return transform
 		
 
 	def apply_transforms(self,g,csp, reverse=False):
@@ -3743,10 +3759,7 @@ class Gcodetools(inkex.Effect):
 			if not reverse :
 				simpletransform.applyTransformToPath(trans, csp)
 			else :
-				trans = numpy.array(trans)
-				if numpy.linalg.det(trans)!=0 :
-					trans = numpy.linalg.inv(trans).tolist()		
-				simpletransform.applyTransformToPath(trans, csp)
+				simpletransform.applyTransformToPath(self.reverse_transform(trans), csp)
 		return csp
 		
 		
@@ -4848,8 +4861,9 @@ class Gcodetools(inkex.Effect):
 					# and apply back transrormations to draw them
 					csp_line = csp_from_polyline(splitted_line)
 					csp_line = self.transform_csp(csp_line, layer, True)
-					csp_draw(csp_line)
-#					csp_draw(lines)
+					
+					self.draw_csp(csp_line, group = area_group)
+#					draw_csp(lines)
 					
 
 
@@ -5390,7 +5404,7 @@ G01 Z1 (going to cutting z)\n""",
 		alias = {"X":"I", "Y":"J", "Z":"K", "x":"i", "y":"j", "z":"k"} 
 		i_, k_ = alias[x], alias[z]
 		c = [ [subpath[0][1], "move", 0, 0, 0] ]
-		#csp_draw(self.transform_csp([subpath],layer,True), color = "Orange", width = .1)
+		#draw_csp(self.transform_csp([subpath],layer,True), color = "Orange", width = .1)
 		for sp1,sp2 in zip(subpath,subpath[1:]) :
 			c += biarc(sp1,sp2,0,0)
 		for i in range(1,len(c)) : # Just in case check end point of each segment
@@ -5465,7 +5479,7 @@ G01 Z1 (going to cutting z)\n""",
 								offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [left,10], [left,0] )
 								offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [right,0], [right,10] )
 								offsetted_subpath = csp_clip_by_line(offsetted_subpath,  [0, miny[1]-r], [10, miny[1]-r] )
-								#csp_draw(self.transform_csp(offsetted_subpath,layer,True), color = "Green", width = 1)
+								#draw_csp(self.transform_csp(offsetted_subpath,layer,True), color = "Green", width = 1)
 								# Join offsetted_subpath together 
 								# Hope there wont be any cicles
 								subpath = csp_join_subpaths(offsetted_subpath)[0]
@@ -5725,7 +5739,7 @@ G01 Z1 (going to cutting z)\n""",
 				return csp_from_arc(p1, p2, C1.to_list(), r, t1)
 
 			cos, sin = Dc.x/dc, Dc.y/dc
-			#csp_draw(self.transform_csp([[ [[C1.x-r*sin,C1.y+r*cos]]*3,[[C2.x-r*sin,C2.y+r*cos]]*3 ]],layer,reverse=True), color = "#00ff00;" )
+			#draw_csp(self.transform_csp([[ [[C1.x-r*sin,C1.y+r*cos]]*3,[[C2.x-r*sin,C2.y+r*cos]]*3 ]],layer,reverse=True), color = "#00ff00;" )
 			#draw_pointer(self.transform(C1.to_list(),layer,reverse=True))
 			#draw_pointer(self.transform(C2.to_list(),layer,reverse=True))
 			
@@ -5893,7 +5907,7 @@ G01 Z1 (going to cutting z)\n""",
 					if self.options.graffiti_create_linearization_preview :
 						t += 1
 						csp = [ [polyline[i],polyline[i],polyline[i]] for i in range(len(polyline))]
-						csp_draw(self.transform_csp([csp],layer,reverse=True), color = "#00cc00;" if polyline_[0]=='draw' else "#ff5555;")
+						draw_csp(self.transform_csp([csp],layer,reverse=True), color = "#00cc00;" if polyline_[0]=='draw' else "#ff5555;")
 
 	
 				# Export polyline to gcode
@@ -6033,7 +6047,7 @@ G01 Z1 (going to cutting z)\n""",
 							offsets_count += 1
 							if offset_ != [] : 
 								for iii in offset_ :
-									csp_draw([iii], color="Green", width=1)		
+									draw_csp([iii], color="Green", width=1)		
 									#print_(offset_)
 							else :
 								print_("------------Reached empty offset at radius %s"% offset )
