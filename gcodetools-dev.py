@@ -1628,19 +1628,28 @@ class Arc():
 class Line():
 	def __init__(self):
 		pass
-
+	def l2(self): return (self.st[0]-self.end[0])**2 + (self.st[1]-self.end[1])**2
+	def l(self): return math.sqrt( (self.st[0]-self.end[0])**2 + (self.st[1]-self.end[1])**2 )
+	
 class Biarc:
 	def __init__(self, items=None):
 		if items == None :
 			self.items = []
 		else: 	
 			self.items = items
+	def l(self) : return self.a * self.r
+	
 	def offset(self):
 		pass
 	def clip_offset(self):
 		pass	
 	def draw(layer, group=None, style=styles["biarc_style"]):
 		pass
+	def from_old_style(self, curve) :
+		#Crve defenitnion [start point, type = {'arc','line','move','end'}, arc center, arc angle, end point, [zstart, zend]]		
+		for sp,sp1 in curve():
+			
+			
 			
 	
 ################################################################################
