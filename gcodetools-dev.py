@@ -1619,6 +1619,29 @@ class P:
 	def to_list(self): return [self.x, self.y]	
 	def ccw(self): return P(-self.y,self.x)
 	def l2(self): return self.x*self.x + self.y*self.y
+
+
+class Arc():
+	def __init__(self):
+		pass
+
+class Line():
+	def __init__(self):
+		pass
+
+class Biarc:
+	def __init__(self, items=None):
+		if items == None :
+			self.items = []
+		else: 	
+			self.items = items
+	def offset(self):
+		pass
+	def clip_offset(self):
+		pass	
+	def draw(layer, group=None, style=styles["biarc_style"]):
+		pass
+			
 	
 ################################################################################
 ###
