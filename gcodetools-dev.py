@@ -5151,17 +5151,25 @@ class Gcodetools(inkex.Effect):
 ###
 ################################################################################
 	def orientation(self, layer=None) :
-	
+
+		if layer == None :
+			layer = self.current_layer if self.current_layer is not None else self.document.getroot()
+		
+		transform = self.get_transforms(layer)
+		if transform != [] : 
+			transform = self.reverse_transform(transform)
+			transform = simpletransform.formatTransform(transform)
+
 		if self.options.orientation_points_count == "graffiti" :
 			print_(self.graffiti_reference_points)
 			print_("Inserting graffiti points")
-			if layer == None :
-				layer = self.current_layer if self.current_layer is not None else self.document.getroot()
 			if layer in self.graffiti_reference_points: graffiti_reference_points_count =  len(self.graffiti_reference_points[layer])
 			else: graffiti_reference_points_count = 0
 			axis = ["X","Y","Z","A"][graffiti_reference_points_count%4]
-			 
-			g = inkex.etree.SubElement(layer, inkex.addNS('g','svg'), {'gcodetools': "Gcodetools graffiti reference point"})
+			attr = {'gcodetools': "Gcodetools graffiti reference point"}
+			if 	transform != [] :
+				attr["transform"] = transform 
+			g = inkex.etree.SubElement(layer, inkex.addNS('g','svg'), attr)
 			inkex.etree.SubElement(	g, inkex.addNS('path','svg'), 
 				{
 					'style':	"stroke:none;fill:#00ff00;", 	
@@ -5169,7 +5177,6 @@ class Gcodetools(inkex.Effect):
 					'gcodetools': "Gcodetools graffiti reference point arrow"
 				})
 			
-
 			draw_text(axis,graffiti_reference_points_count*100+10,-10, group = g, gcodetools_tag = "Gcodetools graffiti reference point text")
 
 		elif self.options.orientation_points_count == "in-out reference point" :
@@ -5177,12 +5184,15 @@ class Gcodetools(inkex.Effect):
 	
 		else :
 			print_("Inserting orientation points")
-			if layer == None :
-				layer = self.current_layer if self.current_layer is not None else self.document.getroot()
+
 			if layer in self.orientation_points:
 				self.error(_("Active layer already has orientation points! Remove them or select another layer!"),"active_layer_already_has_orientation_points")
-		
-			orientation_group = inkex.etree.SubElement(layer, inkex.addNS('g','svg'), {"gcodetools":"Gcodetools orientation group"})
+			
+			attr = {"gcodetools":"Gcodetools orientation group"}
+			if 	transform != [] :
+				attr["transform"] = transform 
+
+			orientation_group = inkex.etree.SubElement(layer, inkex.addNS('g','svg'), attr)
 			doc_height = inkex.unittouu(self.document.getroot().get('height'))
 			if self.document.getroot().get('height') == "100%" :
 				doc_height = 1052.3622047
