@@ -1648,8 +1648,7 @@ class Biarc:
 	def from_old_style(self, curve) :
 		#Crve defenitnion [start point, type = {'arc','line','move','end'}, arc center, arc angle, end point, [zstart, zend]]		
 		for sp,sp1 in curve():
-			
-			
+			pass	
 			
 	
 ################################################################################
