@@ -1622,14 +1622,75 @@ class P:
 
 
 class Arc():
-	def __init__(self):
-		pass
+	def __init__(self,st,end,c,a):
+		self.st = P(st)
+		self.end = P(end)
+		self.c = P(c)
+		self.r = (P(st)-P(c)).mag()
+		self.a = ( (self.st-self.c).angle() - (self.end-self.c).angle() )%math.pi2
+		if a<0 : self.a -= math.pi2
+
+	def offset(self):
+		pass	
+
+	def draw(self, group, style, layer, transform, num = 0, reverse_angle = 1):
+		st = P(self.transform(self.st.to_list(), layer, True))
+		c = P(self.transform(self.c.to_list(), layer, True))
+		a = self.a * reverse_angle
+		r = (P(st)-P(c)).mag()
+		a_st = ( math.atan2((st-c).to_list() ) + math.pi/2 ) % (math.pi*2)
+		if a>0:
+			a_end = a_st+a
+			style = style['biarc%s'%(arcn%2)]
+		else: 
+			a_end = a_st
+			a_st = a_st+a
+			style = style['biarc%s_r'%(arcn%2)]
+		
+		attr = {
+				'style': st,
+				 inkex.addNS('cx','sodipodi'):		str(c.x),
+				 inkex.addNS('cy','sodipodi'):		str(c.y),
+				 inkex.addNS('rx','sodipodi'):		str(r),
+				 inkex.addNS('ry','sodipodi'):		str(r),
+				 inkex.addNS('start','sodipodi'):	str(a_st),
+				 inkex.addNS('end','sodipodi'):		str(a_end),
+				 inkex.addNS('open','sodipodi'):	'true',
+				 inkex.addNS('type','sodipodi'):	'arc',
+				 "gcodetools": "Preview",
+				}	
+		if transform != [] :
+			attr["transform"] = transform	
+		inkex.etree.SubElement(	group, inkex.addNS('path','svg'), attr)
+
 
 class Line():
-	def __init__(self):
-		pass
+	def __init__(self,st,end):
+		self.st = P(st)
+		self.end = P(end)
+		self.l = self.length() 
+		if l != 0 :
+			self.n = ((self.end-self.st)/l).ccw()
+		else: 
+			self.n = [0,1]
+				
+	def offset(self, r):
+		self.st += self.n*r
+		self.end += self.n*r
+		
 	def l2(self): return (self.st[0]-self.end[0])**2 + (self.st[1]-self.end[1])**2
-	def l(self): return math.sqrt( (self.st[0]-self.end[0])**2 + (self.st[1]-self.end[1])**2 )
+	def length(self): return math.sqrt( (self.st[0]-self.end[0])**2 + (self.st[1]-self.end[1])**2 )
+	
+	def draw(self, group, style, transform, num = 0, reverse_angle = 1):
+		attr = {	'style': style['line'],
+					'd':'M %s,%s L %s,%s' % (self.st.x, self.st.y, self.en.x, self.en.x),
+					"gcodetools": "Preview",
+				}
+		if transform != [] :
+			attr["transform"] = transform		
+		inkex.etree.SubElement(	group, inkex.addNS('path','svg'),  attr	)
+	
+	
 	
 class Biarc:
 	def __init__(self, items=None):
@@ -1643,7 +1704,42 @@ class Biarc:
 		pass
 	def clip_offset(self):
 		pass	
-	def draw(layer, group=None, style=styles["biarc_style"]):
+		
+	def draw(self, layer, group=None, style=styles["biarc_style"]):
+		global gcodetools
+		gcodetools.set_markers()
+
+		for i in [0,1]:
+			style['biarc%s_r'%i] = simplestyle.parseStyle(style['biarc%s'%i])
+			style['biarc%s_r'%i]["marker-start"] = "url(#DrawCurveMarker_r)"
+			del(style['biarc%s_r'%i]["marker-end"])
+			style['biarc%s_r'%i] = simplestyle.formatStyle(style['biarc%s_r'%i])
+		
+		if group==None:
+			if "preview_groups" not in dir(options.self) :
+				gcodetools.preview_groups = { layer: inkex.etree.SubElement( gcodetools.layers[min(1,len(gcodetools.layers)-1)], inkex.addNS('g','svg'), {"gcodetools": "Preview group"} ) }
+			elif layer not in gcodetools.preview_groups :
+				gcodetools.preview_groups[layer] = inkex.etree.SubElement( gcodetools.layers[min(1,len(gcodetools.layers)-1)], inkex.addNS('g','svg'), {"gcodetools": "Preview group"} )
+			group = gcodetools.preview_groups[layer]
+		
+		transform = gcodetools.get_transforms(group)
+		if transform != [] : 
+			transform = gcodetools.reverse_transform(transform)
+			transform = simpletransform.formatTransform(transform)
+
+		a,b,c = [0.,0.], [1.,0.], [0.,1.]
+		k = (b[0]-a[0])*(c[1]-a[1])-(c[0]-a[0])*(b[1]-a[1])
+		a,b,c = gcodetools.transform(a, layer, True), gcodetools.transform(b, layer, True), gcodetools.transform(c, layer, True)
+		if ((b[0]-a[0])*(c[1]-a[1])-(c[0]-a[0])*(b[1]-a[1]))*k > 0 : reverse_angle = 1
+		else : reverse_angle = -1 
+
+
+		num = 0
+		for item in self.items :
+			num += 1
+			item.draw(group, style, transform, num, reverse_angle)
+		
+	
 		pass
 	def from_old_style(self, curve) :
 		#Crve defenitnion [start point, type = {'arc','line','move','end'}, arc center, arc angle, end point, [zstart, zend]]		
@@ -6114,6 +6210,6 @@ G01 Z1 (going to cutting z)\n""",
 		
 		
 #						
-e = Gcodetools()
-e.affect()					
+gcodetools = Gcodetools()
+gcodetools.affect()					
 
