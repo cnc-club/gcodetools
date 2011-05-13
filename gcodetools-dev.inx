@@ -311,7 +311,6 @@ packets will be needed)">false</param>
 		<param name="graffiti-create-linearization-preview" type="boolean" _gui-text="Create linearization preview">true</param>
 		<param name="graffiti-preview-size" type="int" min="100" max="10000" _gui-text="Preview's size (px):">800</param>
 		<param name="graffiti-preview-emmit" type="int" min="100" max="10000" _gui-text="Preview's paint emmit (pts/s):">1000</param>
-		
 	</page>
 <!-- Gcodetools: /graffiti block -->
 
@@ -322,6 +321,11 @@ packets will be needed)">false</param>
 	</page>
 <!-- Gcodetools: /update block -->
 
+<!-- Gcodetools: test block -->
+	<page name='test' _gui-text='Test'>	
+		<_param name="help" type="description">This page was created for testing purpouses.</_param>
+	</page>
+<!-- Gcodetools: /test block -->
 
 <!-- Gcodetools: footer block -->
 	</param>	
