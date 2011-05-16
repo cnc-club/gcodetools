@@ -1631,17 +1631,15 @@ class Arc():
 		if a<0 : self.a -= math.pi2
 
 	def offset(self, r):
-		if self.a<0 :
+		if self.a>0 :
 			r += self.r
 		else :
 			r = self.r - r
-
 		
 		if self.r != 0 :
 			self.st = self.c + (self.st-self.c)*r/self.r
 			self.end = self.c + (self.end-self.c)*r/self.r
 			self.r = r
-		pass	
 	
 	def length(self):
 		return abs(self.a*self.r)
@@ -1678,11 +1676,16 @@ class Arc():
 			attr["transform"] = transform	
 		inkex.etree.SubElement(	group, inkex.addNS('path','svg'), attr)
 		
-		
+	def intersect(self,b) :
+		return []
 
 
 class Line():
 	def __init__(self,st,end):
+		if st.__class__ == P :
+			st = st.to_list()
+		if end.__class__ == P :
+			end = end.to_list()
 		self.st = P(st)
 		self.end = P(end)
 		self.l = self.length() 
@@ -1692,8 +1695,8 @@ class Line():
 			self.n = [0,1]
 				
 	def offset(self, r):
-		self.st += self.n*r
-		self.end += self.n*r
+		self.st -= self.n*r
+		self.end -= self.n*r
 		
 	def l2(self): return (self.st-self.end).l2()
 	def length(self): return (self.st-self.end).mag()
@@ -1711,6 +1714,39 @@ class Line():
 			attr["transform"] = transform		
 		inkex.etree.SubElement(	group, inkex.addNS('path','svg'),  attr	)
 	
+	def intersect(self,b) :
+		if b.__class__ == Line :
+			if self.l < 10e-8 or b.l < 10e-8 : return []
+			v1 = self.end - self.st
+			v2 = b.end - b.st
+			x = v1.x*v2.y - v2.x*v1.y 
+			if x == 0 :
+				# lines are parallel
+				res = []
+
+				if (self.st.x-b.st.x)*v1.y - (self.st.y-b.st.y)*v1.x  == 0:
+					# lines are the same
+					if v1.x != 0 :
+						if 0<=(self.st.x-b.st.x)/v2.x<=1 :  res.append(self.st)
+						if 0<=(self.end.x-b.st.x)/v2.x<=1 :  res.append(self.end)
+						if 0<=(b.st.x-self.st.x)/v1.x<=1 :  res.append(b.st)
+						if 0<=(b.end.x-b.st.x)/v1.x<=1 :  res.append(b.end)
+					else :
+						if 0<=(self.st.y-b.st.y)/v2.y<=1 :  res.append(self.st)
+						if 0<=(self.end.y-b.st.y)/v2.y<=1 :  res.append(self.end)
+						if 0<=(b.st.y-self.st.y)/v1.y<=1 :  res.append(b.st)
+						if 0<=(b.end.y-b.st.y)/v1.y<=1 :  res.append(b.end)
+				return res
+			else :
+				t1 = ( -v1.x*(b.end.y-self.end.y) + v1.y*(b.end.x-self.end.x) ) / x
+				t2 = ( -v1.y*(self.st.x-b.st.x) + v1.x*(self.st.y-b.st.y) ) / x
+
+				gcodetools.error((x,t1,t2), "warning")
+				if 0<=t1<=1 and 0<=t2<=1 : return [ self.st+v1*t1 ]
+				else : return []					
+		else: return []	
+			
+			
 	
 	
 class Biarc:
@@ -1723,12 +1759,29 @@ class Biarc:
 	def l(self) : 
 		return sum([i.length() for i in items])
 	
-	def offset(self,r):
+	def close(self) :
+		for subitems in self.items:
+			if (subitems[0].st-subitems[-1].end).l2()>10e-16 :
+				subitems.append(Line(subitems[-1].end,subitems[0].st))
+	
+	def offset(self,r) :
 		# offset each element
+		self.close()
 		for subitems in self.items :
 			for item in subitems :
 				item.offset(r)
+		self.connect(r)
+		
+	def connect(self, r) :				
+		for subitems in self.items :
+			for a,b in zip(subitems, subitems[1:]) :
+				i = a.intersect(b)
+				for p in i : 
+					draw_pointer(p.to_list())
 				
+						
+				
+						
 	def clip_offset(self):
 		pass	
 		
@@ -3509,7 +3562,7 @@ class Gcodetools(inkex.Effect):
 		biarc.draw(self.layers[-1])
 		biarc.offset(10)
 		biarc.draw(self.layers[-1])
-		biarc.offset(-1)
+		biarc.offset(-11)
 		biarc.draw(self.layers[-1])
 
 
