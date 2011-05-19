@@ -4235,6 +4235,7 @@ class Gcodetools(inkex.Effect):
 	def generate_gcode(self, curve, layer, depth):
 		Zauto_scale = self.Zauto_scale[layer]
 		tool = self.tools[layer][0]
+		g = ""
 
 		def c(c):
 			c = [c[i] if i<len(c) else None for i in range(6)]
@@ -4260,8 +4261,10 @@ class Gcodetools(inkex.Effect):
 			self.last_used_tool = None
 		print_("working on curve")
 		print_(curve)
-		g = tool['tool change gcode'] +"\n" if tool != self.last_used_tool else "\n"
 		
+		if tool != self.last_used_tool :
+			g += ( "(Change tool to %s)\n" % re.sub("\"'\(\)\\\\"," ",tool["name"]) ) + tool["tool change gcode"] + "\n"
+
 		lg, zs, f =  'G00', self.options.Zsafe, " F%f"%tool['feed'] 
 		current_a = 0
 		go_to_safe_distance = "G00" + c([None,None,zs]) + "\n" 
@@ -4676,6 +4679,7 @@ class Gcodetools(inkex.Effect):
 						key = get_text(j)
 					if j.get("gcodetools") == "Gcodetools tool defention field value":
 						value = get_text(j)
+						if value == "(None)": value = ""
 				if value == None or key == None: continue
 				#print_("Found tool parameter '%s':'%s'" % (key,value))
 				if key in self.default_tool.keys() :
@@ -5916,10 +5920,11 @@ G01 Z1 (going to cutting z)\n""",
 			if key not in keys: keys += [key]
 		for key in keys :
 			g = inkex.etree.SubElement(tools_group, inkex.addNS('g','svg'), {'gcodetools': "Gcodetools tool parameter"})
-		
 			draw_text(key, 0, y, group = g, gcodetools_tag = "Gcodetools tool defention field name", font_size = 10 if key!='name' else 20)
-			draw_text(tool[key], 150, y, group = g, gcodetools_tag = "Gcodetools tool defention field value", font_size = 10 if key!='name' else 20)
-			v = str(tool[key]).split("\n")
+			param = tool[key]
+			if type(param)==str and re.match("^\s*$",param) : param = "(None)"
+			draw_text(param, 150, y, group = g, gcodetools_tag = "Gcodetools tool defention field value", font_size = 10 if key!='name' else 20)
+			v = str(param).split("\n")
 			y += 15*len(v) if key!='name' else 20*len(v)
 
 		bg.set('d',"m -20,-20 l 400,0 0,%f -400,0 z " % (y+50))
@@ -6054,7 +6059,6 @@ G01 Z1 (going to cutting z)\n""",
 					self.tool["passing feed"]	= float(self.tool["passing feed"] if "passing feed" in self.tool else self.tool["feed"])
 					self.tool["feed"]			= float(self.tool["feed"])
 					self.tool["fine feed"]		= float(self.tool["fine feed"] if "fine feed" in self.tool else self.tool["feed"]) 
-					
 					gcode += ( "(Change tool to %s)\n" % re.sub("\"'\(\)\\\\"," ",self.tool["name"]) ) + self.tool["tool change gcode"] + "\n"
 					
 				for path in paths[layer]:
