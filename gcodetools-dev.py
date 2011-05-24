@@ -1715,37 +1715,58 @@ class Line():
 		inkex.etree.SubElement(	group, inkex.addNS('path','svg'),  attr	)
 	
 	def intersect(self,b) :
+		def btw(a,x,y, strict=False):
+			return x<=a<=y or y<=a<=x if not strict else x<a<y or y<a<x
+		gcodetools.error(b.__class__,"warning")
 		if b.__class__ == Line :
 			if self.l < 10e-8 or b.l < 10e-8 : return []
 			v1 = self.end - self.st
 			v2 = b.end - b.st
-			x = v1.x*v2.y - v2.x*v1.y 
-			if x == 0 :
+			a1,b1,c1 = v1.y, v1.x, self.st.x*self.end.y - self.end.x*self.st.y
+			a2,b2,c2 = v2.y, v2.x, b.st.x*b.end.y - b.end.x*b.st.y
+			k = a1*b2 - a2*b1
+			if k == 0 :
 				# lines are parallel
 				res = []
-
-				if (self.st.x-b.st.x)*v1.y - (self.st.y-b.st.y)*v1.x  == 0:
+				if (a1!=0 and abs (c1*a2 - c2*a1)<10e-10 or b1!=0 and abs (c1*b2 - c2*b1)<10e-10):
 					# lines are the same
 					if v1.x != 0 :
-						if 0<=(self.st.x-b.st.x)/v2.x<=1 :  res.append(self.st)
-						if 0<=(self.end.x-b.st.x)/v2.x<=1 :  res.append(self.end)
-						if 0<=(b.st.x-self.st.x)/v1.x<=1 :  res.append(b.st)
-						if 0<=(b.end.x-b.st.x)/v1.x<=1 :  res.append(b.end)
-					else :
-						if 0<=(self.st.y-b.st.y)/v2.y<=1 :  res.append(self.st)
-						if 0<=(self.end.y-b.st.y)/v2.y<=1 :  res.append(self.end)
-						if 0<=(b.st.y-self.st.y)/v1.y<=1 :  res.append(b.st)
-						if 0<=(b.end.y-b.st.y)/v1.y<=1 :  res.append(b.end)
+						if btw(self.st.x,b.st.x,b.end.x,True)	:  res.append(self.st)
+						if btw(self.end.x,b.st.x,b.end.x,True)	:  res.append(self.end)
+						if btw(b.st.x,self.st.x,self.end.x)		:  res.append(b.st)
+						if btw(b.end.x,self.st.x,self.end.x)	 :  res.append(b.end)
+					elif v1.y !=0 :
+						if btw(self.st.y,b.st.y,b.end.y,True)	:  res.append(self.st)
+						if btw(self.end.y,b.st.y,b.end.y,True)	:  res.append(self.end)
+						if btw(b.st.y,self.st.y,self.end.y)		:  res.append(b.st)
+						if btw(b.end.y,self.st.y,self.end.y) 	:  res.append(b.end)
 				return res
 			else :
-				t1 = ( -v1.x*(b.end.y-self.end.y) + v1.y*(b.end.x-self.end.x) ) / x
-				t2 = ( -v1.y*(self.st.x-b.st.x) + v1.x*(self.st.y-b.st.y) ) / x
-
-				gcodetools.error((x,t1,t2), "warning")
-				if 0<=t1<=1 and 0<=t2<=1 : return [ self.st+v1*t1 ]
-				else : return []					
-		else: return []	
-			
+				x = (b2*c1-b1*c2)/k
+				y = (c1*a2-c2*a1)/k
+				if (v1.x!=0 and btw(x,self.st.x,self.end.x) or v1.y!=0 and btw(y,self.st.y,self.end.y)) and (v2.x!=0 and btw(x,b.st.x,b.end.x) or v2.y!=0 and btw(y,b.st.y,b.end.y)) :
+					return [P(x,y)]
+				else : return []
+		elif b.__class__ == Arc : 
+			#gcodetools.error("arc","warning")
+			v = self.end - self.st
+			a1 = v.x**2 +v.y**2
+			b1 = 2*(v.x*(self.st.x - b.c.x) + v.y*(self.st.y - b.c.y))
+			c1 = (self.st.x - b.c.x)**2 + (self.st.y - b.c.y)**2 - b.r**2
+			t = cubic_solver_real(0,a1,b1,c1)
+			res = []
+			for i in t :
+				if 0<=i<=1 :
+					p = self.st + v*i
+					r = p-b.c
+					a = math.atan2(r.x,r.y)	
+					r = b.st-b.c
+					a_st = math.atan2(r.x,r.y)
+					a_end = math.atan2(r.x,r.y)							
+					if b.a<0 and a_end<=a<=a_st or b.a>0 and a_st<=a<=a_end :
+						res.append(p)						
+			#	gcodetools.error(p,"warning")
+			return res	
 			
 	
 	
@@ -1774,10 +1795,11 @@ class Biarc:
 		
 	def connect(self, r) :				
 		for subitems in self.items :
-			for a,b in zip(subitems, subitems[1:]) :
-				i = a.intersect(b)
-				for p in i : 
-					draw_pointer(p.to_list())
+			for a in subitems:
+				for b in subitems :
+					i = b.intersect(a)
+					for p in i : 
+						draw_pointer(gcodetools.transform(p.to_list(), gcodetools.layers[-1], True))
 				
 						
 				
