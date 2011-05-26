@@ -5469,74 +5469,148 @@ class Gcodetools(inkex.Effect):
 ###
 ################################################################################
 	def engraving(self) :
+		global x1,y1,rx,ry,r,w
+		global cspm, wl
+		r,w = 0,0
+		x1,y1,nx,ny =0,0,0,0
+		#LT See if we can use this parameter for line and Bezier subdivision
+		bitlen=50/self.options.engraving_newton_iterations
+
 		if len(self.selected_paths)<=0:
 			self.error(_("This extension requires at least one selected path."),"warning")
 			return
 		if not self.check_dir() : return
 		gcode = ''
 
-		def find_cutter_center((x1,y1),(nx1,ny1), sp1,sp2, tool, t3 = .5):
-			####################################################################
-			###		To find center of cutter a system of non linear equations 
-			###		will be solved using Newton's method 
-			####################################################################
-			bez = (sp1[1][:],sp1[2][:],sp2[0][:],sp2[1][:])
-			ax,ay,bx,by,cx,cy,dx,dy=bezmisc.bezierparameterize(bez)
-			fx=ax*(t3*t3*t3)+bx*(t3*t3)+cx*t3+dx
-			fy=ay*(t3*t3*t3)+by*(t3*t3)+cy*t3+dy
-		
-			nx2,ny2 = csp_normalized_normal(sp1,sp2,t3)			
-			intersection, t1, t2 = straight_segments_intersection([[x1,y1],[x1+nx1,y1+ny1]],[[fx,fy],[fx+nx2,fy+ny2]], False)
-			if not intersection  or intersection == "Overlap" :
-				if nx1!=0 :
-					t1 = t2 = (x1-fx)/nx1
-				else :
-					t1 = t2 = (y1-fy)/ny1
-					
-			t = [ t1, t2, t3 ]					
-			i = 0
-			F = [0.,0.,0.]
-			F1 = [[0.,0.,0.],[0.,0.,0.],[0.,0.,0.]]
-			while i==0 or abs(F[0])+abs(F[1])+math.sqrt(abs(F[2])) >engraving_tolerance and i<10:
-				t1,t2,t3 = t[0],t[1],t[2]
-				fx=ax*(t3*t3*t3)+bx*(t3*t3)+cx*t3+dx
-				fy=ay*(t3*t3*t3)+by*(t3*t3)+cy*t3+dy
-				f1x=3*ax*(t3*t3)+2*bx*t3+cx
-				f1y=3*ay*(t3*t3)+2*by*t3+cy
-				i+=1
-				
-				tx = fx-x1-nx1*t1
-				ty = fy-y1-ny1*t1
-				
-				F[0] = x1+nx1*t1-fx+t2*f1y
-				F[1] = y1+ny1*t1-fy-t2*f1x
-				F[2] = t1*t1 - tx*tx -ty*ty					
-				
-				F1[0][0] = nx1
-				F1[0][1] = f1y
-				F1[0][2] = -f1x+t2*(6*ay*t3+2*by)
-				
-				F1[1][0] = ny1
-				F1[1][1] = -f1x
-				F1[1][2] = -f1y-t2*(6*ax*t3+2*bx)
-				
-				F1[2][0] = 2*t1+2*nx1*tx +2*ny1*ty
-				F1[2][1] = 0
-				F1[2][2] = -2*f1x*tx -2*f1y*ty
 
-				F1 = inv_3x3(F1)
-			
-				if (	 isnan(F[0]) or isnan(F[1]) or isnan(F[2]) or 
-						 isinf(F[0]) or isinf(F[1]) or  isinf(F[2]) ):
-					return t+[1e100,i]	
-			
-				if F1!= None :
-					t[0] -=  F1[0][0]*F[0] + F1[0][1]*F[1] + F1[0][2]*F[2]
-					t[1] -=  F1[1][0]*F[0] + F1[1][1]*F[1] + F1[1][2]*F[2]
-					t[2] -=  F1[2][0]*F[0] + F1[2][1]*F[1] + F1[2][2]*F[2]
-				else: break	
-				
-			return t+[abs(F[0])+abs(F[1])+math.sqrt(abs(F[2])),i]
+		#LT removed def find_cutter_center((x1,y1),(nx1,ny1), sp1,sp2, tool, t3 = .5):
+
+		def get_radius_to_line((x1,y1),(nx1,ny1), (x2,y2),(nx2,ny2), (x3,y3)):
+			"""LT find biggest circle we can engrave here, constrained by line 2-3
+
+			This function can be used in three ways:
+			- With nx1=ny1=0 it finds circle centred at x1,y1
+			- with nx1,ny1 normalised, it finds circle tangential at x1,y1
+			- with nx1,ny1 scaled by 1/cos(a) it finds circle centred on an angle bisector
+				 where a is the angle between the bisector and the previous/next normals
+
+			If the circle tangential to the line 2-3 touches it outside the
+			limits x2,y2 to x3,y3 we find the biggest circle at the nearer point
+
+			# Note that I wrote this to replace find_cutter_centre. It is less
+			# sophisticated in that it doesn't use the full cubic form of Beziers
+			# but, I hope, far faster.
+			# Note that it handles corners in the conventional manner of letter cutting
+			# by mitering, not rounding.
+			# Algorithm uses dot products of normals to find radius
+			# and hence coordinates of centre
+			"""
+			#Start by converting coordinates to be relative to x1,y1
+			#print_("getRadius",x1,y1,nx1,ny1,x2,y2,nx2,ny2,x3,y3)
+			x2,y2= x2-x1, y2-y1
+			x3,y3= x3-x1, y3-y1
+
+			#Then make sure the line in question is facing x1,y1
+			if x2*nx2+y2*ny2>0 : return self.options.engraving_max_dist
+			denom=nx2*nx1+ny2*ny1-1.0
+			if denom > -0.0001 : return self.options.engraving_max_dist #no convergence
+
+			#radius and centre are:
+			r=(nx2*x2+ny2*y2)/denom
+			bx=r*(nx1-nx2)
+			by=r*(ny1-ny2)
+			#if b is between points 1 and 2 we are on the line, so exit
+			if (x2*by-y2*bx)*(x3*by-y3*bx)<0 : return r
+			# otherwise find smaller circle touching an end point
+			r2=get_radius_to_point((x1,y1),(nx1,ny1), (x1+x2,y1+y2))	
+			r3=get_radius_to_point((x1,y1),(nx1,ny1), (x1+x3,y1+y3))
+			return min(r2,r3)	
+			#end of get_radius_to_line
+
+		def get_radius_to_point((x1,y1),(nx,ny), (x2,y2)):
+			"""LT find biggest circle we can engrave here, constrained by point x2,y2
+
+			This function can be used in three ways:
+			- With nx=ny=0 it finds circle centred at x1,y1
+			- with nx,ny normalised, it finds circle tangential at x1,y1
+			- with nx,ny scaled by 1/cos(a) it finds circle centred on an angle bisector
+				 where a is the angle between the bisector and the previous/next normals
+
+			Note that I wrote this to replace find_cutter_centre. It is far less
+			sophisticated but, I hope, far faster.
+			It turns out that finding a circle touching a point is harder than a circle
+			touching a line.
+			"""
+			#Start by converting coordinates to be relative to x1,y1
+			x2,y2= x2-x1, y2-y1
+			denom=nx**2+ny**2-1
+			if denom<=0.00001 : #Not a corner bisector
+				if denom==-1 : #Find circle centre x1,y1
+					return math.sqrt(x2**2+y2**2)
+				#if x2,y2 not in front of the normal...
+				if x2*nx+y2*ny <=0 : return self.options.engraving_max_dist
+				#print_("Straight",x1,y1,nx,ny,x2,y2)
+				return (x2**2+y2**2)/(2*(x2*nx+y2*ny) )
+			#It is a corner bisector, so..
+			discriminator = (x2*nx+y2*ny)**2 - denom*(x2**2+y2**2)
+			if discriminator < 0 :
+				return self.options.engraving_max_dist #this part irrelevant
+			r=(x2*nx+y2*ny -math.sqrt(discriminator))/denom
+			#print_("Corner",x1,y1,nx,ny,x1+x2,y1+y2,discriminator,r)
+			return r
+			#end of get_radius_to_point
+
+		def bez_divide(a,b,c,d):
+			"""LT recursively divide a Bezier.
+
+			Divides until difference between each
+			part and a straight line is less than some limit
+			Each parameter is a list containing two reals, the coordinates of a point
+			Returned value is a list of Beziers.
+			Each Bezier is a list with has four members,
+			each a list holding a coordinate pair
+			"""
+			bx=b[0]-a[0]
+			by=b[1]-a[1]
+			cx=c[0]-a[0]
+			cy=c[1]-a[1]
+			dx=d[0]-a[0]
+			dy=d[1]-a[1]
+			limit=8*math.sqrt(dx**2+dy**2)/self.options.engraving_newton_iterations
+			#LT This is the only limit we get from the user currently
+			if abs(dx*by-bx*dy)<limit and abs(dx*cy-cx*dy)<limit :
+				return [[a,b,c,d]]
+			abx=(a[0]+b[0])/2.0
+			aby=(a[1]+b[1])/2.0
+			bcx=(b[0]+c[0])/2.0
+			bcy=(b[1]+c[1])/2.0
+			cdx=(c[0]+d[0])/2.0
+			cdy=(c[1]+d[1])/2.0
+			abcx=(abx+bcx)/2.0
+			abcy=(aby+bcy)/2.0
+			bcdx=(bcx+cdx)/2.0
+			bcdy=(bcy+cdy)/2.0
+			m=[(abcx+bcdx)/2.0,(abcy+bcdy)/2.0]
+			return bez_divide(a,[abx,aby],[abcx,abcy],m) + bez_divide(m,[bcdx,bcdy],[cdx,cdy],d)
+			#end of bez_divide
+
+		def save_point((x,y),r,w,i): #LT added i for debugging
+			global wl, cspm
+			cspm+=[ [ [x,y],[x,y],[x,y] ] ]
+			wl+=[w]
+			#end of save_point
+
+		def draw_point((x,y),r):
+			if self.options.engraving_draw_calculation_paths :
+				inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
+						{"gcodetools": "Engraving calculation toolpath", 'style':	"fill:#ff00ff; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x), inkex.addNS('cy','sodipodi'):		str(y), inkex.addNS('rx','sodipodi'):	str(1), inkex.addNS('ry','sodipodi'): str(1), inkex.addNS('type','sodipodi'):	'arc'})	
+				inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
+						{"gcodetools": "Engraving calculation paths", 'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x),  inkex.addNS('cy','sodipodi'):		str(y),inkex.addNS('rx','sodipodi'):		str(r), inkex.addNS('ry','sodipodi'):		str(r), inkex.addNS('type','sodipodi'):	'arc'})
+			#end of draw_point
+
+		#end of subfunction definitions. engraving() starts here:
+		print_("self.options.engraving_max_dist ", self.options.engraving_max_dist )
+		bitlen=20/self.options.engraving_newton_iterations
 		cspe =[]
 		we = []
 		for layer in self.layers :
@@ -5547,181 +5621,186 @@ class Gcodetools(inkex.Effect):
 					if node.tag == inkex.addNS('path','svg'):
 						cspi = cubicsuperpath.parsePath(node.get('d'))
 
-						for j in xrange(len(cspi)):
-							# Remove zerro length segments
-							i = 1
+						#LT: Create my own list n1LT[j] is for subpath j
+						nlLT = []
+						for j in xrange(len(cspi)): #LT For each subpath...
+							# Remove zero length segments, assume closed path
+							i = 0 #LT was from i=1
 							while i<len(cspi[j]):
 								if abs(cspi[j][i-1][1][0]-cspi[j][i][1][0])<engraving_tolerance and abs(cspi[j][i-1][1][1]-cspi[j][i][1][1])<engraving_tolerance:
 									cspi[j][i-1][2] = cspi[j][i][2]
 									del cspi[j][i]
 								else:
 									i += 1
-						for csp in cspi:
-							#	Create list containing normlas and points
-							nl = []
-							for i in range(1,len(csp)):
-								n, n1 = [], []
-								sp1, sp2 = csp[i-1], csp[i]
-								for ti in [.0,.25,.75,1.]:
-									#	Is following string is nedded or not??? (It makes t depend on form of the curve) 
-									#ti = bezmisc.beziertatlength(bez,ti)	
-									x1,y1 = csp_at_t(sp1,sp2,ti)
-									nx,ny = csp_normalized_normal(sp1,sp2,ti)
-									n+=[ [ [x1,y1], [nx,ny], False, False, i] ] # [point coordinates, normal, is an inner corner, is an outer corner, csp's index]
-									if ti==1 and i<len(csp)-1:
-										nx2, ny2 = csp_normalized_slope(csp[i],csp[i+1],0)
-										nx2,ny2 = -ny2,nx2
-										ang = ny2*nx-ny*nx2
-										ang1 = 180-math.acos(max(-1,min(1,nx*nx2+ny*ny2)))*180/math.pi
-			 							if ang > 0  and ang1 < self.options.engraving_sharp_angle_tollerance :	# inner angle
-											n[-1][2] = True
-			 							elif ang < 0 and ang1 < self.options.engraving_sharp_angle_tollerance :					# outer angle
-			 								a = -math.acos(nx*nx2+ny*ny2)
-			 								for t in [.0,.25,.75,1.]:
-			 									n1 += [ [ [x1,y1], [nx*math.cos(a*t)-ny*math.sin(a*t),nx*math.sin(a*t)+ny*math.cos(a*t)], False, True, i ]  ]
-				 				nl += [ n ] + ([ n1 ] if n1!=[] else [])
-				 			# Modify first/last points if curve is closed
-							if abs(csp[-1][1][0]-csp[0][1][0])<engraving_tolerance and abs(csp[-1][1][1]-csp[0][1][1])<engraving_tolerance :
-								x1,y1 = csp_at_t(csp[-2],csp[-1],1)
-								nx,ny = csp_normalized_slope(csp[-2],csp[-1],1)
-								nx,ny = -ny,nx
-								nx2,ny2 = csp_normalized_slope(csp[0],csp[1],0)
-								nx2,ny2 = -ny2,nx2
-								ang = ny2*nx-ny*nx2
-								if ang > 0  and 180-math.acos(nx*nx2+ny*ny2)*180/math.pi < self.options.engraving_sharp_angle_tollerance :	# inner angle
-									nl[-1][-1][2] = True
-	 							elif ang < 0 and 180-math.acos(nx*nx2+ny*ny2)*180/math.pi < self.options.engraving_sharp_angle_tollerance :					# outer angle
-	 								a = -math.acos(nx*nx2+ny*ny2)
-						 			n1 = []
-	 								for t in [.0,.25,.75,1.]:
-	 									n1 += [ [ [x1,y1], [nx*math.cos(a*t)-ny*math.sin(a*t),nx*math.sin(a*t)+ny*math.cos(a*t)], False, True, i ]  ]
-					 				nl += [ n1 ] 
-
-
+						for csp in cspi: #LT6a For each subpath...
+							#create list containing lines and points
+							# line members: [x,y],[nx,ny],False,i
+							# x,y is start of line. Normal on engraved side.
+							# Normal is normalised (unit length)
+							#Note that Y axis increases down the page
+							# corner members: [x,y],[nx,ny],True,sin(halfangle)
+							# if halfangle>0: radius 0 here. normal is bisector
+							# if halfangle<0. reflex angle. normal is bisector
+							# corner normals are divided by cos(halfangle)
+							#so that they will engrave correctly
+							print_("csp is",csp)
+							nlLT.append ([])
+							for i in range(0,len(csp)): #LT for each point
+								#n = []
+								sp0, sp1, sp2 = csp[i-2], csp[i-1], csp[i]
+								#LT find angle between this and previous segment
+								x0,y0 = sp1[1]
+								nx1,ny1 = csp_normalized_normal(sp1,sp2,0)
+								nx0, ny0 = csp_normalized_normal(sp0,sp1,1)
+								sinAng = ny1*nx0-ny0*nx1 #Positive if turning inwards
+								cosBis = math.sqrt((1.0+nx0*nx1-ny0*ny1)/2.0)
+								if ny0==ny1 :
+									if nx0==nx1 : sinBis=ny0
+									else : sinBis = math.copysign(1,ny0)
+								else :
+									sinBis = cosBis*(nx1-nx0)/(ny0-ny1)
+									#dot product of bisector and a normal >0
+									if cosBis*nx0+sinBis*ny0 < 0 :
+										cosBis=-cosBis
+										sinBis=-sinBis
+								#register if turning left or turning right more than limit angle
+			 					if sinAng < -0.0001  or sinAng > math.sin((180-self.options.engraving_sharp_angle_tollerance)*math.pi/180) :
+									#record x,y,normal,ifCorner, sin half angle turned
+									#Get cos(half angle turned)
+									cosBis2=cosBis*nx0+sinBis*ny0
+									b= [[ [x0,y0],[cosBis/cosBis2,sinBis/cosBis2], True, sinBis*nx0-cosBis*ny0]]
+									nlLT[-1] += b
+								#LT now do the line
+								if sp1[1]==sp1[2] and sp2[0]==sp2[1] : #straightline
+									nlLT[-1]+=[[sp1[1],[nx1,ny1],False,i]]
+								else : #Bezier
+									nn=bez_divide(sp1[1],sp1[2],sp2[0],sp2[1])
+									for bLT in nn : #save as three line segments
+										for seg in range(3) :
+											nx=bLT[seg+1][0]-bLT[seg][0]
+											ny=bLT[seg+1][1]-bLT[seg][1]
+											l=math.sqrt(nx**2+ny**2)
+											if l>0.0001 : 
+												nlLT[-1]+=[[bLT[seg],[-ny/l,nx/l], False,i]]
+							#LT for each segment - ends here
 							print_(("engraving_draw_calculation_paths=",self.options.engraving_draw_calculation_paths))
+							if self.options.engraving_draw_calculation_paths:
+								for p in nlLT[-1]: #For last sub-path
+									inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'),
+										{ "d":	"M %f,%f L %f,%f" %(p[0][0],p[0][1],p[0][0]+p[1][0]*10,p[0][1]+p[1][1]*10),
+											'style':	"stroke:#0000ff; stroke-opacity:0.46; stroke-width:0.1; fill:none",
+											"gcodetools": "Engraving normals"
+										})				
+
+
+						#LT6a build nlLT[j] for each subpath - ends here
+				 		# Calculate offset points
+						#print_("nlLT",nlLT) #LT debug stuff
+						reflex=False
+						for j in xrange(len(nlLT)): #LT6b for each subpath
+							cspm=[] #Will be my output. List of csps.
+							wl=[] #Will be my w output list
+							r = 0 #LT initial value in case first point is an angle
+							for i in xrange(len(nlLT[j])) : #LT for each node
+								#LT Note: Python enables wrapping of array indices
+								# backwards to -1, -2, but not forwards. Hence:
+								n0 = nlLT[j][i-2] #previous node
+								n1 = nlLT[j][i-1] #current node
+								n2 = nlLT[j][i] #next node
+								x1a,y1a = n1[0] #this point/start of this line
+								nx,ny = n1[1]
+								x1b,y1b = n2[0] #next point/end of this line
+								if n1[2] == True : # We're at a corner
+									bits=1
+									bit0=0
+									lastr=r #Remember r from last line
+									if n1[3]>0 : #acute. Limit radius
+										len1=(n0[0][0]-n1[0][0])**2 + (n0[0][1]-n1[0][1])**2
+										len2=(n2[0][0]-n1[0][0])**2 + (n2[0][1]-n1[0][1])**2
+										#set initial r value, not to be exceeded
+										r = math.sqrt(min(len1,len2))/n1[3]
+								else: #line. Cut it up if long.
+									rbits=math.sqrt((x1b-x1a)**2+(y1a-y1b)**2)/bitlen
+									bits=max(1,int(rbits+0.5))
+									bit0=(rbits-bits+1)/2
+									r = self.options.engraving_max_dist
+								for b in xrange(bits) : #divide line into bits
+									x1=x1a+ny*(b+bit0)*bitlen
+									y1=y1a-nx*(b+bit0)*bitlen
+										
+									#set a maximum distance
+									if b>0 : r = self.options.engraving_max_dist
+									# set limits within which to look for lines
+									xmin, xmax = x1+r*nx-r, x1+r*nx+r
+									ymin, ymax = y1+r*ny-r, y1+r*ny+r
+									for jj in xrange(0,len(nlLT)):
+										for ii in xrange(0,len(nlLT[jj])):
+											if ii==i and jj==j: continue
+											#LT ignore corners for now
+											if nlLT[jj][ii-1][2] : continue
+											x2,y2 = nlLT[jj][ii-1][0]
+											nx2,ny2 = nlLT[jj][ii-1][1]
+											x3,y3 = nlLT[jj][ii][0]
+											x23min,x23max=min(x2,x3),max(x2,x3)
+											y23min,y23max=min(y2,y3),max(y2,y3)
+											#LT see if line in range
+											if n1[2]==False and (x23max<xmin or x23min>xmax or y23max<ymin or y23min>ymax) : continue
+											t1=get_radius_to_line((x1,y1),(nx,ny), (x2,y2),(nx2,ny2), (x3,y3))
+											if t1>=0 :
+												r = min(t1,r)
+												xmin, xmax = x1+r*nx-r, x1+r*nx+r
+												ymin, ymax = y1+r*ny-r, y1+r*ny+r
+										#next ii
+									#next jj
+									#here, we've found optimum r for this node
+									w = min(r, self.tools[layer][0]['diameter']/2)
+									if reflex : #just after a reflex corner
+										reflex = False
+										if r<lastr : #need to adjust it
+											draw_point((n0[0][0]+n0[1][0]*r,n0[0][1]+n0[1][1]*r),r)
+											save_point((n0[0][0]+n0[1][0]*w,n0[0][1]+n0[1][1]*w),r,w,i)
+									if n1[2] == True : # We're at a corner
+										if n1[3]>0 : #acute
+											#print_("Acute x,y,nx,ny,w,r",x1,y1,nx,ny,w,r)
+											save_point((x1+nx*w,y1+ny*w),r,w,i)
+											draw_point((x1,y1),0)
+											save_point((x1,y1),0,0,i)
+										else : #reflex
+											if r>lastr :
+												draw_point((x1+nx*lastr,y1+ny*lastr),lastr)
+												w = min(lastr, self.tools[layer][0]['diameter']/2)
+												save_point((x1+nx*w,y1+ny*w),r,w,i)
+									draw_point((x1+nx*r,y1+ny*r),r)
+									save_point((x1+nx*w,y1+ny*w),r,w,i)
+								#LT end of for each bit of this line
+								if n1[2] == True and n1[3]<0 : #reflex angle
+									reflex=True
+								lastr=r #remember this r
+							#LT next i
+							cspm+=[cspm[0]]
+							#print_("cspm",cspm)
+							wl+=[wl[0]]
+							#print_("wl",wl)
+							#Note: Original csp_points was a list, each element
+							#being 4 points, with the first being the same as the
+							#last of the previous set.
+							#Each point is a list of [cx,cy,r,w]
+							#I have flattened it to a flat list of points.
+					
 							if self.options.engraving_draw_calculation_paths==True:
-								for i in nl:
-									for p in i:
-										inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
-											{
-												 "d":	"M %f,%f L %f,%f" %(p[0][0],p[0][1],p[0][0]+p[1][0]*10,p[0][1]+p[1][1]*10),
-												'style':	"stroke:#0000ff; stroke-opacity:0.46; stroke-width:0.1; fill:none",
-												"gcodetools": "Engraving calculation paths"
-											})				
-
-
-				 			# 	Calculate offset points	
-				 			csp_points = [] 
-							for ki in xrange(len(nl)):
-								p = []
-								for ti in xrange(3) if ki!=len(nl)-1 else xrange(4):
-									n = nl[ki][ti]
-									x1,y1 = n[0]
-									nx,ny = n[1]
-									d, r = 0, float("inf")
-									if ti==0 and nl[ki-1][-1][2] == True 	or 		ti==3 and nl[ki][ti][2] == True:
-										# Point is a sharp angle r=0p
-										r = 0
-									else :
-										for j in xrange(0,len(cspi)):
-											for i in xrange(1,len(cspi[j])):
-												d = csp_bound_to_point_distance(cspi[j][i-1], cspi[j][i], [x1,y1])
-												if d >= self.options.engraving_max_dist*2 :
-													r = min(math.sqrt(d/2),r) 
-													continue
-												for n1 in xrange(self.options.engraving_newton_iterations):
-							 						t = find_cutter_center((x1,y1),(nx,ny), cspi[j][i-1], cspi[j][i], self.tools[layer][0], float(n1)/(self.options.engraving_newton_iterations-1))
-							 						print_(t)
-													if t[0] > engraving_tolerance and 0<=t[2]<=1 and abs(t[3])<engraving_tolerance:
-							 							print_("!@#!@#!@#!@#!@",t)
-														t3 = t[2]
-														ax,ay,bx,by,cx,cy,dx,dy=bezmisc.bezierparameterize((cspi[j][i-1][1],cspi[j][i-1][2],cspi[j][i][0],cspi[j][i][1]))
-														x2=ax*(t3*t3*t3)+bx*(t3*t3)+cx*t3+dx
-														y2=ay*(t3*t3*t3)+by*(t3*t3)+cy*t3+dy
-														if abs(x2-x1)<engraving_tolerance and abs(y2-y1)<engraving_tolerance:
-															f1x = 3*ax*(t3*t3)+2*bx*t3+cx
-															f1y = 3*ay*(t3*t3)+2*by*t3+cy
-															f2x = 6*ax*t3+2*bx
-															f2y = 6*ay*t3+2*by
-															d = f1x*f2y-f1y*f2x
-															# d = curvature
-															if d!=0 :
-																d = math.sqrt((f1x*f1x+f1y*f1y)**3)/d
-																if d>0:
-																	r = min( d,r) if r!=None else d
-																else :
-																	r = min(r,self.options.engraving_max_dist) if r!=None else self.options.engraving_max_dist
-														else:						
-								 							r = min(t[0],r) if r!=None else t[0]	
-										for j in xrange(0,len(cspi)):
-											for i in xrange(0,len(cspi[j])):
-												x2,y2 = cspi[j][i][1]
-												if (abs(x1-x2)>engraving_tolerance or abs(y1-y2)>engraving_tolerance ) and (x2*nx - x1*nx + y2*ny - y1*ny) != 0:
-													t1 = .5 * ( (x1-x2)**2+(y1-y2)**2 ) /  (x2*nx - x1*nx + y2*ny - y1*ny)
-													if t1>0 : r = min(t1,r) if r!=None else t1
-									if self.options.engraving_draw_calculation_paths==True:
-										inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
-												{"gcodetools": "Engraving calculation paths", 'style':	"fill:#ff00ff; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x1+nx*r), inkex.addNS('cy','sodipodi'):		str(y1+ny*r), inkex.addNS('rx','sodipodi'):	str(1), inkex.addNS('ry','sodipodi'): str(1), inkex.addNS('type','sodipodi'):	'arc'})	
-										inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
-												{"gcodetools": "Engraving calculation paths", 'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x1+nx*r),  inkex.addNS('cy','sodipodi'):		str(y1+ny*r),inkex.addNS('rx','sodipodi'):		str(r), inkex.addNS('ry','sodipodi'):		str(r), inkex.addNS('type','sodipodi'):	'arc'})
-									r = min(r, self.options.engraving_max_dist)
-									w = min(r, self.tools[layer][0]['diameter'])
-									p += [ [x1+nx*w,y1+ny*w,r,w] ]
-							
-						
-							
-								if len(csp_points)>0 : csp_points[-1] += [p[0]]						 			
-								csp_points += [ p ]
-							#	Splitting path to pieces each of them not further from path more than engraving_max_dist
-							engraving_path = [ [] ]
-							for p_ in csp_points :
-								for p in p_:
-									if p[2]<self.options.engraving_max_dist : break
-								if p[2]<self.options.engraving_max_dist: engraving_path[-1] += [p_]
-								else : 
-									if engraving_path[-1] != [] : engraving_path += [ [] ]
-							if engraving_path[-1] == [] : del engraving_path[-1] 
-					
-					
-							for csp_points in engraving_path :
-								#	Create Path that goes through this points 
-								cspm = []
-								w = []
-								m = [[0.0, 0.0, 0.0, 1.0], [0.015625, 0.140625, 0.421875, 0.421875], [0.421875, 0.421875, 0.140625, 0.015625], [1.0, 0.0, 0.0, 0.0]]
-								for p in csp_points:
-									m = numpy.array(m)
-									xi = numpy.array( [p[i][:2] for i in range(4)])
-									sp1,sp2 = [[0.,0.],[0.,0.],[0.,0.]], [[0.,0.],[0.,0.],[0.,0.]]
-									a,b,c,d = numpy.linalg.solve(m, xi).tolist()
-									sp1[1], sp1[0] = d, d
-									sp1[2] = c
-									sp2[0] = b
-									sp2[1], sp2[2] = a, a
-									sp3,sp4,sp5 = csp_split(sp1, sp2, .25)
-									l = cspseglength(sp3,sp4)
-									sp1,sp2,sp4 = csp_split(sp1, sp2, .75)
-									l1 = cspseglength(sp1,sp2)
-									if l1!=0:
-										sp1,sp2,sp3 = csp_splitatlength(sp1, sp2, l/l1)
-										if len(cspm)>0 :
-											cspm[-1][2] = sp1[2]
-											cspm += [sp2[:], sp3[:], sp4[:]]
-											w +=  [p[i][3] for i in range(1,4)] 
-										else :
-											cspm += [sp1[:], sp2[:], sp3[:], sp4[:]]	
-											w += [p[i][3] for i in range(4)]
-								if self.options.engraving_draw_calculation_paths==True:
-									node =  inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 										{
-															 "d":	 cubicsuperpath.formatPath([cspm]),
-															'style':	styles["biarc_style_i"]['biarc1'],
-															"gcodetools": "Engraving calculation paths",
-														})
-									for i in xrange(len(cspm)):
-										inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
-												{"gcodetools": "Engraving calculation paths", 'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(cspm[i][1][0]),  inkex.addNS('cy','sodipodi'):		str(cspm[i][1][1]),inkex.addNS('rx','sodipodi'):		str(w[i]), inkex.addNS('ry','sodipodi'):		str(w[i]), inkex.addNS('type','sodipodi'):	'arc'})
-								cspe += [cspm]
-								we   +=	[w]				
-
+								node =  inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 										{
+														 "d":	 cubicsuperpath.formatPath([cspm]),
+														'style':	styles["biarc_style_i"]['biarc1'],
+														"gcodetools": "Engraving calculation paths",
+													})
+								for i in xrange(len(cspm)):
+									inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
+											{"gcodetools": "Engraving calculation paths", 'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(cspm[i][1][0]),  inkex.addNS('cy','sodipodi'):		str(cspm[i][1][1]),inkex.addNS('rx','sodipodi'):		str(wl[i]), inkex.addNS('ry','sodipodi'):		str(wl[i]), inkex.addNS('type','sodipodi'):	'arc'})
+							cspe += [cspm]
+							we   +=	[wl]
+						#LT6b For each subpath - ends here			
+					#LT5 if it is a path - ends here
+				#LT4 for each selected object in this layer - ends here
 				if self.tools[layer][0]['shape'] != "":
 					f = eval('lambda w: ' + self.tools[layer][0]['shape'].strip('"'))
 				else: 
