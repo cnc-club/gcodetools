@@ -1,9 +1,41 @@
 #!/usr/bin/env python 
 """
-Recent changes: 
-csp_point_inside_bound bug fixed
-engraving() totally rewritten
+Comments starting "#LT" or "#CLT" are by Chris Lusby Taylor who rewrote the engraving function in 2011.
+History of CLT changes to engraving and other functions it uses:
+9 May 2011 Changed test of tool diameter to square it
+10 May Note that there are many unused functions, including:
+	  bound_to_bound_distance, csp_curvature_radius_at_t,
+        csp_special_points, csplength, rebuild_csp, csp_slope,
+        csp_simple_bound_to_point_distance, csp_bound_to_point_distance,
+        bez_at_t, bez_to_point_distance, bez_normalized_slope, matrix_mul, transpose
+       Fixed csp_point_inside_bound() to work if x outside bounds
+20 May Now encoding the bisectors of angles.
+23 May Using r/cos(a) instead of normalised normals for bisectors of angles.
+23 May Note that Z values generated for engraving are in pixels, not mm.
+       Removed the biarc curves - straight lines are better.
+24 May Changed Bezier slope calculation to be less sensitive to tiny differences in points.
+       Added use of self.options.engraving_newton_iterations to control accuracy
+25 May Big restructure and new recursive function.
+	 Changed the way I treat corners - I now find if the centre of a proposed circle is
+        within the area bounded by the line being tested and the two angle bisectors at
+	  its ends. See get_radius_to_line().
+29 May Eliminating redundant points from gcode. If A,B,C colinear, drop B
+30 May Eliminating redundant lines in divided Beziers. Changed subdivision of lines
+  7Jun Try to show engraving in 3D
+ 8 Jun Displaying in stereo 3D.
+       Fixed a bug in bisect - it could go wrong due to rounding errors if
+			1+x1.x2+y1.y2<0 which should never happen. BTW, I spotted a non-normalised normal
+			returned by csp_normalized_normal. Need to check for that.
+ 9 Jun Corrected spelling of 'definition' but still match previous 'defention' and 	  'defenition' if found in file
+	 Changed get_tool to find 1.6.04 tools or new tools with corrected spelling
+10 Jun Put 3D into a separate layer called 3D, created unless it already exists
+       Changed csp_normalized_slope to reject lines shorter than 1e-9.
+10 Jun Changed all dimensions seen by user to be mm/inch, not pixels. This includes
+	  tool diameter, maximum engraving distance, tool shape and all Z values.
+TODO Change line division to be recursive, depending on what line is touched. See line_divide
 
+
+engraving() functions (c) 2011 Chris Lusby Taylor, clusbytaylor@enterprise.net
 Copyright (C) 2009 Nick Drobchenko, nick@cnc-club.ru
 based on gcode.py (C) 2007 hugomatic... 
 based on addnodes.py (C) 2005,2007 Aaron Spike, aaron@ekips.org
@@ -50,7 +82,7 @@ import gettext
 _ = gettext.gettext
 
  
-### Check if inkex has errormsg (0.46 version doesnot have one.) Could be removed later.
+### Check if inkex has errormsg (0.46 version does not have one.) Could be removed later.
 if "errormsg" not in dir(inkex):
 	inkex.errormsg = lambda msg: sys.stderr.write((unicode(msg) + "\n").encode("UTF-8"))
 
@@ -982,8 +1014,7 @@ def csp_point_inside_bound(sp1, sp2, p):
 	bez = [sp1[1],sp1[2],sp2[0],sp2[1]]
 	x,y = p
 	c = 0
-	#LT added test of x in range.
-	# Note that this still fails if the control points' lines cross
+	#CLT added test of x in range
 	xmin=1e100
 	xmax=-1e100
 	for i in range(4):
@@ -1122,14 +1153,14 @@ def csp_normalized_slope(sp1,sp2,t) :
 	if sp1[1]==sp2[1]==sp1[2]==sp2[0] : return [1.,0.]
 	f1x = 3*ax*t*t+2*bx*t+cx
 	f1y = 3*ay*t*t+2*by*t+cy
-	if abs(f1x*f1x+f1y*f1y) > 1e-20 :
+	if abs(f1x*f1x+f1y*f1y) > 1e-9 : #LT changed this from 1e-20, which caused problems
 		l = math.sqrt(f1x*f1x+f1y*f1y)
 		return [f1x/l, f1y/l]
 
 	if t == 0 :
 		f1x = sp2[0][0]-sp1[1][0]
 		f1y = sp2[0][1]-sp1[1][1]
-		if abs(f1x*f1x+f1y*f1y) > 1e-20 :
+		if abs(f1x*f1x+f1y*f1y) > 1e-9 : #LT changed this from 1e-20, which caused problems
 			l = math.sqrt(f1x*f1x+f1y*f1y)
 			return [f1x/l, f1y/l]
 		else :
@@ -1141,7 +1172,7 @@ def csp_normalized_slope(sp1,sp2,t) :
 	elif t == 1 :
 		f1x = sp2[1][0]-sp1[2][0]
 		f1y = sp2[1][1]-sp1[2][1]
-		if abs(f1x*f1x+f1y*f1y) > 1e-20 :
+		if abs(f1x*f1x+f1y*f1y) > 1e-9 :
 			l = math.sqrt(f1x*f1x+f1y*f1y)
 			return [f1x/l, f1y/l]
 		else :
@@ -3790,7 +3821,7 @@ class Gcodetools(inkex.Effect):
 		population = Arangement_Genetic(polygons, material_width)
 		
 		
-		print_("Genetic alhorithm start at %s"%(time_))
+		print_("Genetic algorithm start at %s"%(time_))
 		start_time = time.time()
 		time_ = time.time()
 		
@@ -3898,7 +3929,7 @@ class Gcodetools(inkex.Effect):
 		
 	def __init__(self):
 		inkex.Effect.__init__(self)
-		self.OptionParser.add_option("-d", "--directory",					action="store", type="string", 		dest="directory", default="/home/",					help="Directory for gcode file")
+		self.OptionParser.add_option("-d", "--directory",					action="store", type="string", 		dest="directory", default="C:\\Users\\Chris\\GCode",					help="Directory for gcode file")
 		self.OptionParser.add_option("-f", "--filename",					action="store", type="string", 		dest="file", default="-1.0",						help="File name")			
 		self.OptionParser.add_option("",   "--add-numeric-suffix-to-filename", action="store", type="inkbool",	dest="add_numeric_suffix_to_filename", default=True,help="Add numeric suffix to filename")			
 		self.OptionParser.add_option("",   "--Zscale",						action="store", type="float", 		dest="Zscale", default="1.0",						help="Scale factor Z")				
@@ -3960,7 +3991,7 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--log-filename",				action="store", type="string", 		dest="log_filename", default='',					help="Create log files")
 
 		self.OptionParser.add_option("",   "--orientation-points-count",	action="store", type="string", 		dest="orientation_points_count", default="2",			help="Orientation points count")
-		self.OptionParser.add_option("",   "--tools-library-type",			action="store", type="string", 		dest="tools_library_type", default='cylinder cutter',	help="Create tools defention")
+		self.OptionParser.add_option("",   "--tools-library-type",			action="store", type="string", 		dest="tools_library_type", default='cylinder cutter',	help="Create tools definition")
 
 		self.OptionParser.add_option("",   "--dxfpoints-action",			action="store", type="string", 		dest="dxfpoints_action", default='replace',			help="dxfpoint sign toggle")
 																										  
@@ -4182,7 +4213,7 @@ class Gcodetools(inkex.Effect):
 				self.options.directory += "\\"
 			else :
 				self.options.directory += "/"
-		print_("Checking direcrory: '%s'"%self.options.directory)
+		print_("Checking directory: '%s'"%self.options.directory)
 		if (os.path.isdir(self.options.directory)):
 			if (os.path.isfile(self.options.directory+'header')):
 				f = open(self.options.directory+'header', 'r')
@@ -4239,7 +4270,7 @@ class Gcodetools(inkex.Effect):
 ###		Generate Gcode
 ###		Generates Gcode on given curve.
 ###
-###		Crve defenitnion [start point, type = {'arc','line','move','end'}, arc center, arc angle, end point, [zstart, zend]]		
+###		Curve definition [start point, type = {'arc','line','move','end'}, arc center, arc angle, end point, [zstart, zend]]		
 ###
 ################################################################################
 	def generate_gcode(self, curve, layer, depth):
@@ -4562,6 +4593,8 @@ class Gcodetools(inkex.Effect):
 		self.transform_matrix_reverse = {}
 		self.Zauto_scale = {}
 		self.in_out_reference_points = []
+		self.my3Dlayer = None
+
 		def recursive_search(g, layer, selected=False):
 			items = g.getchildren()
 			items.reverse()
@@ -4569,8 +4602,11 @@ class Gcodetools(inkex.Effect):
 				if selected:
 					self.selected[i.get("id")] = i
 				if i.tag == inkex.addNS("g",'svg') and i.get(inkex.addNS('groupmode','inkscape')) == 'layer':
-					self.layers += [i]
-					recursive_search(i,i)
+					if i.get(inkex.addNS('label','inkscape')) == '3D' :
+						self.my3Dlayer=i
+					else :
+						self.layers += [i]
+						recursive_search(i,i)
 
 				elif i.get('gcodetools') == "Gcodetools orientation group" :
 					points = self.get_orientation_points(i)
@@ -4580,7 +4616,8 @@ class Gcodetools(inkex.Effect):
 					else :
 						self.error(_("Warning! Found bad orientation points in '%s' layer. Resulting Gcode could be corrupt!") % layer.get(inkex.addNS('label','inkscape')), "bad_orientation_points_in_some_layers") 
 
-				elif i.get("gcodetools") == "Gcodetools tool defenition" :
+				#Need to recognise old files ver 1.6.04 and earlier
+				elif i.get("gcodetools") == "Gcodetools tool definition" or i.get("gcodetools") == "Gcodetools tool defenition"  :
 					tool = self.get_tool(i)
 					self.tools[layer] = self.tools[layer] + [tool.copy()] if layer in self.tools else [tool.copy()]
 					print_("Found tool in '%s' layer: %s" % (layer.get(inkex.addNS('label','inkscape')), tool))
@@ -4617,11 +4654,11 @@ class Gcodetools(inkex.Effect):
 		recursive_search(self.document.getroot(),self.document.getroot())
 
 		if len(self.layers) == 1 : 
-			self.error(_("Document has no layers! Add at least one layer ustig layes panel (Ctrl+Shift+L)"),"error")
+			self.error(_("Document has no layers! Add at least one layer using layers panel (Ctrl+Shift+L)"),"Error")
 		root = self.document.getroot() 
 
 		if  root in self.selected_paths or root in self.paths :
-			self.error(_("Warning! There are some paths in the root of the document, but not in any layer! Using bottom most layer's for them."), "tools_warning" )
+			self.error(_("Warning! There are some paths in the root of the document, but not in any layer! Using bottom-most layer for them."), "tools_warning" )
 
 		if  root in self.selected_paths :
 			if self.layers[-1] in self.selected_paths :
@@ -4685,9 +4722,10 @@ class Gcodetools(inkex.Effect):
 				key = None
 				value = None
 				for j in i:
-					if j.get("gcodetools") == "Gcodetools tool defention field name":
+					#need to recognise old tools from ver 1.6.04
+					if j.get("gcodetools") == "Gcodetools tool definition field name" or j.get("gcodetools") == "Gcodetools tool defention field name":
 						key = get_text(j)
-					if j.get("gcodetools") == "Gcodetools tool defention field value":
+					if j.get("gcodetools") == "Gcodetools tool definition field value" or j.get("gcodetools") == "Gcodetools tool defention field value":
 						value = get_text(j)
 						if value == "(None)": value = ""
 				if value == None or key == None: continue
@@ -5477,21 +5515,30 @@ class Gcodetools(inkex.Effect):
 ###
 ###		Engraving
 ###
+#LT Notes to self: See wiki.inkscape.org/wiki/index.php/PythonEffectTutorial
+# To create anything in the Inkscape document, look at the XML editor for
+# details of how such an element looks in XML, then follow this model.
+#layer number n appears in XML as <svg:g id="layern" inkscape:label="layername">
+#
+#to create it, use
+#Mylayer=inkex.etree.SubElement(self.document.getroot(), 'g') #Create a generic element
+#Mylayer.set(inkex.addNS('label', 'inkscape'), "layername")   #Gives it a name
+#Mylayer.set(inkex.addNS('groupmode', 'inkscape'), 'layer')   #Tells Inkscape it's a layer
+#
+#group appears in XML as <svg:g id="gnnnnn"> where nnnnn is a number
+#
+#to create it, use
+#Mygroup=inkex.etree.SubElement(parent, inkex.addNS('g','svg'), {"gcodetools":"My group label"})
+# where parent may be the layer or a parent group. To get the parent group, you can use
+#parent = self.selected_paths[layer][0].getparent()
 ################################################################################
 	def engraving(self) :
 		global x1,y1,rx,ry,r,w
 		global cspm, wl
 		global nlLT, i, j
-		r,w = 0,0
-		x1,y1,nx,ny =0,0,0,0
-		#LT See if we can use this parameter for line and Bezier subdivision:
-		bitlen=50/self.options.engraving_newton_iterations
+		global gcode_3Dleft ,gcode_3Dright
+		global max_dist
 
-		if len(self.selected_paths)<=0:
-			self.error(_("This extension requires at least one selected path."),"warning")
-			return
-		if not self.check_dir() : return
-		gcode = ''
 
 		def bisect((nx1,ny1),(nx2,ny2)) :
 			"""LT Find angle bisecting the normals n1 and n2
@@ -5504,10 +5551,11 @@ class Gcodetools(inkex.Effect):
 			If sinturn is less than the user's requested angle tolerance, I return 0
 			"""
 			#We can get absolute value of cos(bisector vector)
-			cosBis = math.sqrt((1.0+nx1*nx2-ny1*ny2)/2.0)
+			#Note: Need to use max in case of rounding errors
+			cosBis = math.sqrt(max(0,(1.0+nx1*nx2-ny1*ny2)/2.0))
 			#We can get correct sign of the sin, assuming cos is positive
-			if ny1==ny2 :
-				if nx1==nx2 : return(nx1,ny1,0.0)
+			if (abs(ny1-ny2)< engraving_tolerance)  or (abs(cosBis) < engraving_tolerance) :
+				if (abs(nx1-nx2)< engraving_tolerance): return(nx1,ny1,0.0)
 				sinBis = math.copysign(1,ny1)
 			else :
 				sinBis = cosBis*(nx2-nx1)/(ny1-ny2)
@@ -5548,6 +5596,9 @@ class Gcodetools(inkex.Effect):
 			# Algorithm uses dot products of normals to find radius
 			# and hence coordinates of centre
 			"""
+
+			global max_dist
+
 			#Start by converting coordinates to be relative to x1,y1
 			x2,y2= x2-x1, y2-y1
 			x3,y3= x3-x1, y3-y1
@@ -5562,10 +5613,9 @@ class Gcodetools(inkex.Effect):
 
 			#Make sure the line in question is facing x1,y1 and vice versa
 			dist=-x2*nx23-y2*ny23
-			if dist<0 : return self.options.engraving_max_dist
-			if dist<0.01 : print_("Dist 0",x2,nx23,y2,ny23)
+			if dist<0 : return max_dist
 			denom=1.-nx23*nx1-ny23*ny1
-			if denom < engraving_tolerance : return self.options.engraving_max_dist
+			if denom < engraving_tolerance : return max_dist
 
 			#radius and centre are:
 			r=dist/denom
@@ -5574,9 +5624,9 @@ class Gcodetools(inkex.Effect):
 			#if c is not between the angle bisectors at the ends of the line, ignore
 			#Use vector cross products. Not sure if I need the .0001 safety margins:
 			if (x2-cx)*ny2 > (y2-cy)*nx2 +0.0001 :
-				return self.options.engraving_max_dist 
+				return max_dist 
 			if (x3-cx)*ny3 < (y3-cy)*nx3  -0.0001 :
-				return self.options.engraving_max_dist 
+				return max_dist 
 			return r
 			#end of get_radius_to_line
 
@@ -5594,6 +5644,9 @@ class Gcodetools(inkex.Effect):
 			It turns out that finding a circle touching a point is harder than a circle
 			touching a line.
 			"""
+
+			global max_dist
+
 			#Start by converting coordinates to be relative to x1,y1
 			x2,y2= x2-x1, y2-y1
 			denom=nx**2+ny**2-1
@@ -5601,18 +5654,17 @@ class Gcodetools(inkex.Effect):
 				if denom==-1 : #Find circle centre x1,y1
 					return math.sqrt(x2**2+y2**2)
 				#if x2,y2 not in front of the normal...
-				if x2*nx+y2*ny <=0 : return self.options.engraving_max_dist
+				if x2*nx+y2*ny <=0 : return max_dist
 				#print_("Straight",x1,y1,nx,ny,x2,y2)
 				return (x2**2+y2**2)/(2*(x2*nx+y2*ny) )
 			#It is a corner bisector, so..
 			discriminator = (x2*nx+y2*ny)**2 - denom*(x2**2+y2**2)
 			if discriminator < 0 :
-				return self.options.engraving_max_dist #this part irrelevant
+				return max_dist #this part irrelevant
 			r=(x2*nx+y2*ny -math.sqrt(discriminator))/denom
 			#print_("Corner",x1,y1,nx,ny,x1+x2,y1+y2,discriminator,r)
 			return r
 			#end of get_radius_to_point
-
 
 		def bez_divide(a,b,c,d):
 			"""LT recursively divide a Bezier.
@@ -5665,11 +5717,11 @@ class Gcodetools(inkex.Effect):
 				tuple (j,i,r)
 				..where j and i are indices of limiting segment, r is radius
 			"""
-			global nlLT, i, j
+			global max_dist, nlLT, i, j
 			n1 = nlLT[j][i-1] #current node
 			jjmin = -1
 			iimin = -1
-			r = self.options.engraving_max_dist
+			r = max_dist
 			# set limits within which to look for lines
 			xmin, xmax = x1+r*nx-r, x1+r*nx+r
 			ymin, ymax = y1+r*ny-r, y1+r*ny+r
@@ -5746,6 +5798,9 @@ class Gcodetools(inkex.Effect):
 			There is no benefit in saving the imtermediate points.
 			"""
 			global wl, cspm
+			x=round(x,4) #round to 4 decimals
+			y=round(y,4) #round to 4 decimals
+			w=round(w,4) #round to 4 decimals
 			if len(cspm)>1 :
 				xy1a,xy1,xy1b,i1,j1,ii1,jj1=cspm[-1]
 				w1=wl[-1]
@@ -5755,40 +5810,94 @@ class Gcodetools(inkex.Effect):
 					if i==i1 and j==j1 and ii==ii1 and jj==jj1 : #two matches. Now test linearity
 						length1=math.hypot(xy1[0]-x,xy1[1]-y)
 						length2=math.hypot(xy2[0]-x,xy2[1]-y)
+						length12=math.hypot(xy2[0]-xy1[0],xy2[1]-xy1[1])
 						#get the xy distance of point 1 from the line 0-2
-						if length2>length1 and (xy2[0]-x)*(xy1[0]-x)>0: #point 1 between them
+						if length2>length1 and length2>length12 : #point 1 between them
 							xydist=abs( (xy2[0]-x)*(xy1[1]-y)-(xy1[0]-x)*(xy2[1]-y) )/length2
 							if xydist<engraving_tolerance : #so far so good
 								wdist=w2+(w-w2)*length1/length2 -w1
 								if abs(wdist)<engraving_tolerance :
+									#print_("pop",j,i,xy1)
 									cspm.pop()
 									wl.pop()
 			cspm+=[ [ [x,y],[x,y],[x,y],i,j,ii,jj ] ]
 			wl+=[w]
 			#end of save_point
 
-		def draw_point((x,y),r):
-			"""LT Draw this point as a circle with a 1px dot in the middle
+		def draw_point((x0,y0),(x,y),r):
+			"""LT Draw this point as a circle with a 1px dot in the middle and a 3D line
 
 			Note that points that are subsequently erased as being unneeded do get
-			displayed, but this help the user see the total area covered.
+			displayed, but this helps the user see the total area covered.
 			"""
+			global gcode_3Dleft ,gcode_3Dright
 			if self.options.engraving_draw_calculation_paths :
 				inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
-						{"gcodetools": "Engraving calculation toolpath", 'style':	"fill:#ff00ff; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x), inkex.addNS('cy','sodipodi'):		str(y), inkex.addNS('rx','sodipodi'):	str(1), inkex.addNS('ry','sodipodi'): str(1), inkex.addNS('type','sodipodi'):	'arc'})	
-				inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
+						{"gcodetools": "Engraving calculation toolpath", 'style':	"fill:#ff00ff; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x), inkex.addNS('cy','sodipodi'):		str(y), inkex.addNS('rx','sodipodi'):	str(1), inkex.addNS('ry','sodipodi'): str(1), inkex.addNS('type','sodipodi'):	'arc'})
+				#Don't draw zero radius circles
+				if r:
+					inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
 						{"gcodetools": "Engraving calculation paths", 'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x),  inkex.addNS('cy','sodipodi'):		str(y),inkex.addNS('rx','sodipodi'):		str(r), inkex.addNS('ry','sodipodi'):		str(r), inkex.addNS('type','sodipodi'):	'arc'})
+					# Find slope direction for shading
+					s=math.atan2(y-y0,x-x0) #-pi to pi
+					# convert to 2 hex digits as a shade of red
+					s2="#{0:x}0000".format(int(101*(1.5-math.sin(s+0.5))))
+					inkex.etree.SubElement(	gcode_3Dleft , inkex.addNS('path','svg'),
+					{ "d": "M %f,%f L %f,%f" %(x0-150,y0,x-150-0.12*r,y),
+						'style': "stroke:" + s2 + "; stroke-opacity:1; stroke-width:0.6; fill:none",
+						"gcodetools": "Gcode G1R"
+					})
+					inkex.etree.SubElement(	gcode_3Dright , inkex.addNS('path','svg'),
+					{ "d": "M %f,%f L %f,%f" %(x0+150,y0,x+150+0.12*r,y),
+						'style': "stroke:" + s2 + "; stroke-opacity:1; stroke-width:0.6; fill:none",
+						"gcodetools": "Gcode G1L"
+					})
 			#end of draw_point
 
 		#end of subfunction definitions. engraving() starts here:
-		print_("self.options.engraving_max_dist ", self.options.engraving_max_dist )
-		bitlen=20/self.options.engraving_newton_iterations
+		gcode = ''
+		r,w, wmax = 0,0,0
+		x1,y1,nx,ny =0,0,0,0
 		cspe =[]
 		we = []
+		if len(self.selected_paths)<=0:
+			self.error(_("Please select at least one path to engrave and run again."),"warning")
+			return
+		if not self.check_dir() : return
+		#Find what units the user uses
+		unit=" mm"
+		orientation_scale = 3.5433070660
+		if self.options.unit == "G20 (All units in inches)" :
+			orientation_scale = 90
+			unit=" inches"
+		elif self.options.unit != "G21 (All units in mm)" :
+			self.error(_("Unknown unit selected. mm assumed"),"warning")
+		print_("engraving_max_dist mm/inch", self.options.engraving_max_dist )
+		max_dist = self.options.engraving_max_dist * orientation_scale
+		print_("max_dist pixels", max_dist )
+		#LT See if we can use this parameter for line and Bezier subdivision:
+		bitlen=20/self.options.engraving_newton_iterations
+
 		for layer in self.layers :
-			if layer in self.selected_paths : 
+			if layer in self.selected_paths :
 				self.set_tool(layer)
+				if self.tools[layer][0]['shape'] != "":
+					toolshape = eval('lambda w: ' + self.tools[layer][0]['shape'].strip('"'))
+				else: 
+					self.error(_("Tool '%s' has no shape. 45 degree cone assumed!") % self.tools[layer][0]['name'],"Continue")
+					toolshape = lambda w: w
+				#Get tool radius in pixels
+				toolr=self.tools[layer][0]['diameter'] * orientation_scale/2
+				print_("tool radius in pixels=", toolr)
 				engraving_group = inkex.etree.SubElement( self.selected_paths[layer][0].getparent(), inkex.addNS('g','svg') )
+				if self.my3Dlayer  == None :
+					self.my3Dlayer=inkex.etree.SubElement(self.document.getroot(), 'g') #Create a generic element at root level
+					self.my3Dlayer.set(inkex.addNS('label', 'inkscape'), "3D") #Gives it a name
+					self.my3Dlayer.set(inkex.addNS('groupmode', 'inkscape'), 'layer') #Tells Inkscape it's a layer
+				#Create groups for left and right eyes
+				gcode_3Dleft = inkex.etree.SubElement(self.my3Dlayer, inkex.addNS('g','svg'), {"gcodetools":"Gcode 3D L"})
+				gcode_3Dright = inkex.etree.SubElement(self.my3Dlayer, inkex.addNS('g','svg'), {"gcodetools":"Gcode 3D R"})
+
 				for node in self.selected_paths[layer] :	
 					if node.tag == inkex.addNS('path','svg'):
 						cspi = cubicsuperpath.parsePath(node.get('d'))
@@ -5823,10 +5932,19 @@ class Gcodetools(inkex.Effect):
 								#LT find angle between this and previous segment
 								x0,y0 = sp1[1]
 								nx1,ny1 = csp_normalized_normal(sp1,sp2,0)
+								#I don't trust this function, so test result
+								if abs(1-math.hypot(nx1,ny1))> 0.00001 :
+									print_("csp_normalised_normal error t=0",nx1,ny1,sp1,sp2)
+									self.error(_("csp_normalised_normal error. See log."),"warning")
+
 								nx0, ny0 = csp_normalized_normal(sp0,sp1,1)
+								if abs(1-math.hypot(nx0,ny0))> 0.00001 :
+									print_("csp_normalised_normal error t=1",nx0,ny0,sp1,sp2)
+									self.error(_("csp_normalised_normal error. See log."),"warning")
 								bx,by,s=bisect((nx0,ny0),(nx1,ny1))
 								#record x,y,normal,ifCorner, sin(angle-turned/2)
 								nlLT[-1] += [[ [x0,y0],[bx,by], True, s]]
+
 								#LT now do the line
 								if sp1[1]==sp1[2] and sp2[0]==sp2[1] : #straightline
 									nlLT[-1]+=[[sp1[1],[nx1,ny1],False,i]]
@@ -5875,9 +5993,9 @@ class Gcodetools(inkex.Effect):
 
 
 						#LT6a build nlLT[j] for each subpath - ends here
+						#for nnn in nlLT :
+							#print_("nlLT",nnn) #LT debug stuff
 				 		# Calculate offset points
-						for nnn in nlLT :
-							print_("nlLT",nnn) #LT debug stuff
 						reflex=False
 						for j in xrange(len(nlLT)): #LT6b for each subpath
 							cspm=[] #Will be my output. List of csps.
@@ -5898,7 +6016,7 @@ class Gcodetools(inkex.Effect):
 									bits=1
 									bit0=0
 									lastr=r #Remember r from last line
-									r = self.options.engraving_max_dist
+									r = max_dist
 									if n1[3]>0 : #acute. Limit radius
 										len1=math.hypot( (n0[0][0]-n1[0][0]),( n0[0][1]-n1[0][1]) )
 										if i<(len(nlLT[j])-1) :
@@ -5908,7 +6026,7 @@ class Gcodetools(inkex.Effect):
 										#set initial r value, not to be exceeded
 										r = math.sqrt(min(len1,len2))/n1[3]
 								else: #line. Cut it up if long.
-									if n0[3]>0 :
+									if n0[3]>0 and not self.options.engraving_draw_calculation_paths :
 										bit0=r*n0[3] #after acute corner
 									else : bit0=0.0
 									length=math.hypot((x1b-x1a),(y1a-y1b))
@@ -5921,34 +6039,39 @@ class Gcodetools(inkex.Effect):
 									x1=x1a+ny*(b*bitlen+bit0)
 									y1=y1a-nx*(b*bitlen+bit0)
 									jjmin,iimin,r=get_biggest( (x1,y1), (nx,ny))
-									print_("Path j,i,jj,ii,r,x1,y1",j,i,jjmin,iimin,r,x1,y1)
-									w = min(r, self.tools[layer][0]['diameter']/2)
+
+									w = min(r, toolr)
+									wmax=max(wmax,w)
 									if reflex : #just after a reflex corner
 										reflex = False
 										if r<lastr : #need to adjust it
-											draw_point((n0[0][0]+n0[1][0]*r,n0[0][1]+n0[1][1]*r),r)
+											draw_point((x1,y1),(n0[0][0]+n0[1][0]*r,n0[0][1]+n0[1][1]*r),r)
 											save_point((n0[0][0]+n0[1][0]*w,n0[0][1]+n0[1][1]*w),w,i,j,iimin,jjmin)
 									if n1[2] == True : # We're at a corner
 										if n1[3]>0 : #acute
 											save_point((x1+nx*w,y1+ny*w),w,i,j,iimin,jjmin)
-											draw_point((x1,y1),0)
+											draw_point((x1,y1),(x1,y1),0)
 											save_point((x1,y1),0,i,j,iimin,jjmin)
 										elif n1[3]<0  : #reflex
 											if r>lastr :
-												draw_point((x1+nx*lastr,y1+ny*lastr),lastr)
-												w = min(lastr, self.tools[layer][0]['diameter']/2)
+												draw_point((x1,y1),(x1+nx*lastr,y1+ny*lastr),lastr)
+												w = min(lastr, toolr)
+												wmax=max(wmax,w)
 												save_point((x1+nx*w,y1+ny*w),w,i,j,iimin,jjmin)
-									draw_point((x1+nx*r,y1+ny*r),r)
+									elif b>0 and n2[3]>0 and not self.options.engraving_draw_calculation_paths : #acute corner coming up
+										if jjmin==j and iimin==i+2 : break
+									draw_point((x1,y1),(x1+nx*r,y1+ny*r),r)
 									save_point((x1+nx*w,y1+ny*w),w,i,j,iimin,jjmin)
+
 								#LT end of for each bit of this line
 								if n1[2] == True and n1[3]<0 : #reflex angle
 									reflex=True
 								lastr=r #remember this r
 							#LT next i
 							cspm+=[cspm[0]]
-							print_("cspm",cspm)
+							#print_("cspm",cspm)
 							wl+=[wl[0]]
-							print_("wl",wl)
+							#print_("wl",wl)
 							#Note: Original csp_points was a list, each element
 							#being 4 points, with the first being the same as the
 							#last of the previous set.
@@ -5965,25 +6088,30 @@ class Gcodetools(inkex.Effect):
 									inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
 											{"gcodetools": "Engraving calculation paths", 'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(cspm[i][1][0]),  inkex.addNS('cy','sodipodi'):		str(cspm[i][1][1]),inkex.addNS('rx','sodipodi'):		str(wl[i]), inkex.addNS('ry','sodipodi'):		str(wl[i]), inkex.addNS('type','sodipodi'):	'arc'})
 							cspe += [cspm]
+							wluu = [] #width list in user units: mm/inches
+							for w in wl :
+								wluu+=[ w / orientation_scale ]
+							#print_("wl in pixels",wl)
+							#print_("wl in user units",wluu)
+							#LT previously, we was in pixels so gave wrong depth
 							we   +=	[wl]
 						#LT6b For each subpath - ends here			
 					#LT5 if it is a path - ends here
-					print_("cspe",cspe)
-					print_("we",we)
+					#print_("cspe",cspe)
+					#print_("we",we)
 				#LT4 for each selected object in this layer - ends here
-				if self.tools[layer][0]['shape'] != "":
-					f = eval('lambda w: ' + self.tools[layer][0]['shape'].strip('"'))
-				else: 
-					self.error(_("Tool '%s' has no shape!") % self.tools[layer][0]['name'],"engraving_tools_shape_error")
-					f = lambda w: w
-		
+
 				if cspe!=[]:
-					curve = self.parse_curve(cspe, layer, we, f) #convert to biarcs
+					curve = self.parse_curve(cspe, layer, we, toolshape) #convert to lines
 					self.draw_curve(curve, layer, engraving_group)
 					gcode += self.generate_gcode(curve, layer, self.options.Zsurface)
-				
-			#LT3 for layers loop ends here				
+
+			#LT3 for layers loop ends here
 		if gcode!='' :
+			self.header+="(Tool diameter should be at least "+str(2*wmax/orientation_scale)+unit+ ")\n"
+			self.header+="(Depth, as a function of radius w, must be "+ self.tools[layer][0]['shape']+ ")\n"
+			self.header+="(Rapid feeds use safe Z="+ str(self.options.Zsafe) + unit + ")\n"
+			self.header+="(Material surface at Z="+ str(self.options.Zsurface) + unit + ")\n"
 			self.export_gcode(gcode)
 		else : 	self.error(_("No need to engrave sharp angles."),"warning")
 
@@ -6132,7 +6260,7 @@ class Gcodetools(inkex.Effect):
 				"penetration feed":100,
 				"feed":400,
 				"gcode before path":"""G31 Z-100 F500 (find metal)
-G92 Z0 (zerro z)
+G92 Z0 (zero z)
 G00 Z10 F500 (going up)
 M03 (turn on plasma)
 G04 P0.2 (pause)
@@ -6158,7 +6286,7 @@ G01 Z1 (going to cutting z)\n""",
 		tool_num = sum([len(self.tools[i]) for i in self.tools])
 		colors = ["00ff00","0000ff","ff0000","fefe00","00fefe", "fe00fe", "fe7e00", "7efe00", "00fe7e", "007efe", "7e00fe", "fe007e"]
 		
-		tools_group = inkex.etree.SubElement(layer, inkex.addNS('g','svg'), {'gcodetools': "Gcodetools tool defenition"})
+		tools_group = inkex.etree.SubElement(layer, inkex.addNS('g','svg'), {'gcodetools': "Gcodetools tool definition"})
 		bg = inkex.etree.SubElement(	tools_group, inkex.addNS('path','svg'), 
 					{'style':	"fill:#%s;fill-opacity:0.5;stroke:#444444; stroke-width:1px;"%colors[tool_num%len(colors)], "gcodetools":"Gcodetools tool background"})
 
@@ -6170,10 +6298,10 @@ G01 Z1 (going to cutting z)\n""",
 			if key not in keys: keys += [key]
 		for key in keys :
 			g = inkex.etree.SubElement(tools_group, inkex.addNS('g','svg'), {'gcodetools': "Gcodetools tool parameter"})
-			draw_text(key, 0, y, group = g, gcodetools_tag = "Gcodetools tool defention field name", font_size = 10 if key!='name' else 20)
+			draw_text(key, 0, y, group = g, gcodetools_tag = "Gcodetools tool definition field name", font_size = 10 if key!='name' else 20)
 			param = tool[key]
 			if type(param)==str and re.match("^\s*$",param) : param = "(None)"
-			draw_text(param, 150, y, group = g, gcodetools_tag = "Gcodetools tool defention field value", font_size = 10 if key!='name' else 20)
+			draw_text(param, 150, y, group = g, gcodetools_tag = "Gcodetools tool definition field value", font_size = 10 if key!='name' else 20)
 			v = str(param).split("\n")
 			y += 15*len(v) if key!='name' else 20*len(v)
 
