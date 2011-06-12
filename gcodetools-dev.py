@@ -16,10 +16,10 @@ History of CLT changes to engraving and other functions it uses:
 24 May Changed Bezier slope calculation to be less sensitive to tiny differences in points.
        Added use of self.options.engraving_newton_iterations to control accuracy
 25 May Big restructure and new recursive function.
-	 Changed the way I treat corners - I now find if the centre of a proposed circle is
-        within the area bounded by the line being tested and the two angle bisectors at
-	  its ends. See get_radius_to_line().
-29 May Eliminating redundant points from gcode. If A,B,C colinear, drop B
+	   Changed the way I treat corners - I now find if the centre of a proposed circle is
+                within the area bounded by the line being tested and the two angle bisectors at
+		    its ends. See get_radius_to_line().
+29 May Eliminating redundant points. If A,B,C colinear, drop B
 30 May Eliminating redundant lines in divided Beziers. Changed subdivision of lines
   7Jun Try to show engraving in 3D
  8 Jun Displaying in stereo 3D.
@@ -32,6 +32,7 @@ History of CLT changes to engraving and other functions it uses:
        Changed csp_normalized_slope to reject lines shorter than 1e-9.
 10 Jun Changed all dimensions seen by user to be mm/inch, not pixels. This includes
 	  tool diameter, maximum engraving distance, tool shape and all Z values.
+12 Jun ver 35 Now scales correctly if orientation points moved or stretched.
 TODO Change line division to be recursive, depending on what line is touched. See line_divide
 
 
@@ -5866,20 +5867,27 @@ class Gcodetools(inkex.Effect):
 		if not self.check_dir() : return
 		#Find what units the user uses
 		unit=" mm"
-		orientation_scale = 3.5433070660
 		if self.options.unit == "G20 (All units in inches)" :
-			orientation_scale = 90
 			unit=" inches"
 		elif self.options.unit != "G21 (All units in mm)" :
 			self.error(_("Unknown unit selected. mm assumed"),"warning")
 		print_("engraving_max_dist mm/inch", self.options.engraving_max_dist )
-		max_dist = self.options.engraving_max_dist * orientation_scale
-		print_("max_dist pixels", max_dist )
+
 		#LT See if we can use this parameter for line and Bezier subdivision:
 		bitlen=20/self.options.engraving_newton_iterations
 
 		for layer in self.layers :
 			if layer in self.selected_paths :
+				#Calculate scale, as we need to scale Z accordingly
+				p1=self.orientation_points[layer][0][0]
+				p2=self.orientation_points[layer][0][1]
+				ol=math.hypot(p1[0][0]-p2[0][0],p1[0][1]-p2[0][1])
+				oluu=math.hypot(p1[1][0]-p2[1][0],p1[1][1]-p2[1][1])
+				print_("Orientation2 p1 p2 ol oluu",p1,p2,ol,oluu)
+				orientation_scale = ol/oluu
+				max_dist = self.options.engraving_max_dist * orientation_scale
+				print_("max_dist pixels", max_dist )
+
 				self.set_tool(layer)
 				if self.tools[layer][0]['shape'] != "":
 					toolshape = eval('lambda w: ' + self.tools[layer][0]['shape'].strip('"'))
@@ -5890,18 +5898,18 @@ class Gcodetools(inkex.Effect):
 				toolr=self.tools[layer][0]['diameter'] * orientation_scale/2
 				print_("tool radius in pixels=", toolr)
 				engraving_group = inkex.etree.SubElement( self.selected_paths[layer][0].getparent(), inkex.addNS('g','svg') )
-				if self.my3Dlayer  == None :
+				if self.options.engraving_draw_calculation_paths and (self.my3Dlayer  == None) :
 					self.my3Dlayer=inkex.etree.SubElement(self.document.getroot(), 'g') #Create a generic element at root level
 					self.my3Dlayer.set(inkex.addNS('label', 'inkscape'), "3D") #Gives it a name
 					self.my3Dlayer.set(inkex.addNS('groupmode', 'inkscape'), 'layer') #Tells Inkscape it's a layer
 				#Create groups for left and right eyes
-				gcode_3Dleft = inkex.etree.SubElement(self.my3Dlayer, inkex.addNS('g','svg'), {"gcodetools":"Gcode 3D L"})
-				gcode_3Dright = inkex.etree.SubElement(self.my3Dlayer, inkex.addNS('g','svg'), {"gcodetools":"Gcode 3D R"})
+				if self.options.engraving_draw_calculation_paths :
+					gcode_3Dleft = inkex.etree.SubElement(self.my3Dlayer, inkex.addNS('g','svg'), {"gcodetools":"Gcode 3D L"})
+					gcode_3Dright = inkex.etree.SubElement(self.my3Dlayer, inkex.addNS('g','svg'), {"gcodetools":"Gcode 3D R"})
 
 				for node in self.selected_paths[layer] :	
 					if node.tag == inkex.addNS('path','svg'):
 						cspi = cubicsuperpath.parsePath(node.get('d'))
-
 						#LT: Create my own list. n1LT[j] is for subpath j
 						nlLT = []
 						for j in xrange(len(cspi)): #LT For each subpath...
@@ -5914,6 +5922,10 @@ class Gcodetools(inkex.Effect):
 								else:
 									i += 1
 						for csp in cspi: #LT6a For each subpath...
+							#Create copies in 3D layer
+							print_("csp is zz ",csp)
+							cspl=[]
+							cspr=[]
 							#create list containing lines and points, starting with a point
 							# line members: [x,y],[nx,ny],False,i
 							# x,y is start of line. Normal on engraved side.
@@ -5929,6 +5941,17 @@ class Gcodetools(inkex.Effect):
 							for i in range(0,len(csp)): #LT for each point
 								#n = []
 								sp0, sp1, sp2 = csp[i-2], csp[i-1], csp[i]
+								if self.options.engraving_draw_calculation_paths:
+									#Copy it to 3D layer objects
+									spl=[]
+									spr=[]
+									for j in range(0,3) :
+										pl=[sp2[j][0]-150,sp2[j][1]]
+										pr=[sp2[j][0]+150,sp2[j][1]]
+										spl+=[pl]
+										spr+=[pr]
+									cspl+=[spl]
+									cspr+=[spr]					
 								#LT find angle between this and previous segment
 								x0,y0 = sp1[1]
 								nx1,ny1 = csp_normalized_normal(sp1,sp2,0)
@@ -5979,6 +6002,21 @@ class Gcodetools(inkex.Effect):
 							#LT for each segment - ends here.
 							print_(("engraving_draw_calculation_paths=",self.options.engraving_draw_calculation_paths))
 							if self.options.engraving_draw_calculation_paths:
+								#Copy complete paths to 3D layer
+								#print_("cspl",cspl)
+								cspl+=[cspl[0]] #Close paths
+								cspr+=[cspr[0]] #Close paths
+								inkex.etree.SubElement(	gcode_3Dleft , inkex.addNS('path','svg'),
+								{ "d": cubicsuperpath.formatPath([cspl]),
+								'style': "stroke:#808080; stroke-opacity:1; stroke-width:0.6; fill:none",
+								"gcodetools": "G1L outline"
+								})
+								inkex.etree.SubElement(	gcode_3Dright , inkex.addNS('path','svg'),
+								{ "d": cubicsuperpath.formatPath([cspr]),
+								'style': "stroke:#808080; stroke-opacity:1; stroke-width:0.6; fill:none",
+								"gcodetools": "G1L outline"
+								})
+
 								for p in nlLT[-1]: #For last sub-path
 									if p[2]: inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'),
 										{ "d":	"M %f,%f L %f,%f" %(p[0][0],p[0][1],p[0][0]+p[1][0]*10,p[0][1]+p[1][1]*10),
@@ -6069,9 +6107,9 @@ class Gcodetools(inkex.Effect):
 								lastr=r #remember this r
 							#LT next i
 							cspm+=[cspm[0]]
-							#print_("cspm",cspm)
+							print_("cspm",cspm)
 							wl+=[wl[0]]
-							#print_("wl",wl)
+							print_("wl",wl)
 							#Note: Original csp_points was a list, each element
 							#being 4 points, with the first being the same as the
 							#last of the previous set.
@@ -6091,10 +6129,10 @@ class Gcodetools(inkex.Effect):
 							wluu = [] #width list in user units: mm/inches
 							for w in wl :
 								wluu+=[ w / orientation_scale ]
-							#print_("wl in pixels",wl)
-							#print_("wl in user units",wluu)
+							print_("wl in pixels",wl)
+							print_("wl in user units",wluu)
 							#LT previously, we was in pixels so gave wrong depth
-							we   +=	[wl]
+							we   +=	[wluu]
 						#LT6b For each subpath - ends here			
 					#LT5 if it is a path - ends here
 					#print_("cspe",cspe)
