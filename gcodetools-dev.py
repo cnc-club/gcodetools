@@ -32,7 +32,9 @@ History of CLT changes to engraving and other functions it uses:
        Changed csp_normalized_slope to reject lines shorter than 1e-9.
 10 Jun Changed all dimensions seen by user to be mm/inch, not pixels. This includes
 	  tool diameter, maximum engraving distance, tool shape and all Z values.
-12 Jun ver 35 Now scales correctly if orientation points moved or stretched.
+12 Jun ver 208 Now scales correctly if orientation points moved or stretched.
+12 Jun ver 209. Now detect if engraving toolshape not a function of radius
+                Graphics now indicate Gcode toolpath, limited by min(tool diameter/2,max-dist)
 TODO Change line division to be recursive, depending on what line is touched. See line_divide
 
 
@@ -4496,6 +4498,7 @@ class Gcodetools(inkex.Effect):
 						selection_does_not_contain_paths_will_take_all
 						selection_is_empty_will_comupe_drawing
 						selection_contains_objects_that_are_not_paths
+						Continue
 						"""
 		errors = """
 						Error 	
@@ -5534,11 +5537,13 @@ class Gcodetools(inkex.Effect):
 #parent = self.selected_paths[layer][0].getparent()
 ################################################################################
 	def engraving(self) :
-		global x1,y1,rx,ry,r,w
+		#global x1,y1,rx,ry
 		global cspm, wl
 		global nlLT, i, j
 		global gcode_3Dleft ,gcode_3Dright
-		global max_dist
+		global max_dist #minimum of tool radius and user's requested maximum distance
+		global eye_dist
+		eye_dist = 100 #3D constant. Try varying it for your eyes
 
 
 		def bisect((nx1,ny1),(nx2,ny2)) :
@@ -5628,7 +5633,7 @@ class Gcodetools(inkex.Effect):
 				return max_dist 
 			if (x3-cx)*ny3 < (y3-cy)*nx3  -0.0001 :
 				return max_dist 
-			return r
+			return min(r, max_dist)
 			#end of get_radius_to_line
 
 		def get_radius_to_point((x1,y1),(nx,ny), (x2,y2)):
@@ -5664,7 +5669,7 @@ class Gcodetools(inkex.Effect):
 				return max_dist #this part irrelevant
 			r=(x2*nx+y2*ny -math.sqrt(discriminator))/denom
 			#print_("Corner",x1,y1,nx,ny,x1+x2,y1+y2,discriminator,r)
-			return r
+			return min(r, max_dist)
 			#end of get_radius_to_point
 
 		def bez_divide(a,b,c,d):
@@ -5769,6 +5774,7 @@ class Gcodetools(inkex.Effect):
 		def line_divide((x0,y0),j0,i0,(x1,y1),j1,i1,(nx,ny),length):
 			"""LT recursively divide a line as much as necessary
 
+			NOTE: This function is not currently used
 			By noting which other path segment is touched by the circles at each end,
 			we can see if anything is to be gained by a further subdivision, since
 			if they touch the same bit of path we can move linearly between them.
@@ -5825,8 +5831,9 @@ class Gcodetools(inkex.Effect):
 			wl+=[w]
 			#end of save_point
 
-		def draw_point((x0,y0),(x,y),r):
-			"""LT Draw this point as a circle with a 1px dot in the middle and a 3D line
+		def draw_point((x0,y0),(x,y),w,t):
+			"""LT Draw this point as a circle with a 1px dot in the middle (x,y) 
+			and a 3D line from (x0,y0) down to x,y. 3D line thickness should be t/2 
 
 			Note that points that are subsequently erased as being unneeded do get
 			displayed, but this helps the user see the total area covered.
@@ -5836,28 +5843,28 @@ class Gcodetools(inkex.Effect):
 				inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
 						{"gcodetools": "Engraving calculation toolpath", 'style':	"fill:#ff00ff; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x), inkex.addNS('cy','sodipodi'):		str(y), inkex.addNS('rx','sodipodi'):	str(1), inkex.addNS('ry','sodipodi'): str(1), inkex.addNS('type','sodipodi'):	'arc'})
 				#Don't draw zero radius circles
-				if r:
+				if w:
 					inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
-						{"gcodetools": "Engraving calculation paths", 'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x),  inkex.addNS('cy','sodipodi'):		str(y),inkex.addNS('rx','sodipodi'):		str(r), inkex.addNS('ry','sodipodi'):		str(r), inkex.addNS('type','sodipodi'):	'arc'})
+						{"gcodetools": "Engraving calculation paths", 'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x),  inkex.addNS('cy','sodipodi'):		str(y),inkex.addNS('rx','sodipodi'):		str(w), inkex.addNS('ry','sodipodi'):		str(w), inkex.addNS('type','sodipodi'):	'arc'})
 					# Find slope direction for shading
 					s=math.atan2(y-y0,x-x0) #-pi to pi
 					# convert to 2 hex digits as a shade of red
 					s2="#{0:x}0000".format(int(101*(1.5-math.sin(s+0.5))))
 					inkex.etree.SubElement(	gcode_3Dleft , inkex.addNS('path','svg'),
-					{ "d": "M %f,%f L %f,%f" %(x0-150,y0,x-150-0.12*r,y),
-						'style': "stroke:" + s2 + "; stroke-opacity:1; stroke-width:0.6; fill:none",
+					{ "d": "M %f,%f L %f,%f" %(x0-eye_dist,y0,x-eye_dist-0.14*w,y),
+						'style': "stroke:" + s2 + "; stroke-opacity:1; stroke-width:" + str(t/2) +" ; fill:none",
 						"gcodetools": "Gcode G1R"
 					})
 					inkex.etree.SubElement(	gcode_3Dright , inkex.addNS('path','svg'),
-					{ "d": "M %f,%f L %f,%f" %(x0+150,y0,x+150+0.12*r,y),
-						'style': "stroke:" + s2 + "; stroke-opacity:1; stroke-width:0.6; fill:none",
+					{ "d": "M %f,%f L %f,%f" %(x0+eye_dist,y0,x+eye_dist+0.14*r,y),
+						'style': "stroke:" + s2 + "; stroke-opacity:1; stroke-width:" + str(t/2) +" ; fill:none",
 						"gcodetools": "Gcode G1L"
 					})
 			#end of draw_point
 
 		#end of subfunction definitions. engraving() starts here:
 		gcode = ''
-		r,w, wmax = 0,0,0
+		r,w, wmax = 0,0,0 #theoretical and tool-radius-limited radii in pixels
 		x1,y1,nx,ny =0,0,0,0
 		cspe =[]
 		we = []
@@ -5878,25 +5885,29 @@ class Gcodetools(inkex.Effect):
 
 		for layer in self.layers :
 			if layer in self.selected_paths :
-				#Calculate scale, as we need to scale Z accordingly
+				#Calculate scale in pixels per user unit (mm or inch)
 				p1=self.orientation_points[layer][0][0]
 				p2=self.orientation_points[layer][0][1]
 				ol=math.hypot(p1[0][0]-p2[0][0],p1[0][1]-p2[0][1])
 				oluu=math.hypot(p1[1][0]-p2[1][0],p1[1][1]-p2[1][1])
 				print_("Orientation2 p1 p2 ol oluu",p1,p2,ol,oluu)
 				orientation_scale = ol/oluu
-				max_dist = self.options.engraving_max_dist * orientation_scale
-				print_("max_dist pixels", max_dist )
 
 				self.set_tool(layer)
-				if self.tools[layer][0]['shape'] != "":
-					toolshape = eval('lambda w: ' + self.tools[layer][0]['shape'].strip('"'))
+				shape = self.tools[layer][0]['shape']
+				if re.search('w', shape) :
+					toolshape = eval('lambda w: ' + shape.strip('"'))
 				else: 
 					self.error(_("Tool '%s' has no shape. 45 degree cone assumed!") % self.tools[layer][0]['name'],"Continue")
 					toolshape = lambda w: w
 				#Get tool radius in pixels
 				toolr=self.tools[layer][0]['diameter'] * orientation_scale/2
 				print_("tool radius in pixels=", toolr)
+				#max dist from path to engrave in user's units
+				max_distuu = min(self.tools[layer][0]['diameter']/2, self.options.engraving_max_dist)
+				max_dist=max_distuu*orientation_scale
+				print_("max_dist pixels", max_dist )
+
 				engraving_group = inkex.etree.SubElement( self.selected_paths[layer][0].getparent(), inkex.addNS('g','svg') )
 				if self.options.engraving_draw_calculation_paths and (self.my3Dlayer  == None) :
 					self.my3Dlayer=inkex.etree.SubElement(self.document.getroot(), 'g') #Create a generic element at root level
@@ -5946,8 +5957,8 @@ class Gcodetools(inkex.Effect):
 									spl=[]
 									spr=[]
 									for j in range(0,3) :
-										pl=[sp2[j][0]-150,sp2[j][1]]
-										pr=[sp2[j][0]+150,sp2[j][1]]
+										pl=[sp2[j][0]-eye_dist,sp2[j][1]]
+										pr=[sp2[j][0]+eye_dist,sp2[j][1]]
 										spl+=[pl]
 										spr+=[pr]
 									cspl+=[spl]
@@ -6038,7 +6049,7 @@ class Gcodetools(inkex.Effect):
 						for j in xrange(len(nlLT)): #LT6b for each subpath
 							cspm=[] #Will be my output. List of csps.
 							wl=[] #Will be my w output list
-							r = 0 #LT initial value as first point is an angle
+							w = r = 0 #LT initial, as first point is an angle
 							for i in xrange(len(nlLT[j])) : #LT for each node
 								#LT Note: Python enables wrapping of array indices
 								# backwards to -1, -2, but not forwards. Hence:
@@ -6053,8 +6064,9 @@ class Gcodetools(inkex.Effect):
 								if n1[2] == True : # We're at a corner
 									bits=1
 									bit0=0
-									lastr=r #Remember r from last line
-									r = max_dist
+									#lastr=r #Remember r from last line
+									lastw=w #Remember w from last line
+									w = max_dist
 									if n1[3]>0 : #acute. Limit radius
 										len1=math.hypot( (n0[0][0]-n1[0][0]),( n0[0][1]-n1[0][1]) )
 										if i<(len(nlLT[j])-1) :
@@ -6062,7 +6074,7 @@ class Gcodetools(inkex.Effect):
 										else:
 											len2=math.hypot( (nlLT[j][0][0][0]-n1[0][0]),(nlLT[j][0][0][1]-n1[0][1]) )
 										#set initial r value, not to be exceeded
-										r = math.sqrt(min(len1,len2))/n1[3]
+										w = math.sqrt(min(len1,len2))/n1[3]
 								else: #line. Cut it up if long.
 									if n0[3]>0 and not self.options.engraving_draw_calculation_paths :
 										bit0=r*n0[3] #after acute corner
@@ -6072,39 +6084,38 @@ class Gcodetools(inkex.Effect):
 									bits=int((length-bit0)/bitlen)
 									#split excess evenly at both ends
 									bit0+=(length-bit0-bitlen*bits)/2
-									#print_("j,i,r,bit0,bits",j,i,r,bit0,bits)
+									#print_("j,i,r,bit0,bits",j,i,w,bit0,bits)
 								for b in xrange(bits) : #divide line into bits
 									x1=x1a+ny*(b*bitlen+bit0)
 									y1=y1a-nx*(b*bitlen+bit0)
-									jjmin,iimin,r=get_biggest( (x1,y1), (nx,ny))
-
-									w = min(r, toolr)
+									jjmin,iimin,w=get_biggest( (x1,y1), (nx,ny))
+									print_("i,j,jjmin,iimin,w",i,j,jjmin,iimin,w)
+									#w = min(r, toolr)
 									wmax=max(wmax,w)
 									if reflex : #just after a reflex corner
 										reflex = False
-										if r<lastr : #need to adjust it
-											draw_point((x1,y1),(n0[0][0]+n0[1][0]*r,n0[0][1]+n0[1][1]*r),r)
+										if w<lastw : #need to adjust it
+											draw_point((x1,y1),(n0[0][0]+n0[1][0]*w,n0[0][1]+n0[1][1]*w),w, (lastw-w)/2)
 											save_point((n0[0][0]+n0[1][0]*w,n0[0][1]+n0[1][1]*w),w,i,j,iimin,jjmin)
 									if n1[2] == True : # We're at a corner
 										if n1[3]>0 : #acute
 											save_point((x1+nx*w,y1+ny*w),w,i,j,iimin,jjmin)
-											draw_point((x1,y1),(x1,y1),0)
+											draw_point((x1,y1),(x1,y1),0,0)
 											save_point((x1,y1),0,i,j,iimin,jjmin)
 										elif n1[3]<0  : #reflex
-											if r>lastr :
-												draw_point((x1,y1),(x1+nx*lastr,y1+ny*lastr),lastr)
-												w = min(lastr, toolr)
+											if w>lastw :
+												draw_point((x1,y1),(x1+nx*lastw,y1+ny*lastw),w, (w-lastw)/2)
 												wmax=max(wmax,w)
 												save_point((x1+nx*w,y1+ny*w),w,i,j,iimin,jjmin)
 									elif b>0 and n2[3]>0 and not self.options.engraving_draw_calculation_paths : #acute corner coming up
 										if jjmin==j and iimin==i+2 : break
-									draw_point((x1,y1),(x1+nx*r,y1+ny*r),r)
+									draw_point((x1,y1),(x1+nx*w,y1+ny*w),w, bitlen)
 									save_point((x1+nx*w,y1+ny*w),w,i,j,iimin,jjmin)
 
 								#LT end of for each bit of this line
 								if n1[2] == True and n1[3]<0 : #reflex angle
 									reflex=True
-								lastr=r #remember this r
+								lastw = w #remember this w
 							#LT next i
 							cspm+=[cspm[0]]
 							print_("cspm",cspm)
