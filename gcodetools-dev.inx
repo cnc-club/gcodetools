@@ -100,7 +100,7 @@ Also you can manually select object, open XML editor (Shift+Ctrl+X) and add or r
 				
 				<_param name="help" type="description">
 Biarc interpolation tolerance is the maximum distance between path and its approximation.
-The segment will be split into two segments if the distance between path's segment and it's approximation exceeds biarc interpolation tolerance.
+The segment will be split into two segments if the distance between path's segment and its approximation exceeds biarc interpolation tolerance.
 For depth function c=color intensity from 0.0 (white) to 1.0 (black), d is the depth defined by orientation points, s - surface defined by orientation points. 
 </_param>
 		</page>
@@ -154,19 +154,20 @@ Suspected small objects will be marked out by colored arrows.
 
 <!-- Gcodetools: engraving block -->
 		<page name='engraving' _gui-text='Engraving'>	
-			<param name="engraving-sharp-angle-tollerance" type="float"  precision="5" min="0" max="180" _gui-text="Sharp angle tolerance:">150</param>
-			<param name="engraving-max-dist" type="float" precision="5" min="0" max="1000" _gui-text="Maximum distance for engraving:">10</param>
-			<param name="engraving-newton-iterations" type="int" min="2" max="10" _gui-text="Number of sample points used to calculate distance:">4</param>
-			<param name="engraving-draw-calculation-paths" type="boolean" _gui-text="Draw additional graphics to debug engraving path">false</param>
+			<param name="engraving-sharp-angle-tollerance" type="float"  precision="5" min="150" max="180" _gui-text="Smooth convex corners between this value and 180 degrees:">175</param>
+			<param name="engraving-max-dist" type="float" precision="5" min="0" max="1000" _gui-text="Maximum distance for engraving (mm/inch):">10</param>
+			<param name="engraving-newton-iterations" type="int" min="2" max="10" _gui-text="Accuracy factor (2 low to 10 high):">4</param>
+			<param name="engraving-draw-calculation-paths" type="boolean" _gui-text="Draw additional graphics to see engraving path">false</param>
 			
 			<_param name="help" type="description">
-This function creates path to engrave sharp angles.
-Cutter's shape function is defined by the tool. Some simple shapes:
+This function creates path to engrave letters or any shape with sharp angles.
+Cutter's depth as a function of radius is defined by the tool.
+Depth may be any Python expression. For instance:
 
-cone....(45 degrees)...........: w
-cone....(height/diameter=10/3).: 10/3 w
-sphere..("r" diameter).........: math.sqrt(max(0,r**2-w**2))
-ellipse.(R1=r and R2=r*4r).....: math.sqrt(max(0,r**2-w**2))*4</_param>
+cone....(45 degrees)......................: w
+cone....(height/diameter=10/3)..: 10*w/3
+sphere..(radius r)...........................: math.sqrt(max(0,r**2-w**2))
+ellipse.(minor axis r, major 4r).....: math.sqrt(max(0,r**2-w**2))*4</_param>
 		</page>
 <!-- Gcodetools: /engraving block -->
 <!-- Gcodetools: orientation block -->
