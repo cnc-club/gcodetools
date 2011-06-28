@@ -3704,11 +3704,6 @@ class Gcodetools(inkex.Effect):
 						csp = csp_remove_zerro_segments(csp)
 						res = []
 
-
-#		self.OptionParser.add_option("",   "--plasma-prepare-corners-distance", action="store", type="float",	dest="plasma_prepare_corners_distance", default=10.,help="Stepout distance for corners")
-#		self.OptionParser.add_option("",   "--plasma-prepare-corners-tolerance", action="store", type="float",	dest="plasma_prepare_corners_tolerance", default=10.,help="Maximum angle for corner (0-180 deg)")
-						
-						
 						for subpath in csp :
 						# Find closes point to in-out reference point
 						# If subpath is open skip this step 
@@ -3742,7 +3737,7 @@ class Gcodetools(inkex.Effect):
 											if j!=0 :
 												subpath	= csp_concat_subpaths(subpath[j:],subpath[:j+1])
 										else :
-											# hawe to cut path's segment
+											# have to cut path's segment
 											d,i,j,t = d
 											sp1,sp2,sp3 = csp_split(subpath[j-1],subpath[j],t)
 											subpath = csp_concat_subpaths([sp2,sp3], subpath[j:], subpath[:j], [sp1,sp2]) 							
@@ -3759,12 +3754,12 @@ class Gcodetools(inkex.Effect):
 										# got a corner to process
 										S1,S2 = P(s1),P(s2)
 										N = (S1-S2).unit()*plasma_l
-										SP = [P(sp2[0]),P(sp2[1]),P(sp2[2])]
-										P1 = (SP[1] + N)
+										SP2= P(sp2[1])
+										P1 = (SP2 + N)
 										res_ += [
-													[sp2[0],sp2[1],  (SP[2]+S1*plasma_l).to_list() ],
+													[sp2[0],sp2[1],  (SP2+S1*plasma_l).to_list() ],
 													[ (P1-N.ccw()/2 ).to_list(), P1.to_list(), (P1+N.ccw()/2).to_list()], 
-													[(SP[0]-S2*plasma_l).to_list(), sp2[1],sp2[2]]
+													[(SP2-S2*plasma_l).to_list(), sp2[1],sp2[2]]
 												]
 									else: 
 										res_ += [sp2]
@@ -5079,25 +5074,35 @@ class Gcodetools(inkex.Effect):
 						self.error(_("Warning: One or more paths do not have 'd' parameter, try to Ungroup (Ctrl+Shift+G) and Object to Path (Ctrl+Shift+C)!"),"selection_contains_objects_that_are_not_paths")
 						continue		
 					csp = cubicsuperpath.parsePath(path.get("d"))
-					csp = self.apply_transforms(path, csp)
-					for subpath in csp :
+					remove = []
+					for i in range(len(csp)) :
+						subpath = [ [point[:] for point in points] for points in csp[i]]
+						subpath = self.apply_transforms(path,[subpath])[0]
 						bounds = csp_simple_bound([subpath])
 						if  (bounds[2]-bounds[0])**2+(bounds[3]-bounds[1])**2 < self.options.area_find_artefacts_diameter**2:
 							if self.options.area_find_artefacts_action == "mark with an arrow" :
+								arrow =  cubicsuperpath.parsePath( 'm %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z' % (subpath[0][1][0],subpath[0][1][1]) )
+ 								arrow = self.apply_transforms(path,arrow,True)
 								inkex.etree.SubElement(parent, inkex.addNS('path','svg'), 
 										{
-											'd': 'm %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z' % (subpath[0][1][0],subpath[0][1][1]),
+											'd': cubicsuperpath.formatPath(arrow),
 											'style': styles["area artefact arrow"],
 											'gcodetools': 'area artefact arrow',
 										})
-								inkex.etree.SubElement(parent, inkex.addNS('path','svg'), {'d': cubicsuperpath.formatPath([subpath]), 'style': style, "gcodetools_parameter":"area artefact"})		
 							elif self.options.area_find_artefacts_action == "mark with style" :
-								inkex.etree.SubElement(parent, inkex.addNS('path','svg'), {'d': cubicsuperpath.formatPath([subpath]), 'style': styles["area artefact"]})
+								inkex.etree.SubElement(parent, inkex.addNS('path','svg'), {'d': cubicsuperpath.formatPath(csp[i]), 'style': styles["area artefact"]})
+								remove.append(i)
 							elif self.options.area_find_artefacts_action == "delete" :
-								print_("Deleted artifact %s" % subpath )
-						else :
-							inkex.etree.SubElement(parent, inkex.addNS('path','svg'), {'d': cubicsuperpath.formatPath([subpath]), 'style': style})
-					parent.remove(path)
+								remove.append(i)
+								print_("Deleted artefact %s" % subpath )
+					remove.reverse()
+					for i in remove :
+						del csp[i]
+					if len(csp) == 0 :	
+						parent.remove(path)
+					else :
+						path.set("d", cubicsuperpath.formatPath(csp))
+							
 			return
 			
 
