@@ -328,6 +328,15 @@ packets will be needed)">false</param>
 	</page>
 <!-- Gcodetools: /test block -->
 
+
+<!-- Gcodetools: about block -->
+	<page name='About' _gui-text='About'>	
+		<_param name="help" type="description">This page was created for testing purpouses.</_param>
+	</page>
+<!-- Gcodetools: /about block -->
+
+
+
 <!-- Gcodetools: footer block -->
 	</param>	
     <effect>
