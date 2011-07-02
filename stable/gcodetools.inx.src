@@ -1,0 +1,361 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Gcodetools: header block -->
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+    <!-- Gcodetools: name -->
+    <name>Gcodetools dev</name>
+    <!-- Gcodetools: /name -->
+    <!-- Gcodetools: id -->
+    <id>ru.cnc-club.filter.gcodetools_dev</id>
+    <!-- Gcodetools: /id -->
+	<dependency type="executable" location="extensions">gcodetools-dev.py</dependency>
+	<dependency type="executable" location="extensions">inkex.py</dependency>
+	<param name='active-tab' type="notebook">
+<!-- Gcodetools: /header block -->
+<!-- Gcodetools: help block -->
+		<page name='help' _gui-text='Help'>
+			<_param name="fullhelp" type="description">
+Gcodetools plug-in: converts paths to Gcode (using circular interpolation), makes offset paths and engraves sharp corners using cone cutters. 
+This plug-in calculates Gcode for paths using circular interpolation or linear motion when needed.
+
+Tutorials, manuals and support can be found at
+English support forum:
+	http://www.cnc-club.ru/gcodetools
+	
+and Russian support forum:
+	http://www.cnc-club.ru/gcodetoolsru
+
+Credits: Nick Drobchenko, Vladimir Kalyaev, John Brooker, Henry Nicolas, Chris Lusby Taylor.
+
+Gcodetools ver. 1.7
+</_param>	
+
+		</page>
+<!-- Gcodetools: /help block -->
+<!-- Gcodetools: options block -->
+		<page name='options' _gui-text='Options'>
+			<param name="Zscale" type="float" precision="5" min="-100000" max="100000" _gui-text="Scale along Z axis:">1</param>			
+			<param name="Zoffset" type="float" precision="5" min="-100000" max="100000" _gui-text="Offset along Z axis:">0.0</param>
+			<param name="auto_select_paths" type="boolean" _gui-text="Select all paths if nothing is selected">true</param>
+			<param name="min-arc-radius" type="float" precision="5" min="-1000" max="1000"  _gui-text="Minimum arc radius:">0.05</param>
+			<param name="comment-gcode" type="string" _gui-text="Comment Gcode:"></param>
+			<param name="comment-gcode-from-properties" type="boolean" _gui-text="Get additional comments from object's properties">False</param>
+			
+		</page>
+<!-- Gcodetools: /options block -->
+<!-- Gcodetools: preferences block -->
+		<page name='preferences' _gui-text='Preferences'>
+			<param name="filename" type="string" _gui-text="File:">output.ngc</param>
+			<param name="add-numeric-suffix-to-filename" type="boolean" _gui-text="Add numeric suffix to filename">true</param>
+			
+			<param name="directory" type="string" _gui-text="Directory:">/home</param>
+
+			<param name="Zsafe" type="float" precision="5" min="-1000" max="1000" _gui-text="Z safe height for G00 move over blank:">5</param>
+			<param name="unit" type="enum" _gui-text="Units (mm or in):">
+				<_item value="G21 (All units in mm)">mm</_item>
+				<_item value="G20 (All units in inches)">in</_item>
+			</param>
+			<param name="postprocessor" type="enum" _gui-text="Post-processor:">
+				<_item value=" ">None</_item>
+				<_item value="parameterize();">Parameterize Gcode</_item>
+				<_item value="flip(y);parameterize();">Flip y axis and parameterize Gcode</_item>
+				<_item value="round(4);">Round all values to 4 digits</_item>
+				<_item value='regex("G01 Z([0-9\.\-]+).*\(Penetrate\)", lambda match: "G00 Z%f (Fast pre-penetrate)\n%s" %(float(match.group(1))+5, match.group(0)));'>Fast pre-penetrate</_item>
+			</param>
+			<param name="postprocessor-custom" type="string" _gui-text="Additional post-processor:"></param>			
+			
+
+			<param name="create-log" type="boolean" _gui-text="Generate log file">false</param>			
+			<param name="log-filename" type="string" _gui-text="Full path to log file:"></param>			
+			
+		</page>
+<!-- Gcodetools: /preferences block -->
+<!-- Gcodetools: dxfpoints block -->
+		<page name='dxfpoints' _gui-text='DXF points'>
+			<_param name="help" type="description">
+
+Convert selected objects to drill points (as dxf_import plugin does). Also you can save original shape. Only the start point of each curve will be used.
+
+Also you can manually select object, open XML editor (Shift+Ctrl+X) and add or remove XML tag 'dxfpoint' with any value.
+		  </_param>
+			<param type='optiongroup' name='dxfpoints-action' _gui-text="Convert selection:">
+<_option value='save'>set as dxfpoint and save shape</_option>
+<_option value='replace'>set as dxfpoint and draw arrow</_option>
+<_option value='clear'>clear dxfpoint sign</_option>
+			</param>
+
+		</page>
+<!-- Gcodetools: /dxfpoints block -->
+<!-- Gcodetools: ptg block -->
+		<page name='path-to-gcode' _gui-text='Path to Gcode'>	
+				<param name="biarc-tolerance" type='float' precision="5" _gui-text='Biarc interpolation tolerance:'>1</param>
+				<param name="biarc-max-split-depth" type="int" _gui-text="Maximum splitting depth:">4</param>
+				<param name="path-to-gcode-order"  _gui-text="Cutting order" type="optiongroup" appearance="minimal">
+					<_option value="subpath by subpath">Subpath by subpath</_option>
+					<_option value="path by path">Path by path</_option>
+					<_option value="pass by pass">Pass by Pass</_option>
+				</param>
+				
+				<param name="path-to-gcode-depth-function" type="string" _gui-text="Depth function:">d</param>			
+				<param name="path-to-gcode-sort-paths" type="boolean" _gui-text="Sort paths to reduse rapid distance">True</param>			
+				
+				<_param name="help" type="description">
+Biarc interpolation tolerance is the maximum distance between path and its approximation.
+The segment will be split into two segments if the distance between path's segment and its approximation exceeds biarc interpolation tolerance.
+For depth function c=color intensity from 0.0 (white) to 1.0 (black), d is the depth defined by orientation points, s - surface defined by orientation points. 
+</_param>
+		</page>
+<!-- Gcodetools: /ptg block -->
+
+<!-- Gcodetools: area_fill block -->
+		<page name='area_fill' _gui-text='Fill area'>
+			<param name="area-fill-angle" type="float" min="-360" max="360" _gui-text="Area fill anlge">0</param>
+			<param name="area-fill-shift" type="float" min="-1" max="1" _gui-text="Area fill shift">0</param>
+			<param name="area-fill-method" type="float" min="-1" max="1" _gui-text="Area fill shift">0</param>
+			<param name="area-fill-method"  _gui-text="Filling method" type="optiongroup">
+				<_option value="zig-zag">Zig zag</_option>
+				<_option value="spiral">Spiral</_option>
+			</param>
+		</page>
+<!-- Gcodetools: /area_fill block -->
+
+
+<!-- Gcodetools: area block -->
+		<page name='area' _gui-text='Area'>	
+			<param name="max-area-curves" type="int" min="0" max="1000" _gui-text="Maximum area cutting curves:">100</param>
+			<param name="area-inkscape-radius" type="float" min="-1000" max="1000" _gui-text="Area width:">-10</param>
+			<param name="area-tool-overlap" type="float" min="0" max="1" _gui-text="Area tool overlap (0..0.9):">0</param>
+
+			<_param name="help" type="description">
+"Create area offset": creates several Inkscape path offsets to fill original path's area up to "Area radius" value. 
+
+Outlines start from "1/2 D" up to "Area width" total width with "D" steps where D is taken from the nearest tool definition ("Tool diameter" value).
+Only one offset will be created if the "Area width" is equal to "1/2 D".
+			</_param>
+		</page>		
+<!-- Gcodetools: /area block -->
+<!-- Gcodetools: area_artefacts block -->
+		<page name='area_artefacts' _gui-text='Area artifacts'>	
+			<param name="area-find-artefacts-diameter" type="float" min="0.01" max="1000" _gui-text="Artifact diameter:">5.0</param>
+			<param name="area-find-artefacts-action" type="optiongroup" _gui-text="Action:">
+				<_option value="mark with an arrow">mark with an arrow</_option>
+				<_option value="mark with style">mark with style</_option>
+				<_option value="delete">delete</_option>
+			</param>	
+			<_param name="help" type="description">
+Usage: 
+1. Select all Area Offsets (gray outlines)
+2. Object/Ungroup (Shift+Ctrl+G)
+3. Press Apply
+
+Suspected small objects will be marked out by colored arrows.
+			</_param>
+		</page>		
+<!-- Gcodetools: /area_artefacts block -->
+
+<!-- Gcodetools: engraving block -->
+		<page name='engraving' _gui-text='Engraving'>	
+			<param name="engraving-sharp-angle-tollerance" type="float"  precision="5" min="150" max="180" _gui-text="Smooth convex corners between this value and 180 degrees:">175</param>
+			<param name="engraving-max-dist" type="float" precision="5" min="0" max="1000" _gui-text="Maximum distance for engraving (mm/inch):">10</param>
+			<param name="engraving-newton-iterations" type="int" min="2" max="10" _gui-text="Accuracy factor (2 low to 10 high):">4</param>
+			<param name="engraving-draw-calculation-paths" type="boolean" _gui-text="Draw additional graphics to see engraving path">false</param>
+			
+			<_param name="help" type="description">
+This function creates path to engrave letters or any shape with sharp angles.
+Cutter's depth as a function of radius is defined by the tool.
+Depth may be any Python expression. For instance:
+
+cone....(45 degrees)......................: w
+cone....(height/diameter=10/3)..: 10*w/3
+sphere..(radius r)...........................: math.sqrt(max(0,r**2-w**2))
+ellipse.(minor axis r, major 4r).....: math.sqrt(max(0,r**2-w**2))*4</_param>
+		</page>
+<!-- Gcodetools: /engraving block -->
+<!-- Gcodetools: orientation block -->
+		<page name='orientation' _gui-text='Orientation'>	
+
+			<param name="orientation-points-count" type="optiongroup" _gui-text="Orientation type:">
+<_option value="2">2-points mode
+(move and rotate,
+maintained aspect ratio X/Y)</_option>
+<_option value="3">3-points mode
+(move, rotate and mirror, 
+different X/Y scale)</_option>
+<_option value="graffiti">graffiti points</_option>
+<_option value="in-out reference point">in-out reference point</_option>
+
+			</param>
+			<param name="Zsurface" type="float" precision="5" min="-1000" max="1000" _gui-text="Z surface:">0</param>
+			<param name="Zdepth" type="float" precision="5" min="-1000" max="1000" _gui-text="Z depth:">-1</param>
+			<param name="unit" type="enum" _gui-text="Units (mm or in):">
+				<_item value="G21 (All units in mm)">mm</_item>
+				<_item value="G20 (All units in inches)">in</_item>
+			</param>
+
+			<_param name="help" type="description">
+Orientation points are used to calculate transformation (offset,scale,mirror,rotation in XY plane) of the path.
+3-points mode only: do not put all three into one line (use 2-points mode instead).
+
+You can modify Z surface, Z depth values later using text tool (3rd coordinates).
+
+If there are no orientation points inside current layer they are taken from the upper layer.
+
+Do not ungroup orientation points! You can select them using double click to enter the group or by Ctrl+Click.
+
+Now press apply to create control points (independent set for each layer).
+			</_param>
+		</page>
+<!-- Gcodetools: /orientation block -->
+<!-- Gcodetools: tools_library block -->
+		<page name='tools_library' _gui-text='Tools library'>	
+			
+			<param type='optiongroup' name='tools-library-type' _gui-text="Tools type:">
+<_option value='default tool'>default</_option>
+<_option value='cylinder cutter'>cylinder</_option>
+<_option value='cone cutter'>cone</_option>
+<_option value='plasma cutter'>plasma</_option>
+<_option value='tangent knife'>tangent knife</_option>
+<_option value='lathe cutter'>lathe cutter</_option>
+<_option value='graffiti'>graffiti</_option>
+
+
+<_option value='check'>Just check tools</_option>
+
+			</param>
+			
+			<_param name="help" type="description">
+Selected tool type fills appropriate default values. You can change these values using the Text tool later on.
+
+The topmost (z order) tool in the active layer is used. If there is no tool inside the current layer it is taken from the upper layer.
+
+Press Apply to create new tool.
+			</_param>
+	</page>
+<!-- Gcodetools: /tools_library block -->
+
+<!-- Gcodetools: lathe block -->
+	<page name='lathe' _gui-text='Lathe'>	
+		<param name="lathe-width" type="float" precision="5" min="0" max="1000" _gui-text="Lathe width:">10</param>
+		<param name="lathe-fine-cut-width" type="float" precision="5" min="0" max="1000" _gui-text="Fine cut width:">1</param>
+		<param name="lathe-fine-cut-count" type="int" min="0" max="1000" _gui-text="Fine cut count:">1</param>
+		<param name="lathe-create-fine-cut-using"  _gui-text="Create fine cut using:" type="optiongroup" appearance="minimal">
+			<_option value="Move path">Move path</_option>
+			<_option value="Offset path">Offset path</_option>
+		</param>
+		<param name="lathe-x-axis-remap" type="string" _gui-text="Lathe X axis remap:">X</param>
+		<param name="lathe-z-axis-remap" type="string" _gui-text="Lathe Z axis remap:">Z</param>
+	</page>
+<!-- Gcodetools: /lathe block -->
+
+<!-- Gcodetools: lathe_modify_path block -->
+	<page name='lathe_modify_path' _gui-text='Lathe modify path'>	
+		<_param name="help" type="description">	
+			This function modifies path so it will be able to be cut with the rectangular cutter.
+		</_param>
+		<param name="lathe-rectangular-cutter-width" type="float" precision="5" min="0" max="1000" _gui-text="Lathe width:">4</param>
+	</page>
+
+<!-- Gcodetools: /lathe_modify_path block -->
+
+
+<!-- Gcodetools: offset block -->
+	<page name='offset' _gui-text='Offset'>	
+		<param name="offset-radius" type="float" precision="5" min="-1000" max="1000" _gui-text="Offset radius:">10</param>
+		<param name="offset-step" type="float" precision="5" min="0" max="1000" _gui-text="Offset step:">10</param>
+		<param name="offset-draw-clippend-path" type="boolean" _gui-text="Draw clipped path">false</param>
+		<param name="offset-just-get-distance" type="boolean" _gui-text="Don't do offset just get distance">false</param>		
+	</page>
+<!-- Gcodetools: /offset block -->
+
+<!-- Gcodetools: arrangement block -->
+	<page name='arrangement' _gui-text='Arrangement'>	
+	<param name='arrangement-material-width' type="float" precision="5" min="0" max="1000000" _gui-text='Material width:'>500</param>
+	<param name='arrangement-population-count' type="int" min="0" max="1000000" _gui-text='Genetic algorithm populations count:'>100</param>
+	<param name="arrangement-inline-test" type="boolean" _gui-text="Use C-inline test (some additional
+packets will be needed)">false</param>
+	</page>
+<!-- Gcodetools: /arrangement block -->
+
+
+<!-- Gcodetools: plasma-prepare-path block -->
+	<page name='plasma-prepare-path' _gui-text='Prepare path for plasma or laser cuters'>	
+		<param name='in-out-path' type="boolean" _gui-text="Create in-out paths" >True</param>
+		<param name='in-out-path-len' type="float" precision="5" min="0" max="1000000" _gui-text='In-out path length:'>10</param>
+		<param name='in-out-path-point-max-dist' type="float" precision="5" min="0" max="1000000" _gui-text='In-out path max distance to reference point:'>10</param>
+		<param name="in-out-path-type"  _gui-text="In-out path type:" type="optiongroup" appearance="minimal">
+			<_option value="Round">Round</_option>
+			<_option value="Perpendicular">Perpendicular</_option>
+			<_option value="Tangent">Tangent</_option>
+		</param>
+		<param name='in-out-path-radius' type="float" precision="5" min="0" max="1000000" _gui-text='In-out path radius for round path:'>10</param>
+		<param name='in-out-path-replace-original-path' type="boolean" _gui-text="Replace original path" >False</param>
+		<param name='in-out-path-do-not-add-reference-point' type="boolean" _gui-text="Do not add in-out reference points" >False</param>
+
+		<_param name="help" type="description">-------------------------------------------------</_param>
+		<param name='plasma-prepare-corners' type="boolean" _gui-text="Prepare corners" >True</param>
+		<param name='plasma-prepare-corners-distance' type="float" precision="5" min="0" max="1000000" _gui-text='Stepout distance for corners:'>10</param>
+		<param name='plasma-prepare-corners-tolerance' type="float" precision="5" min="0" max="180" _gui-text='Maximum angle for corner (0-180 deg):'>140</param>
+		
+
+
+	</page>
+<!-- Gcodetools: /plasma-prepare-path block -->
+
+
+
+
+<!-- Gcodetools: graffiti block -->
+	<page name='graffiti' _gui-text='Graffiti'>	
+		<param name="graffiti-max-seg-length" type="float" precision="5" min="0" max="1000" _gui-text="Maximum segment length:">10</param>
+		<param name="graffiti-min-radius" type="float" precision="5" min="0" max="1000" _gui-text="Minimal connector radius:">10</param>
+		<param name="graffiti-start-pos" type="string" _gui-text="Start position (x;y):">(0.0;0.0)</param>
+		<param name="graffiti-create-preview" type="boolean" _gui-text="Create preview">true</param>
+		<param name="graffiti-create-linearization-preview" type="boolean" _gui-text="Create linearization preview">true</param>
+		<param name="graffiti-preview-size" type="int" min="100" max="10000" _gui-text="Preview's size (px):">800</param>
+		<param name="graffiti-preview-emmit" type="int" min="100" max="10000" _gui-text="Preview's paint emmit (pts/s):">1000</param>
+	</page>
+<!-- Gcodetools: /graffiti block -->
+
+
+<!-- Gcodetools: update block -->
+	<page name='update' _gui-text='Check for updates'>	
+		<_param name="help" type="description">Check for Gcodetools latest stable version and try to get the updates.</_param>
+	</page>
+<!-- Gcodetools: /update block -->
+
+<!-- Gcodetools: test block -->
+	<page name='test' _gui-text='Test'>	
+		<_param name="help" type="description">This page was created for testing purpouses.</_param>
+	</page>
+<!-- Gcodetools: /test block -->
+
+
+<!-- Gcodetools: about block -->
+	<page name='about' _gui-text='About'>	
+		<_param name="help" type="description">Gcodetools was developed to make simple Gcode from Inkscape's paths. Gcode is a special format which is used in most of CNC machines. So Gcodetools allows you to use Inkscape as CAM program. 
+
+It can be use with a lot of machone types:  
+	Mills 
+	Lathes
+	Laser and Palsma cutters and engravers 
+	Mill engravers
+	Plotters
+	etc.
+	
+To get more info visit developers page at http://www.cnc-club.ru/gcodetools</_param>
+	</page>
+<!-- Gcodetools: /about block -->
+
+
+
+<!-- Gcodetools: footer block -->
+	</param>	
+    <effect>
+<!-- Gcodetools: submenu -->
+<!-- Gcodetools: /submenu -->
+		<object-type>path</object-type>
+    </effect>
+    <script>
+        <command reldir="extensions" interpreter="python">gcodetools-dev.py</command>
+    </script>
+</inkscape-extension>
+<!-- Gcodetools: /footer block -->

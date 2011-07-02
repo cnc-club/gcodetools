@@ -34,14 +34,15 @@ def main():
 					"Engraving: engraving",
 					"Tools library: tools_library no_options no_preferences",
 					"Orientation points: orientation no_options no_preferences",
-					"All in one: ptg area area_artefacts engraving dxfpoints tools_library orientation",
-					"Offset: offset no_options", 
+#					"All in one: ptg area area_artefacts engraving dxfpoints tools_library orientation",
+#					"Offset: offset no_options", 
 					"Lathe: lathe lathe_modify_path ptg",
-					"Arrangement: arrangement no_options",
+#					"Arrangement: arrangement no_options",
 					"Graffiti: graffiti orientation",
 					"Check for updates: update no_options no_preferences",
 					"Prepare path for plasma: plasma-prepare-path no_options no_preferences",
-					"Test: test",					
+#					"Test: test",					
+					"About: about no_options no_preferences",					
 				]
 	
 	if input_file == None : input_file = "gcodetools-dev.inx" 
@@ -51,12 +52,17 @@ def main():
 	f.close()
 	
 	tags = dict(re.findall( r"(?ims)<!--\s*Gcodetools\s*:\s*(.*?)\s*block\s*-->(.*)<!--\s*Gcodetools\s*:\s*/\1\s*block\s*-->",s))
+	if dev == "" : 
+		tags['header'] = re.sub("\-dev\.py", ".py",tags['header']) 
+		tags['footer'] = re.sub("\-dev\.py", ".py",tags['footer']) 
+
 	print (dev)
 	for arg_ in args:
 		print "Computing set: %s..." % arg_
 		r = re.match("((.*):)?(.*)",arg_)
 		if r!=None:
 			arg = r.group(3).split()
+				
 			res = '<?xml version="1.0" encoding="UTF-8"?>\n'+tags['header']
 			name = ( r.group(2) if r.group(2)!=None else r.group(3) ) + dev
 			id = re.sub("\s|[\.,!@#$%^&*]", "_", r.group(3).lower()) + dev
