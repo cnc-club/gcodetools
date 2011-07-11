@@ -3687,7 +3687,7 @@ class Gcodetools(inkex.Effect):
 				self.error(_("No paths are selected! Trying to work on all available paths."),"warning")
 
 			if self.selected_paths == {}:
-				self.error(_("Noting is selected. Please select something."),"warning")
+				self.error(_("Nothing is selected. Please select something."),"warning")
 			a = self.options.plasma_prepare_corners_tolerance
 			corner_tolerance = cross([1.,0.], [math.cos(a),math.sin(a)])
 
@@ -3801,7 +3801,7 @@ class Gcodetools(inkex.Effect):
 					for subpath in csp :
 						for sp1, sp2 in zip(subpath,subpath[1:]) :
 							polygon.add([csp_segment_convex_hull(sp1,sp2)])
-					#print_("Redused edges count from", sum([len(poly) for poly in polygon.polygon ]) )
+					#print_("Reduced edges count from", sum([len(poly) for poly in polygon.polygon ]) )
 					polygon.hull()
 					original_paths += [path]
 					polygons += [polygon]
@@ -3942,7 +3942,7 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--biarc-max-split-depth",		action="store", type="int", 		dest="biarc_max_split_depth", default="4",			help="Defines maximum depth of splitting while approximating using biarcs.")				
 		self.OptionParser.add_option("",   "--path-to-gcode-order",			action="store", type="string", 		dest="path_to_gcode_order", default="path by path",	help="Defines cutting order path by path or layer by layer.")				
 		self.OptionParser.add_option("",   "--path-to-gcode-depth-function",action="store", type="string", 		dest="path_to_gcode_depth_function", default="zd",	help="Path to gcode depth function.")				
-		self.OptionParser.add_option("",   "--path-to-gcode-sort-paths",	action="store", type="inkbool",		dest="path_to_gcode_sort_paths", default=True,		help="Sort paths to reduse rapid distance.")		
+		self.OptionParser.add_option("",   "--path-to-gcode-sort-paths",	action="store", type="inkbool",		dest="path_to_gcode_sort_paths", default=True,		help="Sort paths to reduce rapid distance.")		
 		self.OptionParser.add_option("",   "--comment-gcode",				action="store", type="string", 		dest="comment_gcode", default="",					help="Comment Gcode")				
 		self.OptionParser.add_option("",   "--comment-gcode-from-properties",action="store", type="inkbool", 	dest="comment_gcode_from_properties", default=False,help="Get additional comments from Object Properties")				
 
@@ -4927,6 +4927,7 @@ class Gcodetools(inkex.Effect):
 							return path.get(match.group(1))
 						else: 
 							return "None"
+							
 					if self.options.comment_gcode != "" :
 						comment = re.sub("\[([A-Za-z_\-\:]+)\]", partial(set_comment, path=path), self.options.comment_gcode)
 						comment = comment.replace(":newline:","\n") 
@@ -5030,7 +5031,7 @@ class Gcodetools(inkex.Effect):
 ################################################################################
 	def dxfpoints(self):
 		if self.selected_paths == {}:
-			self.error(_("Noting is selected. Please select something to convert to drill point (dxfpoint) or clear point sign."),"warning")
+			self.error(_("Nothing is selected. Please select something to convert to drill point (dxfpoint) or clear point sign."),"warning")
 		for layer in self.layers :
 			if layer in self.selected_paths :
 				for path in self.selected_paths[layer]:
@@ -5570,7 +5571,7 @@ class Gcodetools(inkex.Effect):
 				sinBis = math.copysign(1,ny1)
 			else :
 				sinBis = cosBis*(nx2-nx1)/(ny1-ny2)
-			#We can correct signs by noting that the dot product
+			# We can correct signs by noting that the dot product
 			# of bisector and either normal must be >0
 			costurn=cosBis*nx1+sinBis*ny1
 			if costurn == 0 : return (ny1*100,-nx1*100,1) #Path doubles back on itself
