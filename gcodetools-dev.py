@@ -127,7 +127,7 @@ def isset(variable):
 math.pi2 = math.pi*2
 straight_tolerance = 0.0001
 straight_distance_tolerance = 0.0001
-engraving_tolerance = 0.0001
+engraving_tolerance = 0.00001
 loft_lengths_tolerance = 0.0000001
 
 EMC_TOLERANCE_EQUAL = 0.00001
@@ -1504,6 +1504,7 @@ def draw_text(text,x,y, group = None, style = None, font_size = 10, gcodetools_t
 		y += font_size
 		span.text = str(s)
 
+
 def draw_csp(csp, stroke = "#f00", fill = "none", comment = "", width = 0.354, group = None, style = None, gcodetools_tag = None) :
 	if style == None : 
 		style = "fill:%s;fill-opacity:1;stroke:%s;stroke-width:%s"%(fill,stroke,width)
@@ -1512,17 +1513,21 @@ def draw_csp(csp, stroke = "#f00", fill = "none", comment = "", width = 0.354, g
 				}
 	if comment != '':
 		attributes['comment'] = comment
+	if 	gcodetools_tag != None :
+		attributes['gcodetools'] = gcodetools_tag
 	if group == None :
 		group = options.doc_root
 		
 	return inkex.etree.SubElement( group, inkex.addNS('path','svg'), attributes) 
 	
-def draw_pointer(x,color = "#f00", figure = "cross", group = None, comment = "", fill=None, width = .1, size = 10., text = None, font_size=None, pointer_type=None, attrib = None) :
+def draw_pointer(x,color = "#f00", figure = "cross", group = None, comment = "", fill="none", width = .1, size = 10., text = None, font_size=None, pointer_type=None, style= None, attrib = None, gcodetools_tag = None) :
 	size = size/2
 	if attrib == None : attrib = {}
 	if pointer_type == None: 
 		pointer_type = "Pointer"
 	attrib["gcodetools"] = pointer_type
+	if gcodetools_tag != None :
+		attrib["gcodetools"] = gcodetools_tag
 	if group == None:
 		group = options.self.current_layer
 	if text != None	:
@@ -1533,16 +1538,22 @@ def draw_pointer(x,color = "#f00", figure = "cross", group = None, comment = "",
 		s = ""
 		for i in range(1,len(x)/2) :
 			s+= " %s, %s " %(x[i*2],x[i*2+1])
-		attrib.update({"d": "M %s,%s L %s"%(x[0],x[1],s), "style":"fill:none;stroke:%s;stroke-width:%f;"%(color,width),"comment":str(comment)})			
+		if style ==	None :
+			style = "fill:none;stroke:%s;stroke-width:%f;"%(color,width)
+		attrib.update({"d": "M %s,%s L %s"%(x[0],x[1],s), "style":style,"comment":str(comment)})			
 		inkex.etree.SubElement( group, inkex.addNS('path','svg'), attrib)
 	elif figure == "arrow" :
 		if fill == None : fill = "#12b3ff"
 		fill_opacity = "0.8" 
 		d = "m %s,%s " % (x[0],x[1]) + re.sub("([0-9\-.e]+)",(lambda match: str(float(match.group(1))*size*2.)), "0.88464,-0.40404 c -0.0987,-0.0162 -0.186549,-0.0589 -0.26147,-0.1173 l 0.357342,-0.35625 c 0.04631,-0.039 0.0031,-0.13174 -0.05665,-0.12164 -0.0029,-1.4e-4 -0.0058,-1.4e-4 -0.0087,0 l -2.2e-5,2e-5 c -0.01189,0.004 -0.02257,0.0119 -0.0305,0.0217 l -0.357342,0.35625 c -0.05818,-0.0743 -0.102813,-0.16338 -0.117662,-0.26067 l -0.409636,0.88193 z")
-		attrib.update({"d": d, "style":"fill:%s;stroke:none;fill-opacity:%s;"%(fill,fill_opacity),"comment":str(comment)})			
+		if style ==	None :
+			style = "fill:%s;stroke:none;fill-opacity:%s;"%(fill,fill_opacity)
+		attrib.update({"d": d, "style":style,"comment":str(comment)})			
 		inkex.etree.SubElement( group, inkex.addNS('path','svg'), attrib)
 	else :
-		attrib.update({"d": "m %s,%s l %f,%f %f,%f %f,%f %f,%f , %f,%f"%(x[0],x[1], size,size, -2*size,-2*size, size,size, size,-size, -2*size,2*size ), "style":"fill:none;stroke:%s;stroke-width:%f;"%(color,width),"comment":str(comment)})
+		if style ==	None :
+			style = "fill:none;stroke:%s;stroke-width:%f;"%(color,width)
+		attrib.update({"d": "m %s,%s l %f,%f %f,%f %f,%f %f,%f , %f,%f"%(x[0],x[1], size,size, -2*size,-2*size, size,size, size,-size, -2*size,2*size ), "style":style,"comment":str(comment)})
 		inkex.etree.SubElement( group, inkex.addNS('path','svg'), attrib)
 
 
@@ -4108,7 +4119,7 @@ class Gcodetools(inkex.Effect):
 ### 	Draw csp 
 ################################################################################
 
-	def draw_csp(self, csp, layer=None, group=None, fill='none', stroke='#178ade', width=0.354, style=None):
+	def draw_csp(self, csp, layer=None, group=None, fill='none', stroke='#178ade', width=0.354, style=None, gcodetools_tag = None):
 		if layer!=None :
 			csp = self.transform_csp(csp,layer,reverse=True)
 		if group==None and layer==None:
@@ -4116,14 +4127,54 @@ class Gcodetools(inkex.Effect):
 		elif group==None and layer!=None :
 			group = layer
 		csp = self.apply_transforms(group,csp, reverse=True)
+		
 		if style!=None :
-			return draw_csp(csp, group=group, style=style)
+			return draw_csp(csp, group=group, style=style, gcodetools_tag=gcodetools_tag)
 		else :
-			return draw_csp(csp, group=group, fill=fill, stroke=stroke, width=width)
+			return draw_csp(csp, group=group, fill=fill, stroke=stroke, width=width, gcodetools_tag=gcodetools_tag)
+
+
 				
+	def draw_arc(self, c, r, ry=None, start=None, end=None, open_=None, layer=None, group=None, fill='none', stroke='#178ade', width=0.354, style=None, gcodetools_tag = None):
+	#	Transforms (using orientation points[layer]) and draws an arc
 
+		if layer!=None :
+			c = self.transform(c,layer,reverse=True)
+			r = self.transform_scalar(r,layer,reverse=True)
+			ry = r if ry == None else self.transform_scalar(ry,layer,reverse=True)
+		if group==None and layer==None:
+			group = self.document.getroot()
+		elif group==None and layer!=None :
+			group = layer
+		#TODO add inkscape transforms for the group
+		#c = self.apply_transforms([[c]],csp, reverse=True)
+		if style == None : 
+			style = "fill:%s;fill-opacity:1;stroke:%s;stroke-width:%s"%(fill,stroke,width)
+		attributes = {
+						'style' : 						str(style),
+						inkex.addNS('cx','sodipodi'): 	str(c[0]),
+						inkex.addNS('cy','sodipodi'): 	str(c[1]),
+						inkex.addNS('rx','sodipodi'): 	str(r),
+						inkex.addNS('ry','sodipodi'): 	str(ry),
+						inkex.addNS('type','sodipodi'):	'arc'
+					}
+		if start != None and end != None :
+			attributes[inkex.addNS('start','sodipodi')] = str(start)	
+			attributes[inkex.addNS('start','sodipodi')] = str(end)	
+		if open_ :
+			attributes[inkex.addNS('open','sodipodi')]  = 'true'
+		if 	gcodetools_tag != None :
+			attributes['gcodetools'] = gcodetools_tag
 
-
+		return inkex.etree.SubElement(	group, inkex.addNS('path','svg'), attributes )
+		
+	def draw_pointer(self, x, layer=None, **karg) :
+		if layer != None : 
+			for i in range(0,len(x)/2) :
+				x[i*2],x[i*2+1] = self.transform([x[i*2], x[i*2+1]],layer,reverse=True)
+		draw_pointer(x, **karg)	
+		
+		
 	def draw_curve(self, curve, layer, group=None, style=styles["biarc_style"]):
 		self.set_markers()
 
@@ -4392,10 +4443,12 @@ class Gcodetools(inkex.Effect):
 				simpletransform.applyTransformToPath(self.reverse_transform(trans), csp)
 		return csp
 		
-		
-
 	def transform_scalar(self,x,layer,reverse=False):
-		return self.transform([x,0],layer,reverse)[0] - self.transform([0,0],layer,reverse)[0]
+		if layer not in self.transform_scalar_scale :
+			self.transform_scalar_scale[layer] = self.transform([1.,0],layer)[0] - self.transform([0,0],layer)[0]
+			if self.transform_scalar_scale[layer] == 0 :
+				self.error("Error transforming scalar!","error")
+		return x*self.transform_scalar_scale[layer] if not reverse else x/self.transform_scalar_scale[layer]
 
 	def transform(self,source_point, layer, reverse=False):
 		if layer not in self.transform_matrix:
@@ -4589,6 +4642,7 @@ class Gcodetools(inkex.Effect):
 		self.layers = [self.document.getroot()]
 		self.Zcoordinates = {}
 		self.transform_matrix = {}
+		self.transform_scalar_scale = {}		
 		self.transform_matrix_reverse = {}
 		self.Zauto_scale = {}
 		self.in_out_reference_points = []
@@ -5846,26 +5900,33 @@ class Gcodetools(inkex.Effect):
 			"""
 			global gcode_3Dleft ,gcode_3Dright
 			if self.options.engraving_draw_calculation_paths :
-				inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
-						{"gcodetools": "Engraving calculation toolpath", 'style':	"fill:#ff00ff; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x), inkex.addNS('cy','sodipodi'):		str(y), inkex.addNS('rx','sodipodi'):	str(1), inkex.addNS('ry','sodipodi'): str(1), inkex.addNS('type','sodipodi'):	'arc'})
+				self.draw_arc( [x,y], 0.3, 
+								group = engraving_group, layer = layer, 
+								style =  "fill:#ff00ff; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;",
+								gcodetools_tag = "Engraving calculation toolpath"
+								)
 				#Don't draw zero radius circles
 				if w:
-					inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
-						{"gcodetools": "Engraving calculation paths", 'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(x),  inkex.addNS('cy','sodipodi'):		str(y),inkex.addNS('rx','sodipodi'):		str(w), inkex.addNS('ry','sodipodi'):		str(w), inkex.addNS('type','sodipodi'):	'arc'})
+					self.draw_arc( [x,y], w, 
+								group = engraving_group, layer = layer, 
+								style =  "fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;",
+								gcodetools_tag = "Engraving calculation toolpath"
+								)
+						
 					# Find slope direction for shading
 					s=math.atan2(y-y0,x-x0) #-pi to pi
 					# convert to 2 hex digits as a shade of red
 					s2="#{0:x}0000".format(int(101*(1.5-math.sin(s+0.5))))
-					inkex.etree.SubElement(	gcode_3Dleft , inkex.addNS('path','svg'),
-					{ "d": "M %f,%f L %f,%f" %(x0-eye_dist,y0,x-eye_dist-0.14*w,y),
-						'style': "stroke:" + s2 + "; stroke-opacity:1; stroke-width:" + str(t/2) +" ; fill:none",
-						"gcodetools": "Gcode G1R"
-					})
-					inkex.etree.SubElement(	gcode_3Dright , inkex.addNS('path','svg'),
-					{ "d": "M %f,%f L %f,%f" %(x0+eye_dist,y0,x+eye_dist+0.14*r,y),
-						'style': "stroke:" + s2 + "; stroke-opacity:1; stroke-width:" + str(t/2) +" ; fill:none",
-						"gcodetools": "Gcode G1L"
-					})
+					self.draw_pointer(
+										[x0-eye_dist,y0,x-eye_dist-0.14*w,y], layer=layer, group = gcode_3Dleft, figure="line", 
+										style = "stroke:" + s2 + "; stroke-opacity:1; stroke-width:" + str(t/2) +" ; fill:none",
+										gcodetools_tag = "Gcode G1R"
+									)
+					self.draw_pointer(
+										[x0+eye_dist,y0,x+eye_dist+0.14*r,y], layer=layer, group = gcode_3Dright, figure="line", 
+										style = "stroke:" + s2 + "; stroke-opacity:1; stroke-width:" + str(t/2) +" ; fill:none",
+										gcodetools_tag = "Gcode G1L"
+									)
 			#end of draw_point
 
 		#end of subfunction definitions. engraving() starts here:
@@ -5891,13 +5952,6 @@ class Gcodetools(inkex.Effect):
 
 		for layer in self.layers :
 			if layer in self.selected_paths :
-				#Calculate scale in pixels per user unit (mm or inch)
-				p1=self.orientation_points[layer][0][0]
-				p2=self.orientation_points[layer][0][1]
-				ol=math.hypot(p1[0][0]-p2[0][0],p1[0][1]-p2[0][1])
-				oluu=math.hypot(p1[1][0]-p2[1][0],p1[1][1]-p2[1][1])
-				print_("Orientation2 p1 p2 ol oluu",p1,p2,ol,oluu)
-				orientation_scale = ol/oluu
 
 				self.set_tool(layer)
 				shape = self.tools[layer][0]['shape']
@@ -5907,12 +5961,9 @@ class Gcodetools(inkex.Effect):
 					self.error(_("Tool '%s' has no shape. 45 degree cone assumed!") % self.tools[layer][0]['name'],"Continue")
 					toolshape = lambda w: w
 				#Get tool radius in pixels
-				toolr=self.tools[layer][0]['diameter'] * orientation_scale/2
-				print_("tool radius in pixels=", toolr)
+				toolr=self.tools[layer][0]['diameter'] / 2
 				#max dist from path to engrave in user's units
-				max_distuu = min(self.tools[layer][0]['diameter']/2, self.options.engraving_max_dist)
-				max_dist=max_distuu*orientation_scale
-				print_("max_dist pixels", max_dist )
+				max_dist = min(self.tools[layer][0]['diameter']/2, self.options.engraving_max_dist)
 
 				engraving_group = inkex.etree.SubElement( self.selected_paths[layer][0].getparent(), inkex.addNS('g','svg') )
 				if self.options.engraving_draw_calculation_paths and (self.my3Dlayer  == None) :
@@ -5927,6 +5978,12 @@ class Gcodetools(inkex.Effect):
 				for node in self.selected_paths[layer] :	
 					if node.tag == inkex.addNS('path','svg'):
 						cspi = cubicsuperpath.parsePath(node.get('d'))
+						# apply inkscape transforms to cspi
+						cspi = self.apply_transforms(node, cspi)
+						# make cpsi in user units
+						cspi = self.transform_csp(cspi, layer)
+						
+						
 						#LT: Create my own list. n1LT[j] is for subpath j
 						nlLT = []
 						for j in xrange(len(cspi)): #LT For each subpath...
@@ -6023,29 +6080,33 @@ class Gcodetools(inkex.Effect):
 								#print_("cspl",cspl)
 								cspl+=[cspl[0]] #Close paths
 								cspr+=[cspr[0]] #Close paths
-								inkex.etree.SubElement(	gcode_3Dleft , inkex.addNS('path','svg'),
-								{ "d": cubicsuperpath.formatPath([cspl]),
-								'style': "stroke:#808080; stroke-opacity:1; stroke-width:0.6; fill:none",
-								"gcodetools": "G1L outline"
-								})
-								inkex.etree.SubElement(	gcode_3Dright , inkex.addNS('path','svg'),
-								{ "d": cubicsuperpath.formatPath([cspr]),
-								'style': "stroke:#808080; stroke-opacity:1; stroke-width:0.6; fill:none",
-								"gcodetools": "G1L outline"
-								})
+								self.draw_csp(	
+												[cspl], layer, gcode_3Dleft, 
+												style = "stroke:#808080; stroke-opacity:1; stroke-width:0.6; fill:none",
+												gcodetools_tag = "G1L outline"
+											)
+								self.draw_csp(	
+												[cspr], layer, gcode_3Dright, 
+												style = "stroke:#808080; stroke-opacity:1; stroke-width:0.6; fill:none",
+												gcodetools_tag = "G1R outline"
+											)
 
 								for p in nlLT[-1]: #For last sub-path
-									if p[2]: inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'),
-										{ "d":	"M %f,%f L %f,%f" %(p[0][0],p[0][1],p[0][0]+p[1][0]*10,p[0][1]+p[1][1]*10),
-											'style':	"stroke:#f000af; stroke-opacity:0.46; stroke-width:0.1; fill:none",
-											"gcodetools": "Engraving normals"
-										})				
-									else: inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'),
-										{ "d":	"M %f,%f L %f,%f" %(p[0][0],p[0][1],p[0][0]+p[1][0]*10,p[0][1]+p[1][1]*10),
-											'style':	"stroke:#0000ff; stroke-opacity:0.46; stroke-width:0.1; fill:none",
-											"gcodetools": "Engraving bisectors"
-										})				
-
+									if p[2]: 
+										print_([   [  [p[0]]*3, [p[0][0]+p[1][0]*10,p[0][1]+p[1][1]*10]*3] ])
+										self.draw_csp(	
+													  [ [  [p[0]]*3, [[p[0][0]+p[1][0]*10,p[0][1]+p[1][1]*10]]*3   ] ],
+														layer, engraving_group, 
+														style = "stroke:#f000af; stroke-opacity:0.46; stroke-width:0.1; fill:none",
+														gcodetools_tag = "Engraving normals"
+													)
+									else:
+										self.draw_csp(	
+													  [ [   [p[0]]*3, [[p[0][0]+p[1][0]*10,p[0][1]+p[1][1]*10]]*3   ] ],
+														layer, engraving_group, 
+														style = "stroke:#0000ff; stroke-opacity:0.46; stroke-width:0.1; fill:none",
+														gcodetools_tag = "Engraving bisectors"
+													)
 
 						#LT6a build nlLT[j] for each subpath - ends here
 						#for nnn in nlLT :
@@ -6134,22 +6195,19 @@ class Gcodetools(inkex.Effect):
 							#I have flattened it to a flat list of points.
 					
 							if self.options.engraving_draw_calculation_paths==True:
-								node =  inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 										{
-														 "d":	 cubicsuperpath.formatPath([cspm]),
-														'style':	styles["biarc_style_i"]['biarc1'],
-														"gcodetools": "Engraving calculation paths",
-													})
+								self.draw_csp(	
+												[cspm], layer, engraving_group, 
+												style = styles["biarc_style_i"]['biarc1'],
+												gcodetools_tag = "Engraving calculation paths"
+											)
 								for i in xrange(len(cspm)):
-									inkex.etree.SubElement(	engraving_group, inkex.addNS('path','svg'), 
-											{"gcodetools": "Engraving calculation paths", 'style':	"fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", inkex.addNS('cx','sodipodi'):		str(cspm[i][1][0]),  inkex.addNS('cy','sodipodi'):		str(cspm[i][1][1]),inkex.addNS('rx','sodipodi'):		str(wl[i]), inkex.addNS('ry','sodipodi'):		str(wl[i]), inkex.addNS('type','sodipodi'):	'arc'})
+									self.draw_arc(cspm[i][1], wl[i], layer=layer, group=engraving_group, style="fill:none; fill-opacity:0.46; stroke:#000000; stroke-width:0.1;", gcodetools_tag = "Engraving calculation paths")
+
+										
+										
 							cspe += [cspm]
-							wluu = [] #width list in user units: mm/inches
-							for w in wl :
-								wluu+=[ w / orientation_scale ]
-							print_("wl in pixels",wl)
-							print_("wl in user units",wluu)
 							#LT previously, we was in pixels so gave wrong depth
-							we   +=	[wluu]
+							we   +=	[wl]
 						#LT6b For each subpath - ends here			
 					#LT5 if it is a path - ends here
 					#print_("cspe",cspe)
@@ -6157,13 +6215,15 @@ class Gcodetools(inkex.Effect):
 				#LT4 for each selected object in this layer - ends here
 
 				if cspe!=[]:
+					cspe = self.transform_csp(cspe, layer, reverse = True)
 					curve = self.parse_curve(cspe, layer, we, toolshape) #convert to lines
 					self.draw_curve(curve, layer, engraving_group)
+					self.draw_csp(cspe,layer)
 					gcode += self.generate_gcode(curve, layer, self.options.Zsurface)
 
 			#LT3 for layers loop ends here
 		if gcode!='' :
-			self.header+="(Tool diameter should be at least "+str(2*wmax/orientation_scale)+unit+ ")\n"
+			self.header+="(Tool diameter should be at least "+str(2*wmax)+unit+ ")\n"
 			self.header+="(Depth, as a function of radius w, must be "+ self.tools[layer][0]['shape']+ ")\n"
 			self.header+="(Rapid feeds use safe Z="+ str(self.options.Zsafe) + unit + ")\n"
 			self.header+="(Material surface at Z="+ str(self.options.Zsurface) + unit + ")\n"
