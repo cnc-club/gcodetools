@@ -1477,7 +1477,9 @@ def get_text(node) :
 
 
 
-def draw_text(text,x,y, group = None, style = None, font_size = 10, gcodetools_tag = None) :
+def draw_text(text,x,y, group = None, style = None, font_size = 10, gcodetools_tag = None, layer = None) :
+	if layer != None :
+		x,y = gcodetools.transform([x,y], layer, True)
 	if style == None : 
 		style = "font-family:DejaVu Sans;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:DejaVu Sans;fill:#000000;fill-opacity:1;stroke:none;"
 	style += "font-size:%fpx;"%font_size
@@ -1520,7 +1522,22 @@ def draw_csp(csp, stroke = "#f00", fill = "none", comment = "", width = 0.354, g
 		
 	return inkex.etree.SubElement( group, inkex.addNS('path','svg'), attributes) 
 	
-def draw_pointer(x,color = "#f00", figure = "cross", group = None, comment = "", fill="none", width = .1, size = 10., text = None, font_size=None, pointer_type=None, style= None, attrib = None, gcodetools_tag = None) :
+def draw_pointer(x1,color = "#f00", figure = "cross", group = None, comment = "", fill="none", width = .1, size = 10., text = None, font_size=None, pointer_type=None, style= None, attrib = None, gcodetools_tag = None, layer=None) :
+	if x1.__class__ == P : x1 =[x1]	 
+	x = []
+	for i in x1 :
+		
+		if i.__class__ == P :	 
+			x += [i.x,i.y]
+		else :
+			x += [i]
+	
+	if layer != None :
+		x1 = x[:]
+		x = []
+		for x1,y1 in zip(x1[::2], x1[1::2]):
+			x1,y1 = gcodetools.transform([x1,y1], layer, True)
+			x += [x1,y1]
 	size = size/2
 	if attrib == None : attrib = {}
 	if pointer_type == None: 
@@ -1551,6 +1568,7 @@ def draw_pointer(x,color = "#f00", figure = "cross", group = None, comment = "",
 		attrib.update({"d": d, "style":style,"comment":str(comment)})			
 		inkex.etree.SubElement( group, inkex.addNS('path','svg'), attrib)
 	else :
+		gcodetools.error(x, "warning")
 		if style ==	None :
 			style = "fill:none;stroke:%s;stroke-width:%f;"%(color,width)
 		attrib.update({"d": "m %s,%s l %f,%f %f,%f %f,%f %f,%f , %f,%f"%(x[0],x[1], size,size, -2*size,-2*size, size,size, size,-size, -2*size,2*size ), "style":style,"comment":str(comment)})
@@ -1683,8 +1701,12 @@ class Arc():
 		self.c = P(c)
 		self.r = (P(st)-P(c)).mag()
 		self.a = ( (self.st-self.c).angle() - (self.end-self.c).angle() ) % math.pi2
-		if a<0 : self.a -= math.pi2
-
+		if a>0 : self.a -= math.pi2
+		self.a *= -1.
+		self.cp = (self.st-self.c).rot(self.a/2)+self.c # central point of an arc
+		#draw_pointer([self.cp], layer=gcodetools.layers[-1], color="purple", )
+		#draw_text(self.a, self.st.x,self.st.y, layer=gcodetools.layers[-1])
+		
 	def offset(self, r):
 		if self.a>0 :
 			r += self.r
@@ -1694,7 +1716,11 @@ class Arc():
 		if self.r != 0 :
 			self.st = self.c + (self.st-self.c)*r/self.r
 			self.end = self.c + (self.end-self.c)*r/self.r
+			self.cp = self.c + (self.cp-self.c)*r/self.r
 			self.r = r
+			
+	def connect(self, b):
+		return []
 	
 	def length(self):
 		return abs(self.a*self.r)
@@ -1705,9 +1731,10 @@ class Arc():
 		c = P(gcodetools.transform(self.c.to_list(), layer, True))
 		a = self.a * reverse_angle
 		r = (st-c)
-		a_st = (math.atan2(r.x,-r.y) - math.pi/2) % (math.pi*2)
+		a_st = ((st-c).angle()-math.pi/2)%(math.pi*2)+math.pi/2
+		#draw_text("%0.2f %0.2f\n  %s %s"%(self.a,a_st, st, c), self.st.x,self.st.y, layer=gcodetools.layers[-1])
 		r = r.mag()
-		if a<0:
+		if a>0:
 			a_end = a_st+a
 			style = style['biarc%s'%(num%2)]
 		else: 
@@ -1730,9 +1757,53 @@ class Arc():
 		if transform != [] :
 			attr["transform"] = transform	
 		inkex.etree.SubElement(	group, inkex.addNS('path','svg'), attr)
+	
+	def check_intersection(self, points):
+		res = []
+		cp = self.cp-self.c
+		draw_pointer(self.cp, layer=gcodetools.layers[-1], color="black")
+ 		for p in points :
+			a = math.acos( cp.dot(p-self.c)/(self.r**2) )
+			if abs(a)<abs(self.a/2) :
+				res.append(p)
+				draw_pointer(p, layer=gcodetools.layers[-1], color="green")
+			else:
+				draw_pointer(p, layer=gcodetools.layers[-1], color = "red")
+
+		return res		
+		
 		
 	def intersect(self,b) :
-		return []
+		if b.__class__ == Line :
+			return b.intersect(self)
+		else : 
+			# taken from http://paulbourke.net/geometry/2circle/
+			r0 = self.r 
+			r1 = b.r
+			P0 = self.c
+			P1 = b.c
+			d2 = (P0-P1).l2() 
+			if d2>r0**2+r1**2  or r0+r1<=0 or d2<(r0-r1)**2 :
+				return []
+			if d2==0 and r0==r1 :
+				return self.check_intersection(b.check_intersection(
+				[self.start, self.end, b.start, b.end] ))
+			if d2 == (P0-P1).l2()  :
+				return self.check_intersection(b.check_intersection(
+					[P0 + (P1 - P0)*r0/(r0+r1)]))
+			else: 
+				a = (r0**2 - r1**2 + d2)/(2.*d)
+				P2 = P0 + a(P1-P0)/d
+				h = math.sqrt(r0**2-a**2)
+				return self.check_intersection(b.check_intersection( [
+							P([P2.x+h*(P1.y-P0.y)/d, P2.y-h*(P1.x-P0.x)/d]),
+							P([P2.x-h*(P1.y-P0.y)/d, P2.y+h*(P1.x-P0.x)/d]),
+						] ))
+				
+				
+			
+				
+				
 
 
 class Line():
@@ -1793,15 +1864,42 @@ class Line():
 						if 0<=(b.end.y-b.st.y)/v1.y<=1 :  res.append(b.end)
 				return res
 			else :
-				t1 = ( -v1.x*(b.end.y-self.end.y) + v1.y*(b.end.x-self.end.x) ) / x
-				t2 = ( -v1.y*(self.st.x-b.st.x) + v1.x*(self.st.y-b.st.y) ) / x
-
-				gcodetools.error((x,t1,t2), "warning")
-				if 0<=t1<=1 and 0<=t2<=1 : return [ self.st+v1*t1 ]
+				t1 = ( v2.x*(self.st.y-b.st.y) - v2.y*(self.st.x-b.st.x) ) / x
+				t2 = ( v1.x*(self.st.y-b.st.y) - v1.y*(self.st.x-b.st.x) ) / x
+				
+				if 0<=t1<=1 and 0<=t2<=1 : return [ self.st+v1*t1 ]	
 				else : return []					
-		else: return []	
+		else: 
+			# taken from http://mathworld.wolfram.com/Circle-LineIntersection.html
+			x1 = self.st.x - b.c.x
+			x2 = self.end.x - b.c.x
+			y1 = self.st.y - b.c.y
+			y2 = self.end.y - b.c.y
+			dx = x2-x1
+			dy = y2-y1
+			D = x1*y2-x2*y1
+			dr = dx*dx+dy*dy
+			descr = b.r**2*dr-D*D
+			if descr<0 : return []
+			if descr==0 : return self.check_intersection(b.check_intersection([ P([D*dx,D*dy]) ]))
+			sign = -1. if dy<0 else 1.
 			
+#			draw_pointer([self.st,self.end,   P( [ (D*dy+sign*dx*descr)/dr+b.c.x, (-D*dx+abs(dy)*descr)/dr+b.c.y ]  ),  					 P( [ (D*dy-sign*dx*descr)/dr+b.c.x, (-D*dx-abs(dy)*descr)/dr+b.c.y ] ) ],layer = gcodetools.layers[-1], color="Blue", figure="line")
+			descr = math.sqrt(descr)
+			return self.check_intersection(b.check_intersection( [
+					 P( [ (D*dy+sign*dx*descr)/dr+b.c.x, (-D*dx+abs(dy)*descr)/dr+b.c.y ]  ), 
+					 P( [ (D*dy-sign*dx*descr)/dr+b.c.x, (-D*dx-abs(dy)*descr)/dr+b.c.y ] )
+					]))
 			
+	def check_intersection(self, 	points):
+		res = []
+		for p in points :
+			if (self.st.x-self.end.x != 0 and 0<=(p.x-self.st.x)/(self.st.x-self.end.x)<=1 or
+			   self.st.y-self.end.y != 0 and 0<=(p.y-self.st.y)/(self.st.y-self.end.y)<=1 ):
+			   		res.append(p)
+		return res
+				
+				
 	
 	
 class Biarc:
@@ -1829,11 +1927,14 @@ class Biarc:
 		
 	def connect(self, r) :				
 		for subitems in self.items :
-			for a,b in zip(subitems, subitems[1:]) :
-				i = a.intersect(b)
-				for p in i : 
-					draw_pointer(p.to_list())
+			i = 0
+			while i < len(subitems) :
+				a,b = subitems[i],subitems[(i+1)%len(subitems)]
 				
+				for p in a.intersect(b) : 
+					pass
+				#	draw_pointer(p.to_list(), layer=gcodetools.layers[-1], color="orange")
+				i += 1				
 						
 				
 						
@@ -1865,8 +1966,8 @@ class Biarc:
 		a,b,c = [0.,0.], [1.,0.], [0.,1.]
 		k = (b[0]-a[0])*(c[1]-a[1])-(c[0]-a[0])*(b[1]-a[1])
 		a,b,c = gcodetools.transform(a, layer, True), gcodetools.transform(b, layer, True), gcodetools.transform(c, layer, True)
-		if ((b[0]-a[0])*(c[1]-a[1])-(c[0]-a[0])*(b[1]-a[1]))*k > 0 : reverse_angle = -1
-		else : reverse_angle = 1 
+		if ((b[0]-a[0])*(c[1]-a[1])-(c[0]-a[0])*(b[1]-a[1]))*k > 0 : reverse_angle = 1
+		else : reverse_angle = -1 
 
 
 		num = 0
