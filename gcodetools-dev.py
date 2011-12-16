@@ -1719,6 +1719,9 @@ class Arc():
 			self.__init__(p, self.end, self.c, self.a) # a - defines only direction
 		else :
 			self.__init__(self.st, p, self.c, self.a) # a - defines only direction
+	
+	def split_by_point(self,point) :
+		pass
 		
 	def offset(self, r):
 		if self.a>0 :
@@ -1835,6 +1838,10 @@ class Line():
 			self.__init__(p, self.end)
 		else :
 			self.__init__(self.st, p)
+
+	def split_by_point(self,point) :
+		pass
+
 				
 	def offset(self, r):
 		self.st -= self.n*r
@@ -1981,6 +1988,7 @@ class Biarc:
 				item.offset(r)
 		self.clean()
 		self.connect(r)
+		self.clip()
 		
 	def connect(self, r) :				
 		for subitems in self.items :
@@ -2018,7 +2026,15 @@ class Biarc:
 				
 						
 	def clip_offset(self):
-		pass	
+		clipped_items = []
+		for subitems in self.items :
+			for item in self.items :
+				pass				
+			
+			
+			
+		
+			
 		
 	def draw(self, layer, group=None, style=styles["biarc_style"]):
 		global gcodetools
@@ -3918,6 +3934,7 @@ class Gcodetools(inkex.Effect):
 					"4th axis meaning": " ",
 					"4th axis scale": 1.,
 					"4th axis offset": 0.,
+					"lift knife at corner": 0.,
 					"passing feed":"800",					
 					"fine feed":"800",					
 				}			
@@ -4196,11 +4213,35 @@ class Gcodetools(inkex.Effect):
 					r += s[i] + ("%f" % (c[i]*m[i]+a[i])) + s1[i]
 			return r
 
-		def calculate_angle(a, current_a):
+		def calculate_angle(a, current_a) :
 			return  min(					
 						[abs(a-current_a%math.pi2+math.pi2), a+current_a-current_a%math.pi2+math.pi2],
 						[abs(a-current_a%math.pi2-math.pi2), a+current_a-current_a%math.pi2-math.pi2],
 						[abs(a-current_a%math.pi2),			 a+current_a-current_a%math.pi2])[1]
+		
+		def get_tangent_knife_turn_gcode(s,si,tool,current_a, depth) :
+			# get tangent at start point
+			if s[1] == 'line' :
+				a = atan2(si[0][0]-s[0][0],si[0][1]-s[0][1])
+			else :
+				if s[3]<0 : # CW
+					a = atan2(s[2][1]-s[0][1],-s[2][0]+s[0][0]) + math.pi 
+				else: #CCW
+					a = atan2(-s[2][1]+s[0][1],s[2][0]-s[0][0]) + math.pi
+			a = calculate_angle(a, current_a)
+			
+			axis4 = " A%s"%((a+s[3])*tool['4th axis scale']+tool['4th axis offset']) if s[1]=="arc" else ""
+			if abs((a-current_a)%math.pi2)<1e-5 or abs((a-current_a)%math.pi2 - math.pi2)<1e-5 : 
+				g = ""
+			else :	
+				g = "G01 A%s  (Turn knife)\n" % (a*tool['4th axis scale']+tool['4th axis offset'])
+				if tool['lift knife at corner']!=0. :
+					g = "G00 Z%s  (Lift up)\n"%(depth+tool['lift knife at corner']) + g + "G01 Z%s (Penetrate back)\n"%depth
+			return a, axis4, g	
+				
+				
+			
+			
 		if len(curve)==0 : return ""	
 				
 		try :
@@ -4228,28 +4269,20 @@ class Gcodetools(inkex.Effect):
 				g += go_to_safe_distance + tool['gcode after path'] + "\n"
 				lg = 'G00'
 			elif s[1] == 'line':
-				if tool['4th axis meaning'] == "tangent knife" : 
-					a = atan2(si[0][0]-s[0][0],si[0][1]-s[0][1])
-					a = calculate_angle(a, current_a)
-					g+="G01 A%s\n" % (a*tool['4th axis scale']+tool['4th axis offset'])
-					current_a = a
 				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + penetration_feed +"(Penetrate)\n"	
+				if tool['4th axis meaning'] == "tangent knife" : 
+					current_a, axis4, g_ =  get_tangent_knife_turn_gcode(s,si,tool,current_a, depth)
+					g+=g_
 				g += "G01" +c(si[0]+[s[5][1]+depth]) + feed + "\n"
 				lg = 'G01'
 			elif s[1] == 'arc':
 				r = [(s[2][0]-s[0][0]), (s[2][1]-s[0][1])]
+				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + penetration_feed + "(Penetrate)\n"				
 				if tool['4th axis meaning'] == "tangent knife" : 
-					if s[3]<0 : # CW
-						a1 = atan2(s[2][1]-s[0][1],-s[2][0]+s[0][0]) + math.pi 
-					else: #CCW
-						a1 = atan2(-s[2][1]+s[0][1],s[2][0]-s[0][0]) + math.pi
-					a = calculate_angle(a1, current_a)
-					g+="G01 A%s\n" % (a*tool['4th axis scale']+tool['4th axis offset'])
-					current_a = a
-					axis4 = " A%s"%((current_a+s[3])*tool['4th axis scale']+tool['4th axis offset'])
+					current_a, axis4, g_ =  get_tangent_knife_turn_gcode(s,si,tool,current_a, depth)
+					g+=g_
 					current_a = current_a+s[3]
 				else : axis4 = ""
-				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + penetration_feed + "(Penetrate)\n"				
 				if (r[0]**2 + r[1]**2)>self.options.min_arc_radius**2:
 					r1, r2 = (P(s[0])-P(s[2])), (P(si[0])-P(s[2]))
 					if abs(r1.mag()-r2.mag()) < 0.001 :
@@ -4260,10 +4293,8 @@ class Gcodetools(inkex.Effect):
 					lg = 'G02'
 				else:
 					if tool['4th axis meaning'] == "tangent knife" : 
-						a = atan2(si[0][0]-s[0][0],si[0][1]-s[0][1]) + math.pi
-						a = calculate_angle(a, current_a)
-						g+="G01 A%s\n" % (a*tool['4th axis scale']+tool['4th axis offset'])
-						current_a = a
+						current_a, axis4, g_ = get_tangent_knife_turn_gcode(s[:1]+["line"]+s[2:],si,tool,current_a, depth)	
+						g+=g_
 					g += "G01" +c(si[0]+[s[5][1]+depth]) + feed + "\n"
 					lg = 'G01'
 		if si[1] == 'end':
@@ -6222,6 +6253,7 @@ class Gcodetools(inkex.Effect):
 					"4th axis meaning": "tangent knife",
 					"4th axis scale": 1.,
 					"4th axis offset": 0,
+					"lift knife at corner": 0.,
 					"tool change gcode":" "
 			}
 			
