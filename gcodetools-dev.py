@@ -1923,10 +1923,14 @@ class Line():
 		return res
 				
 				
-	
+class Biarc_Bounds_Tree_Node:
+	def __init__(self,i,x1,y1,x2,y2,l,r)
+		self.x1, self.y1, self.x2, self.y2,  = x1,y1, x2,y2
+		self.l = l
+		self.r = r
+
 	
 class Biarc:
-
 	def connect_items_with_arc(self, a, b, r) :
 		# get normals
 		if a.__class__ == Line : nst = a.n
@@ -1951,6 +1955,16 @@ class Biarc:
 			self.items = []
 		else: 	
 			self.items = items
+		self.bounds_tree = []
+		
+	def rebuild_bounds_tree (self):
+		""" Bounds tree is needed to increase biarcs intersection speed
+			
+			Tree is firstly bounds of subcurves as roots, then binary tree of their elements."""
+		self.bounds_tree = []
+		def create_tree(i,j)
+			pass		
+			#TODO 
 			
 	def l(self) : 
 		return sum([i.length() for i in items])
@@ -4228,8 +4242,8 @@ class Gcodetools(inkex.Effect):
 					a = atan2(s[2][1]-s[0][1],-s[2][0]+s[0][0]) + math.pi 
 				else: #CCW
 					a = atan2(-s[2][1]+s[0][1],s[2][0]-s[0][0]) + math.pi
+			# calculate all vars		
 			a = calculate_angle(a, current_a)
-			
 			axis4 = " A%s"%((a+s[3])*tool['4th axis scale']+tool['4th axis offset']) if s[1]=="arc" else ""
 			if abs((a-current_a)%math.pi2)<1e-5 or abs((a-current_a)%math.pi2 - math.pi2)<1e-5 : 
 				g = ""
