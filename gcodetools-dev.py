@@ -1924,7 +1924,7 @@ class Line():
 				
 				
 class Biarc_Bounds_Tree_Node:
-	def __init__(self,i,x1,y1,x2,y2,l,r)
+	def __init__(self,i,x1,y1,x2,y2,l,r):
 		self.x1, self.y1, self.x2, self.y2,  = x1,y1, x2,y2
 		self.l = l
 		self.r = r
@@ -1962,7 +1962,7 @@ class Biarc:
 			
 			Tree is firstly bounds of subcurves as roots, then binary tree of their elements."""
 		self.bounds_tree = []
-		def create_tree(i,j)
+		def create_tree(i,j) :
 			pass		
 			#TODO 
 			
