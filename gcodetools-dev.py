@@ -1826,7 +1826,7 @@ class Arc():
 				return []
 			if d2==0 and r0==r1 :
 				return self.check_intersection(b.check_intersection(
-				[self.start, self.end, b.start, b.end] ))
+				[self.st, self.end, b.st, b.end] ))
 			if d == r0+r1  :
 				return self.check_intersection(b.check_intersection(
 					[P0 + (P1 - P0)*r0/(r0+r1)]))
@@ -1940,7 +1940,7 @@ class Line():
 					 P( [ (D*dy-sign*dx*descr)/dr+b.c.x, (-D*dx-abs(dy)*descr)/dr+b.c.y ] )
 					]))
 			
-	def check_intersection(self, 	points):
+	def check_intersection(self, points):
 		res = []
 		for p in points :
 			if (self.st.x-self.end.x != 0 and 0<=(p.x-self.st.x)/(self.st.x-self.end.x)<=1 or
@@ -1956,7 +1956,7 @@ class Biarc_Bounds_Tree_Node:
 		self.r = r
 		self.i = i
 	def intersect(self,b) :
-		return  ( b.x1 > self.x2 or self.x1 > b.x2 or  
+		return not ( b.x1 > self.x2 or self.x1 > b.x2 or  
 				  b.y1 > self.y2 or self.y1 > b.y2 )
 				
 	
@@ -1992,7 +1992,7 @@ class Biarc:
 			
 			Tree is firstly bounds of subcurves as roots, then binary tree of their elements."""
 		self.bounds_tree = []
-		
+		self.tree_len = 0
 		def create_tree(i,j,k) :
 			#gcodetools.error((i,j),"warning")
 			if i!=j : 
@@ -2001,6 +2001,7 @@ class Biarc:
 						create_tree(i,int(floor((i+j)*.5)),k),
 						create_tree(int(ceil((i+j)*.5)),j,k)
 					)
+				self.tree_len += 1	
 				#gcodetools.error((i,j,node.l,node.r),"warning")
 				node.x1 = min(node.l.x1, node.r.x1)
 				node.y1 = min(node.l.y1, node.r.y1)
@@ -2008,27 +2009,33 @@ class Biarc:
 				node.y2 = max(node.l.y2, node.r.y2)
 				return node
 			else : 
+				self.tree_len += 1
 				x1,y1, x2,y2 = self.items[k][i].bounds()
 				return Biarc_Bounds_Tree_Node (i,x1,y1,x2,y2,None,None)		
 		
 		for i in range(len(self.items)) :
 			self.bounds_tree.append( create_tree(0,len(self.items[i])-1,i) ) 	
-	
-	def intersect_bounds_trees_recursion(self,a,b) :
+			gcodetools.warning(self.tree_len)
+	#	sys.exit()
+	def intersect_bounds_trees_recursion(self,a,b, depth = 0) :
+		
 		if a.intersect(b) : 
-			if a.r != None and b.r != None: 
-				intersect += intersect_bounds_trees_recursion(a.r,b.r)
-			if a.l != None and b.r != None: 
-				intersect += intersect_bounds_trees_recursion(a.l,b.r)
-			if a.r != None and b.l != None: 
-				intersect += intersect_bounds_trees_recursion(a.r,b.l)
-			if a.l != None and b.l != None: 
-				intersect += intersect_bounds_trees_recursion(a.l,b.l)
-			if a.l == None and a.r == None and b.l == None and b.r == None and a != b : 
-				return [[a.i,b.i]]
-			else : 
-				return None	
 			intersect = []
+#			gcodetools.warning((depth))
+			if a==b : return []
+			if a.l == None and a.r == None and b.l == None and b.r == None : 
+				return [[a.i,b.i]]
+			if depth % 2 or b.l == None and b.r == None : 
+				if a.r != None : 
+					intersect += self.intersect_bounds_trees_recursion(a.r,b,depth+1)
+				if a.l != None : 
+					intersect += self.intersect_bounds_trees_recursion(a.l,b,depth+1)
+			if not depth % 2 or a.l == None and a.r == None : 
+				if b.l != None : 
+					intersect += self.intersect_bounds_trees_recursion(a,b.l,depth+1)
+				if b.r != None : 
+					intersect += self.intersect_bounds_trees_recursion(a,b.r,depth+1)
+			return intersect
 		else : return []
 				
 	
@@ -2037,11 +2044,14 @@ class Biarc:
 		
 		for i in range(len(self.items)) : 
 			for j in range(len(b.items)) :
+				gcodetools.warning((i,j))
 				intersect = self.intersect_bounds_trees_recursion(self.bounds_tree[i],b.bounds_tree[j])
+				gcodetools.warning((intersect,"!!!"))
 				for p in intersect : 
 					self.draw_bounds(self.items[i][p[0]])
 					b.draw_bounds(b.items[j][p[1]])
-			
+					if self.items[i][p[0]].intersect(b.items[j][p[1]]) :
+						draw_pointer(self.items[i][p[0]].intersect(b.items[j][p[1]]), layer=gcodetools.layers[-1],width=3) 
 				
 	def draw_bounds(self, item=None) :
 		if item == None :
@@ -3589,14 +3599,22 @@ class Gcodetools(inkex.Effect):
 		biarc.from_old_style(curve)
 		#self.error(biarc.items,"warning")
 		biarc.draw(self.layers[-1])
-		for i in [1,2,3,4,5,6,7] :
-			biarc.from_old_style(curve)
-			
-			biarc.offset(i)
-			biarc.draw(self.layers[-1])
+#		for i in [1,2,3,4,5,6,7] :
+#			biarc.from_old_style(curve)
+#			biarc.offset(i)
+#			biarc.draw(self.layers[-1])
 #			biarc.draw_bounds()
+
+		i = 10
+		biarc.from_old_style(curve)
+		biarc.offset(i)
+		biarc.draw(self.layers[-1])
+
 		biarc1 = Biarc()
-		biarc1.from_old_style(curve1) 	
+		biarc1.from_old_style(curve)
+		biarc1.offset(-i)
+		biarc1.draw(self.layers[-1])
+
 		biarc1.rebuild_bounds_tree()
 		biarc.rebuild_bounds_tree()
 		biarc.intersect_bounds_trees(biarc1)
@@ -4370,6 +4388,7 @@ class Gcodetools(inkex.Effect):
 		for i in range(1,len(curve)):
 		#	Creating Gcode for curve between s=curve[i-1] and si=curve[i] start at s[0] end at s[4]=si[0]
 			s, si = curve[i-1], curve[i]
+			if point_to_point_d2(s[0],si[0]) < 1e-7 : continue
 			feed = f if lg not in ['G01','G02','G03'] else ''
 			if s[1]	== 'move':
 				g += go_to_safe_distance + "G00" + c(si[0]) + "\n" + tool['gcode before path'] + "\n"
@@ -4386,12 +4405,12 @@ class Gcodetools(inkex.Effect):
 				lg = 'G01'
 			elif s[1] == 'arc':
 				r = [(s[2][0]-s[0][0]), (s[2][1]-s[0][1])]
-				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + penetration_feed + "(Penetrate)\n"				
 				if tool['4th axis meaning'] == "tangent knife" : 
 					current_a, axis4, g_ =  get_tangent_knife_turn_gcode(s,si,tool,current_a, depth)
 					g+=g_
 					current_a = current_a+s[3]
 				else : axis4 = ""
+				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + penetration_feed + "(Penetrate)\n"				
 				if (r[0]**2 + r[1]**2)>self.options.min_arc_radius**2:
 					r1, r2 = (P(s[0])-P(s[2])), (P(si[0])-P(s[2]))
 					if abs(r1.mag()-r2.mag()) < 0.001 :
@@ -4530,7 +4549,7 @@ class Gcodetools(inkex.Effect):
 ###		Notes, warnings adn errors could be assigned to space or comma or dot 
 ###		sepparated strings (case is ignoreg).
 ################################################################################
-	def error(self, s, type_= "Warning"):
+	def error(self, s, type_= "Warning") :
 		notes = "Note "
 		warnings = """
 						Warning tools_warning
@@ -4568,6 +4587,9 @@ class Gcodetools(inkex.Effect):
 			print_(s)
 			inkex.errormsg(s)		
 			sys.exit()
+
+	def warning(self, s) :
+		self.error(s,"Warning")
 	
 
 ################################################################################
