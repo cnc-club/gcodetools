@@ -4326,7 +4326,6 @@ class Gcodetools(inkex.Effect):
 		Zauto_scale = self.Zauto_scale[layer]
 		tool = self.tools[layer][0]
 		g = ""
-
 		def c(c):
 			c = [c[i] if i<len(c) else None for i in range(6)]
 			if c[5] == 0 : c[5]=None
@@ -4344,8 +4343,12 @@ class Gcodetools(inkex.Effect):
 						[abs(a-current_a%pi2-pi2), a+current_a-current_a%pi2-pi2],
 						[abs(a-current_a%pi2),			 a+current_a-current_a%pi2])[1]
 		
-		def get_tangent_knife_turn_gcode(s,si,tool,current_a, depth) :
+		def get_tangent_knife_turn_gcode(s,si,tool,current_a, depth, penetration_feed) :
 			# get tangent at start point
+			forse = False
+			if current_a == None : 
+				current_a = 0 
+				forse = True
 			if s[1] == 'line' :
 				a = atan2_(si[0][0]-s[0][0],si[0][1]-s[0][1])
 			else :
@@ -4356,12 +4359,12 @@ class Gcodetools(inkex.Effect):
 			# calculate all vars		
 			a = calculate_angle(a, current_a)
 			axis4 = " A%s"%((a+s[3])*tool['4th axis scale']+tool['4th axis offset']) if s[1]=="arc" else ""
-			if abs((a-current_a)%pi2)<1e-5 or abs((a-current_a)%pi2 - pi2)<1e-5 : 
+			if not forse and ( abs((a-current_a)%pi2)<1e-5 or abs((a-current_a)%pi2 - pi2)<1e-5 ) : 
 				g = ""
 			else :	
 				g = "A%s  (Turn knife)\n" % (a*tool['4th axis scale']+tool['4th axis offset'])
 				if tool['lift knife at corner']!=0. :
-					g = "G00 Z%s  (Lift up)\n"%(depth+tool['lift knife at corner']) + "G00 "+ g + "G01 Z%s (Penetrate back)\n"%depth
+					g = "G00 Z%s  (Lift up)\n"%(depth+tool['lift knife at corner']) + "G00 "+ g + "G01 Z%s %s (Penetrate back)\n"%(depth,penetration_feed)
 				else : 	
 					g = "G01 "+g
 			return a, axis4, g	
@@ -4382,13 +4385,13 @@ class Gcodetools(inkex.Effect):
 			g += ( "(Change tool to %s)\n" % re.sub("\"'\(\)\\\\"," ",tool["name"]) ) + tool["tool change gcode"] + "\n"
 
 		lg, zs, f =  'G00', self.options.Zsafe, " F%f"%tool['feed'] 
-		current_a = 0
+		current_a = None
 		go_to_safe_distance = "G00" + c([None,None,zs]) + "\n" 
 		penetration_feed = " F%s"%tool['penetration feed'] 
 		for i in range(1,len(curve)):
 		#	Creating Gcode for curve between s=curve[i-1] and si=curve[i] start at s[0] end at s[4]=si[0]
 			s, si = curve[i-1], curve[i]
-			if point_to_point_d2(s[0],si[0]) < 1e-7 : continue
+			if s[1] in ["line","arc"] and point_to_point_d2(s[0],si[0]) < 1e-7 : continue
 			feed = f if lg not in ['G01','G02','G03'] else ''
 			if s[1]	== 'move':
 				g += go_to_safe_distance + "G00" + c(si[0]) + "\n" + tool['gcode before path'] + "\n"
@@ -4398,7 +4401,7 @@ class Gcodetools(inkex.Effect):
 				lg = 'G00'
 			elif s[1] == 'line':
 				if tool['4th axis meaning'] == "tangent knife" : 
-					current_a, axis4, g_ =  get_tangent_knife_turn_gcode(s,si,tool,current_a, depth)
+					current_a, axis4, g_ =  get_tangent_knife_turn_gcode(s,si,tool,current_a, depth, penetration_feed)
 					g+=g_
 				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + penetration_feed +"(Penetrate)\n"	
 				g += "G01" +c(si[0]+[s[5][1]+depth]) + feed + "\n"
@@ -4406,7 +4409,7 @@ class Gcodetools(inkex.Effect):
 			elif s[1] == 'arc':
 				r = [(s[2][0]-s[0][0]), (s[2][1]-s[0][1])]
 				if tool['4th axis meaning'] == "tangent knife" : 
-					current_a, axis4, g_ =  get_tangent_knife_turn_gcode(s,si,tool,current_a, depth)
+					current_a, axis4, g_ =  get_tangent_knife_turn_gcode(s,si,tool,current_a, depth, penetration_feed)
 					g+=g_
 					current_a = current_a+s[3]
 				else : axis4 = ""
@@ -4421,7 +4424,7 @@ class Gcodetools(inkex.Effect):
 					lg = 'G02'
 				else:
 					if tool['4th axis meaning'] == "tangent knife" : 
-						current_a, axis4, g_ = get_tangent_knife_turn_gcode(s[:1]+["line"]+s[2:],si,tool,current_a, depth)	
+						current_a, axis4, g_ = get_tangent_knife_turn_gcode(s[:1]+["line"]+s[2:],si,tool,current_a, depth, penetration_feed)	
 						g+=g_
 					g += "G01" +c(si[0]+[s[5][1]+depth]) + feed + "\n"
 					lg = 'G01'
