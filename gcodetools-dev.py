@@ -5,36 +5,36 @@ History of CLT changes to engraving and other functions it uses:
 9 May 2011 Changed test of tool diameter to square it
 10 May Note that there are many unused functions, including:
 	  bound_to_bound_distance, csp_curvature_radius_at_t,
-        csp_special_points, csplength, rebuild_csp, csp_slope,
-        csp_simple_bound_to_point_distance, csp_bound_to_point_distance,
-        bez_at_t, bez_to_point_distance, bez_normalized_slope, matrix_mul, transpose
-       Fixed csp_point_inside_bound() to work if x outside bounds
+		csp_special_points, csplength, rebuild_csp, csp_slope,
+		csp_simple_bound_to_point_distance, csp_bound_to_point_distance,
+		bez_at_t, bez_to_point_distance, bez_normalized_slope, matrix_mul, transpose
+	   Fixed csp_point_inside_bound() to work if x outside bounds
 20 May Now encoding the bisectors of angles.
 23 May Using r/cos(a) instead of normalised normals for bisectors of angles.
 23 May Note that Z values generated for engraving are in pixels, not mm.
-       Removed the biarc curves - straight lines are better.
+	   Removed the biarc curves - straight lines are better.
 24 May Changed Bezier slope calculation to be less sensitive to tiny differences in points.
-       Added use of self.options.engraving_newton_iterations to control accuracy
+	   Added use of self.options.engraving_newton_iterations to control accuracy
 25 May Big restructure and new recursive function.
 	   Changed the way I treat corners - I now find if the centre of a proposed circle is
-                within the area bounded by the line being tested and the two angle bisectors at
-		    its ends. See get_radius_to_line().
+				within the area bounded by the line being tested and the two angle bisectors at
+			its ends. See get_radius_to_line().
 29 May Eliminating redundant points. If A,B,C colinear, drop B
 30 May Eliminating redundant lines in divided Beziers. Changed subdivision of lines
   7Jun Try to show engraving in 3D
  8 Jun Displaying in stereo 3D.
-       Fixed a bug in bisect - it could go wrong due to rounding errors if
+	   Fixed a bug in bisect - it could go wrong due to rounding errors if
 			1+x1.x2+y1.y2<0 which should never happen. BTW, I spotted a non-normalised normal
 			returned by csp_normalized_normal. Need to check for that.
  9 Jun Corrected spelling of 'definition' but still match previous 'defention' and 	  'defenition' if found in file
 	 Changed get_tool to find 1.6.04 tools or new tools with corrected spelling
 10 Jun Put 3D into a separate layer called 3D, created unless it already exists
-       Changed csp_normalized_slope to reject lines shorter than 1e-9.
+	   Changed csp_normalized_slope to reject lines shorter than 1e-9.
 10 Jun Changed all dimensions seen by user to be mm/inch, not pixels. This includes
 	  tool diameter, maximum engraving distance, tool shape and all Z values.
 12 Jun ver 208 Now scales correctly if orientation points moved or stretched.
 12 Jun ver 209. Now detect if engraving toolshape not a function of radius
-                Graphics now indicate Gcode toolpath, limited by min(tool diameter/2,max-dist)
+				Graphics now indicate Gcode toolpath, limited by min(tool diameter/2,max-dist)
 TODO Change line division to be recursive, depending on what line is touched. See line_divide
 
 
@@ -117,7 +117,83 @@ def isset(variable):
 	# VARIABLE NAME SHOULD BE A STRING! Like isset("foobar")
 	return variable in locals() or variable in globals()
 	
-	
+
+################################################################################
+###
+###		Debug Levels
+###
+################################################################################
+
+debug_level = {
+	"offset": 					0b000001*256,
+	"offset clip": 				0b000010*256,
+	"split_by_points": 			0b000010*256,
+	"intersect": 				0b000100*256,
+	"check_intersection":	 	0b001000*256,
+	"bounds": 					0b010000*256,
+	"intersect_bounds_trees":	0b10000000000000000000000*256,
+}
+
+debug_classes = {
+	"Biarc" : ["intersect","offset","split_by_points","intersect_bounds_trees"],
+	"Arc" : ["intersect","check_intersections"],
+	"Line" : ["intersect","check_intersections"],
+}
+
+class Debugger:
+	def get_debug_level(self, level_name=None, fname=None) :
+		if gcodetools.options.debug_level<16 : return False
+		if fname==None : fname = inspect.stack()[1][3]
+		if level_name != None : level_name.lower()
+		return  (
+					fname in debug_level and gcodetools.options.debug_level & debug_level[fname] 
+					or (level_name in debug_level and (gcodetools.options.debug_level & debug_level[level_name])) 
+				)
+				
+	def add_debugger_to_class(self,cl) :
+		if "debugger" in cl.__dict__ : return
+		cl.debugger = True
+		if cl.__name__ in debug_classes :
+			for method in cl.__dict__ :
+				if method in debug_classes[cl.__name__] : 
+					cl.__dict__[method] = self.debug_decorator(cl.__dict__[method],cl.__name__)
+					
+	def debug_decorator(self, func, cl) :
+		def g(*args, **kwargs):
+			ret = func(*args, **kwargs)
+			self.debug(args,ret,func,cl)
+			return ret 
+		return g
+
+	def debug(self,args,ret,func,cl) :
+		if cl not in debug_classes : 
+			return
+		fname = func.__name__
+		if self.get_debug_level(fname=fname) : 
+			if (cl in ["Arc","Line"] and fname == "intersect") :
+				for point in ret :
+					draw_pointer(point, figure="cross", width=.1,  color="green", text="Proofed intersect point %s"%point)
+			if (cl in ["Arc","Line"] and fname == "check_intersection") :
+				for point in arg :
+					draw_pointer(point, figure="cross", width=.1, color="red", text="Check intersect point %s"%point)
+			if (fname == "intersect_bounds_trees") : 
+				a,b = args
+				for i,j,bounds in ret :
+					for p in bounds :	 
+						a.draw_bounds(a.items[i][p[0]])
+						b.draw_bounds(b.items[j][p[1]])
+			if (fname == "split_by_points") : 
+				args[0].draw(width=.1, color="red")
+			
+
+
+		#warn(func, cl)
+		#pass
+		#[warn(i) for i in inspect.stack()]
+		#warn( )
+		
+debugger = Debugger()
+		
 ################################################################################
 ###
 ###		Styles and additional parameters
@@ -214,6 +290,30 @@ styles = {
 		
 	}
 
+for style in styles :
+	s = styles[style]
+	for i in ['biarc0','biarc1'] : 
+		if i in s :
+			si = simplestyle.parseStyle(s[i])
+			si["marker-start"] = "url(#DrawCurveMarker_r)"
+			del( si["marker-end"] )
+			styles[style][i[:-1]+"_r"+i[-1]] = simplestyle.formatStyle(si)
+
+def get_style(stype, reverse=None, i=None, name=None, color = None, width = None) :
+	if stype == 'biarc' and i==None : i=0 
+	if i!=None : i=i%2
+	if reverse : stype+="_r"
+	if name==None : name = "biarc_style"
+	style = styles[name]
+	if i!=None : stype += "%s"%i
+	style = style[stype]
+	if color != None or width != None :
+		style = simplestyle.parseStyle(style)
+		if color!=None : style["stroke"]=color
+		if width!=None : style["stroke-width"]=width
+		style = simplestyle.formatStyle(style)
+	return str(style)
+	
 
 
 ################################################################################
@@ -907,7 +1007,7 @@ def csp_subpath_split_by_points(subpath, points) :
 		if int1[0]==int2[0] :	# same segment
 			sp = csp_split_by_two_points(subpath[int1[0]-1],subpath[int1[0]],int1[1], int2[1])
 			if sp[1]!=sp[2] :
-				parts += [   [sp[1],sp[2]]     ]
+				parts += [   [sp[1],sp[2]]	 ]
 		else :
 			sp5,sp1,sp2 = csp_split(subpath[int1[0]-1],subpath[int1[0]],int1[1])
 			sp3,sp4,sp5 = csp_split(subpath[int2[0]-1],subpath[int2[0]],int2[1])
@@ -1309,9 +1409,9 @@ def csp_segment_convex_hull(sp1,sp2):
 	
 	m1, m2, m3  =  abc*abd>0, abc*bcd>0, abc*cad>0
 	if m1 and m2 and m3 : return [a,b,c]
-	if     m1 and     m2 and not m3 : return [a,b,c,d]
-	if     m1 and not m2 and     m3 : return [a,b,d,c]
-	if not m1 and     m2 and     m3 : return [a,d,b,c]
+	if	 m1 and	 m2 and not m3 : return [a,b,c,d]
+	if	 m1 and not m2 and	 m3 : return [a,b,d,c]
+	if not m1 and	 m2 and	 m3 : return [a,d,b,c]
 	if m1 and not (m2 and m3) : return [a,b,d]
 	if not (m1 and m2) and m3 : return [c,a,d]
 	if not (m1 and m3) and m2 : return [b,c,d]
@@ -1462,7 +1562,6 @@ def atan2_(*arg):
 	if len(arg)==1 and ( type(arg[0]) == type([0.,0.]) or type(arg[0])==type((0.,0.)) ) :
 		return (pi/2 - atan2(arg[0][0], arg[0][1]) ) % pi2
 	elif len(arg)==2 :
-		
 		return (pi/2 - atan2(arg[0],arg[1]) ) % pi2
 	else :
 		raise ValueError, "Bad argumets for atan! (%s)" % arg  
@@ -1522,7 +1621,7 @@ def draw_csp(csp, stroke = "#f00", fill = "none", comment = "", width = 0.354, g
 		
 	return inkex.etree.SubElement( group, inkex.addNS('path','svg'), attributes) 
 	
-def draw_pointer(x1,color = "#f00", figure = "cross", group = None, comment = "", fill="none", width = .1, size = 10., text = None, font_size=None, pointer_type=None, style= None, attrib = None, gcodetools_tag = None, layer=None) :
+def draw_pointer(x1,color = "#f00", figure = "cross", group = None, comment = "", fill="none", width = .1, size = 2., text = None, font_size=None, pointer_type=None, style= None, attrib = None, gcodetools_tag = None, layer=None) :
 	if x1.__class__ == P : x1 =[x1]	 
 	x = []
 	for i in x1 :
@@ -1531,6 +1630,9 @@ def draw_pointer(x1,color = "#f00", figure = "cross", group = None, comment = ""
 			x += [i.x,i.y]
 		else :
 			x += [i]
+
+	if group == None and layer == None :
+		layer=gcodetools.layers[-1]
 	
 	if layer != None :
 		x1 = x[:]
@@ -1657,6 +1759,8 @@ def print_(*arg):
 	f.write("\n")
 	f.close()
 
+def warn(*arg) :
+	gcodetools.warning(", ".join([str(s) for s in arg]))
 
 ################################################################################
 ###		Point (x,y) operations
@@ -1689,7 +1793,7 @@ class P:
 		s = sin(theta)
 		return P(self.x * c - self.y * s,  self.x * s + self.y * c)
 	def angle(self): return atan2(self.y, self.x)
-	def __repr__(self): return '%f,%f' % (self.x, self.y)
+	def __repr__(self): return '%.2f,%.2f' % (self.x, self.y)
 	def pr(self): return "%.2f,%.2f" % (self.x, self.y)
 	def to_list(self): return [self.x, self.y]	
 	def ccw(self): return P(-self.y,self.x)
@@ -1697,7 +1801,8 @@ class P:
 
 
 class Arc():
-	def __init__(self,st,end,c,a) :
+	def __init__(self,st,end,c,a,r=None) :
+		debugger.add_debugger_to_class(self.__class__)
 		# a - arc's angle, it's not defining actual angle before now, but defines direction so it's value does not mather matters only the sign.
 		if st.__class__ == P :  st = st.to_list()
 		if end.__class__ == P : end = end.to_list()
@@ -1705,22 +1810,40 @@ class Arc():
 		self.st = P(st)
 		self.end = P(end)
 		self.c = P(c)
-		self.r = (P(st)-P(c)).mag()
+		if r == None : self.r = (P(st)-P(c)).mag()
+		else: self.r = r
 		self.a = ( (self.st-self.c).angle() - (self.end-self.c).angle() ) % pi2
 		if a>0 : self.a -= pi2
 		self.a *= -1.
 		self.cp = (self.st-self.c).rot(self.a/2)+self.c # central point of an arc
-		#draw_pointer([self.cp], layer=gcodetools.layers[-1], color="purple", )
-		#draw_text(self.a, self.st.x,self.st.y, layer=gcodetools.layers[-1])
-	
+
+	def __repr__(self) :
+		return "Arc: s%s e%s c%s r%.2f a%.2f (l=%.3f) " % (self.st,self.end,self.c,self.r,self.a,self.length())
+
+	def copy(self) :
+		return Arc(self.st,self.end,self.c,self.a,self.r)	
+
+	def rebuild(self,st=None,end=None,c=None,a=None,r=None) : 
+		if st==None: st=self.st
+		if end==None: end=self.end
+		if c==None: c=self.c
+		if a==None: a=self.a
+		if r==None: r=self.r
+		self.__init__(st,end,c,a,r)
+
+	def get_t_at_point(self, p, y=None) :
+		if not p.__class__ == P : p = P(p,y) 
+		a1,a2,a = (self.st-self.c).angle(), (self.end-self.c).angle(), (p-self.c).angle()
+		inside = ( self.a>=0 and (a1<=a<=a2 or a2<=a1<=a or a<=a2<=a1) or
+				 self.a<0 and (a2<=a<=a1 or a1<=a2<=a or a<=a1<=a2) )
+		return abs( asin( (self.st-self.c).cross((p-self.c))/(self.r**2) ) ) if inside else -1. # consuming all arcs les than 180 deg
+
+		
 	def point_inside_angle(self,p,y=None) : 
 		if not p.__class__ == P : p = P(p,y) 
 		a1,a2,a = (self.st-self.c).angle(), (self.end-self.c).angle(), (p-self.c).angle()
 		return ( self.a>=0 and (a1<=a<=a2 or a2<=a1<=a or a<=a2<=a1) or
-			     self.a<0 and (a2<=a<=a1 or a1<=a2<=a or a<=a1<=a2) )
-			   
-			   
-			    
+				 self.a<0 and (a2<=a<=a1 or a1<=a2<=a or a<=a1<=a2) )
 	
 	def bounds(self) : 
 		# first get bounds of start/end 
@@ -1736,52 +1859,52 @@ class Arc():
 		if self.point_inside_angle(self.c+P(self.r,0)) :
 			x2 = max(x2, self.c.x+self.r)
 		return x1,y1, x2,y2
-			
+
 	def clip_by_point(self, p, from_start) :
 		if from_start : 
-			self.__init__(p, self.end, self.c, self.a) # a - defines only direction
+			self.rebuild(st=p) 
 		else :
-			self.__init__(self.st, p, self.c, self.a) # a - defines only direction
+			self.rebuild(end=p)
 	
-	def split_by_point(self,point) :
-		pass
+	def split_by_point(self, p) :
+		n = self.copy().clip_by_point(p, False)
+		self.clip_by_point(p, True)
+		return n		
 		
 	def offset(self, r):
+		oldr = self.r
 		if self.a>0 :
-			r += self.r
+			self.r = self.r + r
 		else :
-			r = self.r - r
+			self.r = self.r - r
 		
 		if self.r != 0 :
-			self.st = self.c + (self.st-self.c)*r/self.r
-			self.end = self.c + (self.end-self.c)*r/self.r
-			self.cp = self.c + (self.cp-self.c)*r/self.r
-			self.r = r
-		else: 
-			return "remove"	
+			self.st = self.c + (self.st-self.c)*self.r/oldr
+			self.end = self.c + (self.end-self.c)*self.r/oldr
+		self.rebuild()	
 			
 	def length(self):
 		return abs(self.a*self.r)
 	
 
-	def draw(self, group, style, layer, transform, num = 0, reverse_angle = 1):
+	def draw(self, group=None, style=None, layer=None, transform=None, num = 0, reverse_angle = None, color=None, width=None):
+		layer, group, transform, reverse_angle = gcodetools.get_preview_group(layer, group, transform)
 		st = P(gcodetools.transform(self.st.to_list(), layer, True))
 		c = P(gcodetools.transform(self.c.to_list(), layer, True))
 		a = self.a * reverse_angle
 		r = (st-c)
 		a_st = ((st-c).angle()-pi/2)%(pi*2)+pi/2
-		#draw_text("%0.2f %0.2f\n  %s %s"%(self.a,a_st, st, c), self.st.x,self.st.y, layer=gcodetools.layers[-1])
 		r = r.mag()
 		if a>0:
 			a_end = a_st+a
-			style = style['biarc%s'%(num%2)]
+			reverse=False
 		else: 
 			a_end = a_st
 			a_st = a_st+a
-			style = style['biarc%s_r'%(num%2)]
+			reverse=True
 		
 		attr = {
-				'style': style,
+				'style': get_style("biarc", i=num, name=style, reverse=reverse, width=width, color=color),
 				 inkex.addNS('cx','sodipodi'):		str(c.x),
 				 inkex.addNS('cy','sodipodi'):		str(c.y),
 				 inkex.addNS('rx','sodipodi'):		str(r),
@@ -1790,7 +1913,7 @@ class Arc():
 				 inkex.addNS('end','sodipodi'):		str(a_end),
 				 inkex.addNS('open','sodipodi'):	'true',
 				 inkex.addNS('type','sodipodi'):	'arc',
-				 "gcodetools": "Preview",
+				 "gcodetools": "Preview %s"%self,
 				}	
 		if transform != [] :
 			attr["transform"] = transform	
@@ -1799,23 +1922,18 @@ class Arc():
 	def check_intersection(self, points):
 		res = []
 		cp = self.cp-self.c
-#		draw_pointer(self.cp, layer=gcodetools.layers[-1], color="black")
  		for p in points :
 			a = acos(cp.dot(p-self.c)/(self.r**2))
 			if abs(a)<abs(self.a/2) :
 				res.append(p)
-			#	draw_pointer(p, layer=gcodetools.layers[-1], color="green")
-			#else:
-			#	draw_pointer(p, layer=gcodetools.layers[-1], color = "red")
-
 		return res		
-		
 		
 	def intersect(self,b) :
 		if b.__class__ == Line :
 			return b.intersect(self)
 		else : 
 			# taken from http://paulbourke.net/geometry/2circle/
+			if (self.st-b.st).l2()<1e-10 and (self.end-b.end).l2()<1e-10 : return [self.st,self.end]
 			r0 = self.r 
 			r1 = b.r
 			P0 = self.c
@@ -1825,11 +1943,11 @@ class Arc():
 			if d>r0+r1  or r0+r1<=0 or d2<(r0-r1)**2 :
 				return []
 			if d2==0 and r0==r1 :
-				return self.check_intersection(b.check_intersection(
-				[self.st, self.end, b.st, b.end] ))
+				return self.check_intersection( b.check_intersection(
+					[self.st, self.end, b.st, b.end] ) )
 			if d == r0+r1  :
-				return self.check_intersection(b.check_intersection(
-					[P0 + (P1 - P0)*r0/(r0+r1)]))
+				return self.check_intersection( b.check_intersection(
+								[P0 + (P1 - P0)*r0/(r0+r1)]  ) )
 			else: 
 				a = (r0**2 - r1**2 + d2)/(2.*d)
 				P2 = P0 + a*(P1-P0)/d
@@ -1845,6 +1963,7 @@ class Arc():
 class Line():
 
 	def __init__(self,st,end):
+		debugger.add_debugger_to_class(self.__class__)
 		if st.__class__ == P :  st = st.to_list()
 		if end.__class__ == P :	end = end.to_list()
 		self.st = P(st)
@@ -1855,35 +1974,54 @@ class Line():
 		else: 
 			self.n = [0,1]
 	
+	def get_t_at_point(self,p) :
+		if self.st.x-self.end.x != 0 :
+			return (self.st.x-p.x)/(self.st.x-self.end.x)
+		else :
+			return (self.st.y-p.y)/(self.st.y-self.end.y)
+			
+	def __repr__(self) :
+		return "Line: %s %s (l=.3%f) " % (self.st,self.end,self.l)
+				
+	def copy(self) : 
+		return Line(self.st,self.end)
+	
+	def rebuild(self,st=None,end=None) : 
+		if st==None: st=self.st
+		if end==None: end=self.end
+		self.__init__(st,end)
+	
 	def bounds(self) :
 		return  ( min(self.st.x,self.end.x),min(self.st.y,self.end.y),
 				  max(self.st.x,self.end.x),max(self.st.y,self.end.y) )
 	
 	def clip_by_point(self, p, from_start) :
 		if from_start : 
-			self.__init__(p, self.end)
+			self.rebuild(st=p)
 		else :
-			self.__init__(self.st, p)
+			self.rebuild(end=p)
 
-	def split_by_point(self,point) :
-		pass
-
-				
+	def split_by_point(self, p) :
+		n = self.copy().clip_by_point(p, False)
+		self.clip_by_point(p, True)
+		return n
+			
 	def offset(self, r):
 		self.st -= self.n*r
 		self.end -= self.n*r
+		self.rebuild()
 		
 	def l2(self): return (self.st-self.end).l2()
 	def length(self): return (self.st-self.end).mag()
 	
-	def draw(self, group, style, layer, transform, num = 0, reverse_angle = 1):
+	def draw(self, group=None, style=None, layer=None, transform=None, num = 0, reverse_angle = None, color = None, width=None) :
+		layer, group, transform, reverse_angle = gcodetools.get_preview_group(layer, group, transform, reverse_angle)
 		st = gcodetools.transform(self.st.to_list(), layer, True)
 		end = gcodetools.transform(self.end.to_list(), layer, True)
 
-
-		attr = {	'style': style['line'],
+		attr = {	'style': get_style('line', name=style, width=width, color=color),
 					'd':'M %s,%s L %s,%s' % (st[0],st[1],end[0],end[1]),
-					"gcodetools": "Preview",
+					"gcodetools": "Preview %s"%self,
 				}
 		if transform != [] :
 			attr["transform"] = transform		
@@ -1930,21 +2068,21 @@ class Line():
 			dr = dx*dx+dy*dy
 			descr = b.r**2*dr-D*D
 			if descr<0 : return []
-			if descr==0 : return self.check_intersection(b.check_intersection([ P([D*dx,D*dy]) ]))
+			if descr==0 : return self.check_intersection(b.check_intersection([ P([D*dy/dr+b.c.x,-D*dx/dr+b.c.y]) ]))
 			sign = -1. if dy<0 else 1.
-			
-#			draw_pointer([self.st,self.end,   P( [ (D*dy+sign*dx*descr)/dr+b.c.x, (-D*dx+abs(dy)*descr)/dr+b.c.y ]  ),  					 P( [ (D*dy-sign*dx*descr)/dr+b.c.x, (-D*dx-abs(dy)*descr)/dr+b.c.y ] ) ],layer = gcodetools.layers[-1], color="Blue", figure="line")
 			descr = sqrt(descr)
-			return self.check_intersection(b.check_intersection( [
-					 P( [ (D*dy+sign*dx*descr)/dr+b.c.x, (-D*dx+abs(dy)*descr)/dr+b.c.y ]  ), 
-					 P( [ (D*dy-sign*dx*descr)/dr+b.c.x, (-D*dx-abs(dy)*descr)/dr+b.c.y ] )
-					]))
-			
+			return self.check_intersection(b.check_intersection([
+						 P( [ (D*dy+sign*dx*descr)/dr+b.c.x, (-D*dx+abs(dy)*descr)/dr+b.c.y ]  ), 
+						 P( [ (D*dy-sign*dx*descr)/dr+b.c.x, (-D*dx-abs(dy)*descr)/dr+b.c.y ] )
+						]))
+							
+
 	def check_intersection(self, points):
 		res = []
 		for p in points :
-			if (self.st.x-self.end.x != 0 and 0<=(p.x-self.st.x)/(self.st.x-self.end.x)<=1 or
-			   self.st.y-self.end.y != 0 and 0<=(p.y-self.st.y)/(self.st.y-self.end.y)<=1 ):
+			if ((self.st.x-1e-7<=p.x<=self.end.x+1e-7 or self.end.x-1e-7<=p.x<=self.st.x+1e-7)
+				and 
+				(self.st.y-1e-7<=p.y<=self.end.y+1e-7 or self.end.y-1e-7<=p.y<=self.st.y+1e-7)) :
 			   		res.append(p)
 		return res
 				
@@ -1961,97 +2099,169 @@ class Biarc_Bounds_Tree_Node:
 				
 	
 class Biarc:
-	def connect_items_with_arc(self, a, b, r) :
-		# get normals
-		if a.__class__ == Line : nst = a.n
-		else : nst = (a.end-a.c)/a.r
-		if b.__class__ == Line : nend = b.n
-		else : nend = (b.st-b.c)/b.r
-		# get center
-		if a.__class__ == Line : c = a.end+a.n*r
-		elif b.__class__ == Line : c = b.st+b.n*r
-		else: 
-			c = a.end + (a.end - a.c)*r/a.r*(1. if a.a < 0 else -1.)
-		# get angle sign
-		ang = -1. if  (a.end-c).cross(b.st-c)<0 else  1.
-		if abs(ang) <= 1e-10 : return None
-		# return arc
-#		draw_pointer([a.end,c,b.st], layer=gcodetools.layers[-1], color="orange", figure="line")
-		return Arc(a.end, b.st, c, ang)
-
-
 	def __init__(self, items=None):
+		debugger.add_debugger_to_class(self.__class__)
 		if items == None :
 			self.items = []
 		else: 	
 			self.items = items
 		self.bounds_tree = []
 		
+	def copy(self) :
+		b = Biarc()
+		for it in self.items :
+			b.items.append([])
+			for i in it :
+				b.items[-1].append(i.copy())
+		return b		
+	
+	def point_inside(self, p) :
+		self.close()
+		points = []
+		for subitems in self.items :
+			for item in subitems :
+				if (item.st-p).l2<1e-10 : return True
+				points.append( [1e100 if p.x-item.st.x == 0 else (item.st.y-p.y)/(item.st.x-p.x),item.st])
+		points.sort()
+		a = None 
+		for i,j in zip(points,points[1:]) :
+			if i[0]!=j[0] :
+				a = (i[0]+j[0])/2
+				break 
+		if a==None : return False		
+		mx = max([i[1].x for i in points])+10
+		l = Line(p,(mx,mx*a))
+		count = 0		
+		for subitems in self.items :
+			for item in subitems :
+				p = l.intersect(item)
+				if debugger.get_debug_level() :
+					[draw_pointer(p,size=.5, width=.1, text="x") for i in p ]
+				if item.__class__==Arc and len(p)==1 and abs(l.n.dot(p[0]-item.c))<1e-10 : count +=2 # touches intem at tangent point.
+				else : count += len(p)
+		if debugger.get_debug_level() :
+			if count%2==1 :		
+				l.draw(width=.1)
+			else :
+				l.draw(width=.1)	
+			draw_pointer(l.st,color="red",size=10	)
+			draw_pointer(l.end,color="blue", size=10)
+			draw_pointer(l.st,color="blue", size=10, text=count)		
+		return count
+		
+	
 	def rebuild_bounds_tree (self) :
 		""" Bounds tree is needed to increase biarcs intersection speed
-			
 			Tree is firstly bounds of subcurves as roots, then binary tree of their elements."""
 		self.bounds_tree = []
 		self.tree_len = 0
 		def create_tree(i,j,k) :
-			#gcodetools.error((i,j),"warning")
 			if i!=j : 
 				node = Biarc_Bounds_Tree_Node (
 						-1,0,0,0,0,
 						create_tree(i,int(floor((i+j)*.5)),k),
-						create_tree(int(ceil((i+j)*.5)),j,k)
+						create_tree(int(floor((i+j)*.5)+1),j,k)
 					)
 				self.tree_len += 1	
-				#gcodetools.error((i,j,node.l,node.r),"warning")
 				node.x1 = min(node.l.x1, node.r.x1)
 				node.y1 = min(node.l.y1, node.r.y1)
 				node.x2 = max(node.l.x2, node.r.x2)
 				node.y2 = max(node.l.y2, node.r.y2)
+				#node.i = "%s - %s"%(i,j) # only for debug
 				return node
 			else : 
 				self.tree_len += 1
 				x1,y1, x2,y2 = self.items[k][i].bounds()
 				return Biarc_Bounds_Tree_Node (i,x1,y1,x2,y2,None,None)		
-		
 		for i in range(len(self.items)) :
 			self.bounds_tree.append( create_tree(0,len(self.items[i])-1,i) ) 	
-			gcodetools.warning(self.tree_len)
-	#	sys.exit()
-	def intersect_bounds_trees_recursion(self,a,b, depth = 0) :
-		
+	
+	def intersect_bounds_trees_recursion(self,a,b, selfintersect, depth = 0) :
 		if a.intersect(b) : 
 			intersect = []
-#			gcodetools.warning((depth))
-			if a==b : return []
 			if a.l == None and a.r == None and b.l == None and b.r == None : 
+				if selfintersect and a.i == b.i : return []
 				return [[a.i,b.i]]
 			if depth % 2 or b.l == None and b.r == None : 
 				if a.r != None : 
-					intersect += self.intersect_bounds_trees_recursion(a.r,b,depth+1)
+					intersect += self.intersect_bounds_trees_recursion(a.r,b,selfintersect,depth+1)
 				if a.l != None : 
-					intersect += self.intersect_bounds_trees_recursion(a.l,b,depth+1)
+					intersect += self.intersect_bounds_trees_recursion(a.l,b,selfintersect,depth+1)
 			if not depth % 2 or a.l == None and a.r == None : 
 				if b.l != None : 
-					intersect += self.intersect_bounds_trees_recursion(a,b.l,depth+1)
+					intersect += self.intersect_bounds_trees_recursion(a,b.l,selfintersect,depth+1)
 				if b.r != None : 
-					intersect += self.intersect_bounds_trees_recursion(a,b.r,depth+1)
+					intersect += self.intersect_bounds_trees_recursion(a,b.r,selfintersect,depth+1)
 			return intersect
 		else : return []
-				
 	
-	def intersect_bounds_trees(self, b) : 
+
+	def intersect_bounds_trees(self, b) :
 		selfintersect =  b == self
-		
+		bounds_intersect = []
 		for i in range(len(self.items)) : 
 			for j in range(len(b.items)) :
-				gcodetools.warning((i,j))
-				intersect = self.intersect_bounds_trees_recursion(self.bounds_tree[i],b.bounds_tree[j])
-				gcodetools.warning((intersect,"!!!"))
-				for p in intersect : 
-					self.draw_bounds(self.items[i][p[0]])
-					b.draw_bounds(b.items[j][p[1]])
-					if self.items[i][p[0]].intersect(b.items[j][p[1]]) :
-						draw_pointer(self.items[i][p[0]].intersect(b.items[j][p[1]]), layer=gcodetools.layers[-1],width=3) 
+				intersect = self.intersect_bounds_trees_recursion(self.bounds_tree[i],b.bounds_tree[j], selfintersect and i==j)
+				if intersect != [] :
+					bounds_intersect.append([i, j, intersect])
+		return bounds_intersect
+
+
+	def intersect(self,b = None) :
+		if b == None : b = self
+		selfintersect = b==self  
+		
+		# rebuild bounds trees, just in case
+		self.rebuild_bounds_tree()
+		if not selfintersect : b.rebuild_bounds_tree()
+		
+		# get the intersections
+		bounds_int = self.intersect_bounds_trees(b)
+		res = []
+		for int_ in bounds_int :
+			i,j,intersect = int_
+			for bound in intersect : 
+				if debugger.get_debug_level("bounds") :
+					self.draw_bounds(self.items[i][bound[0]])
+					b.draw_bounds(b.items[j][bound[1]])
+				if selfintersect and i == j and bound[0] == bound[1] : continue # same items
+				points = self.items[i][bound[0]].intersect(b.items[j][bound[1]])
+				for p in points :
+					if selfintersect and (	i == j
+								 and ( bound[0] == (bound[1] + 1) % len(self.items[i]) and (p-self.items[i][bound[0]].st).l2()<1e-10 
+								 		or
+								 		bound[1] == (bound[0] + 1) % len(self.items[i]) and (p-self.items[i][bound[0]].end).l2()<1e-10  )	
+							): continue # intersection at the start*end
+					res.append([i,j,bound[0],bound[1],p])
+		return res
+
+	def split_by_points(self, points_) :
+		# points are usualy intersection points [i,j,i1,j1,(x,y)] so we'll need only i,i1,(x,y)
+		points = {}
+		for i,j,i1,j1,p in points_ : 
+			if i not in points : points[i] = [] 
+			points[i].append([i1,self.items[i][i1].get_t_at_point(p),p])
+		items = []
+		for i in range(len(self.items)) :
+			if i not in points : 
+				items.append(self.items[i])
+			else :
+				points[i].sort()
+				si = self.items[i]
+				j0, last_p = 0, None
+				for j,t,p in points[i] :
+					items.append( si[j0:j] )
+					items[-1].append(si[j].copy())
+					items[-1][-1].rebuild(end=p)
+					if last_p!=None :
+						items[-1][0].rebuild(st=last_p)
+					last_p = p
+					j0 = j
+				items.append(si[j0:])
+				if last_p!=None : items[-1][0].clip_by_point(last_p,True)
+				
+		self.items = items		
+											
 				
 	def draw_bounds(self, item=None) :
 		if item == None :
@@ -2063,14 +2273,32 @@ class Biarc:
 			x1,y1,x2,y2 = item.bounds()
 			draw_pointer([x1,y1, x2,y1, x2,y2, x1,y2, x1,y1], layer=gcodetools.layers[-1], color="red",figure="line")
 
+	
 	def l(self) : 
-		return sum([i.length() for i in items])
+		return sum([ sum([i.length() for i in subitems]) for subitems in items ])
+	
 	
 	def close(self) :
 		for subitems in self.items:
 			if (subitems[0].st-subitems[-1].end).l2()>10e-10 :
 				subitems.append(Line(subitems[-1].end,subitems[0].st))
+	
+	def check_close(self) :
+		for subitems in self.items:
+			for i in range(len(subitems)) :
+				if (subitems[i].st-subitems[i-1].end).l2()>1e-6 : 
+					draw_pointer(subitems[i].st, color="blue",figure="cross",width=3,text=_("break %f"%(subitems[i].st-subitems[i-1].end).l2()))
+					draw_pointer(subitems[i-1].end, color="blue",figure="cross",width=3,text=_("break %f")%(subitems[i].st-subitems[i-1].end).l2())
+	
+	def check(self, check_close = True) :
+		for subitems in self.items :
+			for i in subitems :
+				if i.__class__ == Arc :
+					if ((i.st-i.c).rot(i.a)+i.c-i.end).l2()>1e-8 : 
+						i.draw(color="red",width=5)
+		if check_close : self.check_close()
 				
+	
 	def clean(self) :			
 		# clean biarc from 0 length elements.
 		i = 0
@@ -2079,9 +2307,11 @@ class Biarc:
 			
 			while j<len(self.items[i]) :
 				item = self.items[i][j]
-				if ( item.__class__==Line and item.l<1e-10 or
-					 item.__class__==Arc and abs(item.r)<1e-10 or
-					 (item.st-item.end).l2()<1e-20   )  :
+				if ( item.__class__==Line and item.l<1e-3 or
+					 item.__class__==Arc and abs(item.r)<1e-3 or
+					 (item.st-item.end).l2()<1e-5   )  :
+					 		
+					 		self.items[i][j-1].rebuild(end=self.items[i][j].end)
 							self.items[i][j:j+1] = []
 							continue
 				j += 1		
@@ -2089,9 +2319,8 @@ class Biarc:
 				self.items[i:i+1] = []
 				continue
 			i += 1	
-		
-	def offset(self,r) :
-		# offset each element
+	
+	def offset_items(self,r) :
 		self.close()
 		self.clean()		
 		for subitems in self.items :
@@ -2099,9 +2328,102 @@ class Biarc:
 				item.offset(r)
 		self.clean()
 		self.connect(r)
-		#self.clip()
 		
-	def connect(self, r) :				
+		
+	def offset(self,r) :
+		orig = self.copy()
+		if debugger.get_debug_level() :
+			orig.draw(width=.1,)
+
+		b = self.copy()		
+		self.offset_items(r)
+		if debugger.get_debug_level() :
+			self.draw(width=.1,)
+
+		self.check()
+		if r>0 : 
+			b.offset_items(r-0.01)
+		else: 
+			b.offset_items(r+0.01)
+		if debugger.get_debug_level() :
+			b.draw(width=.1,style="biarc_style_dark")
+
+		self.split_by_points(self.intersect(self))
+		
+		i = 0
+		b1 = Biarc()
+		while i<len(self.items):
+			b1.items = [self.items[i]]
+			if len(b1.intersect(b))>0 : 
+				if debugger.get_debug_level("Offset clip") : 
+					for i1 in b1.intersect(b) : 
+						draw_pointer(i1[4], figure="cross", width=.1, color="green", text="Offset clipping intersection")
+				self.items[i:i+1] = []
+				continue
+
+			c = b.point_inside(self.items[i][0].st)
+			if c==True or c%2==1 : 
+				pass
+				self.items[i:i+1] = []
+				continue
+	
+			i += 1	
+		self.clean()		
+		self.connect_subitems()
+		self.draw()
+		self.check()	
+
+		# remove floating ends. 
+		ends = [i[-1] for i in b.items]
+		sts = [i[0] for i in b.items]
+		for i in range(len(ends)) : 
+			for j in range(i+1,len(ends)) :
+				pass
+		#self.clip()
+
+	def connect_subitems(self) :
+		joined = True
+		while joined :	
+			joined = False
+			i = 0
+			while i<len(self.items) :
+				j = i+1
+				while j<len(self.items) :
+					if (self.items[i][-1].end-self.items[j][0].st).l2()<1e-6 : 
+						self.items[i] += self.items[j]
+						self.items[j:j+1] = []
+						joined = True
+						continue 
+					if (self.items[j][-1].end-self.items[i][0].st).l2()<1e-6 : 
+						self.items[i] = self.items[j] + self.items[i]
+						self.items[j:j+1] = []
+						joined = True
+						continue
+					j += 1	
+				i += 1		
+					
+
+	def connect_items_with_arc(self, a, b, r) :
+		# get normals
+		if a.__class__ == Line : nst = a.n
+		else : nst = (a.end-a.c)/a.r
+		if b.__class__ == Line : nend = b.n
+		else : nend = (b.st-b.c)/b.r
+
+		# get center
+		if a.__class__ == Line : c = a.end+a.n*r
+		elif b.__class__ == Line : c = b.st+b.n*r
+		else:
+			c = a.end + (a.end - a.c)*r/a.r*(1. if a.a < 0 else -1.)
+		# get angle sign
+		ang = -1. if  (a.end-c).cross(b.st-c)<0 else  1.
+		if abs(ang) <= 1e-10 : return None
+		# return arc
+#		draw_pointer([a.end,c,b.st], layer=gcodetools.layers[-1], color="orange", figure="line")
+		return Arc(a.end, b.st, c, ang)
+		
+		
+	def connect(self, r):				
 		for subitems in self.items :
 			i = 0
 			while i < len(subitems) :
@@ -2117,7 +2439,7 @@ class Biarc:
 					if len(points)==0 : 
 						arc = self.connect_items_with_arc(a,b,r)
 						if arc!=None:
-							subitems.insert(i+1,self.connect_items_with_arc(a,b,r))
+							subitems.insert(i+1,arc)
 							i += 1
 					else :
 						# take closest point to the start of a
@@ -2127,61 +2449,24 @@ class Biarc:
 						# now we've got only one point		
 						a.clip_by_point(point, from_start=False)
 						b.clip_by_point(point, from_start=True)
-
-							
-					for p in a.intersect(b) : 
-						draw_pointer(p.to_list(), layer=gcodetools.layers[-1], color="orange")
-
+#					for p in a.intersect(b) : 
+#						draw_pointer(p.to_list(), layer=gcodetools.layers[-1], color="orange")
 				i += 1				
-						
 				
 						
-	def clip_offset(self):
-		clipped_items = []
-		for subitems in self.items :
-			for item in self.items :
-				pass				
-			
-			
-			
-		
-			
-		
-	def draw(self, layer, group=None, style=styles["biarc_style"]):
+	def draw(self, layer=None, group=None, style="biarc_style", width=None, color=None):
 		global gcodetools
 		gcodetools.set_markers()
-
-		for i in [0,1]:
-			style['biarc%s_r'%i] = simplestyle.parseStyle(style['biarc%s'%i])
-			style['biarc%s_r'%i]["marker-start"] = "url(#DrawCurveMarker_r)"
-			del(style['biarc%s_r'%i]["marker-end"])
-			style['biarc%s_r'%i] = simplestyle.formatStyle(style['biarc%s_r'%i])
+		layer, group, transform, reverse_angle = gcodetools.get_preview_group(layer, group, None, None)
+		group = inkex.etree.SubElement( group,inkex.addNS('g','svg'), {"gcodetools": "Biarc preview %s"%self} )
 		
-		if group==None:
-			if "preview_groups" not in dir(options.self) :
-				gcodetools.preview_groups = { layer: inkex.etree.SubElement( gcodetools.layers[min(1,len(gcodetools.layers)-1)], inkex.addNS('g','svg'), {"gcodetools": "Preview group"} ) }
-			elif layer not in gcodetools.preview_groups :
-				gcodetools.preview_groups[layer] = inkex.etree.SubElement( gcodetools.layers[min(1,len(gcodetools.layers)-1)], inkex.addNS('g','svg'), {"gcodetools": "Preview group"} )
-			group = gcodetools.preview_groups[layer]
-		
-		transform = gcodetools.get_transforms(group)
-		if transform != [] : 
-			transform = gcodetools.reverse_transform(transform)
-			transform = simpletransform.formatTransform(transform)
-
-		a,b,c = [0.,0.], [1.,0.], [0.,1.]
-		k = (b[0]-a[0])*(c[1]-a[1])-(c[0]-a[0])*(b[1]-a[1])
-		a,b,c = gcodetools.transform(a, layer, True), gcodetools.transform(b, layer, True), gcodetools.transform(c, layer, True)
-		if ((b[0]-a[0])*(c[1]-a[1])-(c[0]-a[0])*(b[1]-a[1]))*k > 0 : reverse_angle = 1
-		else : reverse_angle = -1 
-
-
 		num = 0
 		for subitems in self.items :
+			group_ = inkex.etree.SubElement( group,inkex.addNS('g','svg'), {"gcodetools": "Biarc preview sub %s"%self} )
 			for item in subitems :
 				num += 1
 				#if num>1 : break
-				item.draw(group, style, layer, transform, num, reverse_angle)
+				item.draw(group_, style, layer, transform, num, reverse_angle, width=width, color=color)
 
 	def from_old_style(self, curve) :
 		#Crve defenitnion [start point, type = {'arc','line','move','end'}, arc center, arc angle, end point, [zstart, zend]]		
@@ -3561,29 +3846,6 @@ class Arangement_Genetic:
 class Gcodetools(inkex.Effect):
 
 	def test(self):
-		curve = [[[-242.02105943024699, 43.013216710019094], 'move', 0, 0], [[-242.02105943024699, 43.013216710019094], 'arc', [-207.64121210444409, 34.103767487983284], -0.27140861262102689, [-238.37403515245467, 51.903929708738964], [0, 0.0]], [[-238.37403515245467, 51.903929708738964], 'arc', [-207.64119369870204, 34.103756827550221], -0.27140850116213855, [-232.47701219694406, 59.491466805885892], [0.0, 0]], [[-232.47701219694406, 59.491466805885892], 'arc', [-207.64121788392458, 34.103733717414976], -0.27140830395239846, [-224.76172248959, 65.220320814611782], [0, 0.0]], [[-224.76172248959, 65.220320814611782], 'arc', [-207.64123458214013, 34.103764066491046], -0.27140872834701746, [-215.79301081099135, 68.671086125957544], [0.0, 0]],
-				[[-215.79301081099135, 68.671086125957544], 'arc', [-207.77138185524845, 34.655637414891103], -0.29922176023265568, [-205.40961968039375, 69.52423878558335], [0, 0.0]], [[-205.40961968039375, 69.52423878558335], 'arc', [-207.63036107082675, 36.737641085413095], -0.31791365458465837, [-195.27228860271745, 67.187119339546399], [0.0, 0]], [[-195.27228860271745, 67.187119339546399], 'arc', [-207.27034924824696, 37.624673630547051], -0.32778569559937942, [-186.39354187574477, 61.750397857661468], [0, 0.0]], [[-186.39354187574477, 61.750397857661468], 'arc', [-206.12671154988811, 38.94628795758679], -0.34641497612234762, [-179.82313926839331, 53.695779438834563], [0.0, 0]], 
-				[[-179.82313926839331, 53.695779438834563], 'arc', [-205.42143624349947, 39.34176473968239], -0.35635315063264805, [-176.42382021146449, 43.863800837268798], [0, 0.0]], [[-176.42382021146449, 43.863800837268798], 'arc', [-203.9542753569919, 39.570561289109804], -0.3749125820809045, [-176.76394913948448, 33.484180876803521], [0.0, 0]], [[-176.76394913948448, 33.484180876803521], 'arc', [-203.27872095776408, 39.419331758036897], -0.38492322755934794, [-180.93268541029954, 23.962493922635716], [0, 0.0]], [[-180.93268541029954, 23.962493922635716], 'arc', [-202.22854965989481, 38.692924274433167], -0.40340655910616352, [-188.42460942954585, 16.785148335207793], [0.0, 0]],
-				[[-188.42460942954585, 16.785148335207793], 'arc', [-203.54661776807509, 40.78480684482863], -0.37320460090371377, [-198.21585898356366, 12.923691369128163], [0, 0.0]], [[-198.21585898356366, 12.923691369128163], 'arc', [-207.65058604421608, 62.234123662995657], -0.21254429034537026, [-208.83008337048261, 12.043072729841697], [0.0, 0]], [[-208.83008337048261, 12.043072729841697], 'arc', [-206.9049939169866, 93.961243004899771], -0.12962841384151869, [-219.40314009232787, 12.979214549217708], [0, 0.0]], [[-219.40314009232787, 12.979214549217708], 'arc', [-267.8010422460743, -300.61611666447044], 0.03351871865640077, [-229.93967071551569, 14.425000077032507], [0.0, 0]], 
-				[[-229.93967071551569, 14.425000077032507], 'arc', [-240.92677559554843, -76.999862261724004], 0.11573428813715014, [-240.57055772261043, 15.082139433137911], [0, 0.0]], [[-240.57055772261043, 15.082139433137911], 'arc', [-240.71817188392683, -23.075989299171454], 0.27779828276077478, [-251.04066439383215, 13.65969807258017], [0.0, 0]], [[-251.04066439383215, 13.65969807258017], 'arc', [-242.57567607217791, -16.465623822020859], 0.16992454992156469, [-256.01318016172644, 11.794321867636626], [0, 0.0]], [[-256.01318016172644, 11.794321867636626], 'arc', [-245.17734238098012, -10.994150243342844], 0.2104506638675665, [-260.53463411573262, 9.0279233789668751], [0.0, 0]],
-				[[-260.53463411573262, 9.0279233789668751], 'arc', [-246.53632094095241, -9.2221243279472418], 0.23123023494418993, [-264.34452983813208, 5.3341358001995349], [0, 0.0]], [[-264.34452983813208, 5.3341358001995349], 'arc', [-249.20680932289585, -7.0392925911225932], 0.2715590034420523, [-267.10876093175716, 0.8202519978831333], [0.0, 0]], [[-267.10876093175716, 0.8202519978831333], 'arc', [-249.2665423581094, -7.0130631286162632], 0.46571121172285235, [-268.72622359573711, -8.0261749836378158], [0, 0.0]], [[-268.72622359573711, -8.0261749836378158], 'arc', [-246.21156015136879, -6.8540143419103048], 0.40435425877893261, [-266.44940797236569, -16.789483437899719],
-				[0.0, 0]], [[-266.44940797236569, -16.789483437899719], 'arc', [-244.47092517365255, -5.9995315452876046], 0.37082443477374216, [-261.04540092073211, -24.020728000786637], [0, 0.0]], [[-261.04540092073211, -24.020728000786637], 'arc', [-241.05944157396158, -2.2902729785055413], 0.30862627966139611, [-253.50047096369829, -29.064739064869968], [0.0, 0]], [[-253.50047096369829, -29.064739064869968], 'arc', [-239.62326175408268, 0.80019905009138981], 0.27584013420355458, [-244.8419895819863, -31.715279478083353], [0, 0.0]], [[-244.8419895819863, -31.715279478083353], 'arc', [-238.06589072956965, 10.503457349381204], 0.21299138385430183, [-235.76447777162534, -32.19362397196204],
-				[0.0, 0]], [[-235.76447777162534, -32.19362397196204], 'arc', [-238.47078055267212, 18.015173047268021], 0.18075021858283424, [-226.78264988391521, -30.889172100489471], [0, 0.0]], [[-226.78264988391521, -30.889172100489471], 'arc', [-244.79625528020526, 44.481612212390729], 0.1174648517334651, [-218.07371069092662, -28.258684171291634], [0.0, 0]], [[-218.07371069092662, -28.258684171291634], 'arc', [-260.72499134987606, 87.839498474880955], 0.1314361139111373, [-203.22599458403249, -21.667511010878343], [0, 0.0]], [[-203.22599458403249, -21.667511010878343], 'arc', [-92.469037644888942, -232.60446324218933], -0.068306326272474571, [-188.5705860526173, -14.599890536272198],
-				[0.0, 0]], [[-188.5705860526173, -14.599890536272198], 'arc', [-149.69709469851063, -102.78427584805539], -0.16952162454973418, [-173.13569474798237, -9.3055821762054798], [0, 0.0]], [[-173.13569474798237, -9.3055821762054798], 'arc', [-162.39562197994647, -52.139538563443175], -0.36667977978282984, [-157.06498466932473, -8.3025531663024026], [0.0, 0]], [[-157.06498466932473, -8.3025531663024026], 'arc', [-162.87259881178846, -56.061930665278226], -0.28585962775677309, [-143.8333608605106, -11.878291845552193], [0, 0.0]], [[-143.8333608605106, -11.878291845552193], 'arc', [-523.06280893157282, -891.94171698195339], -0.014449882577936002, [-131.15658094081763, -17.449798775074555], 
-				[0.0, 0]], [[-131.15658094081763, -17.449798775074555], 'arc', [-85.388886977735353, 84.675375782659955], 0.12403244288059945, [-118.17060386980936, -22.327391129014387], [0, 0.0]], [[-118.17060386980936, -22.327391129014387], 'arc', [-107.95110497400989, 11.030064244703603], 0.39323057709597453, [-104.60888743081347, -23.69726747808761], [0.0, 0]], [[-104.60888743081347, -23.69726747808761], 'arc', [-107.57330606742178, 7.1045427260355574], 0.46571657088000507, [-91.092639370318395, -19.085663743614294], [0, 0.0]], [[-91.092639370318395, -19.085663743614294], 'arc', [-110.56212886315329, 11.854222308789774], 0.39623881296410257, [-80.659862291483364, -9.1741400602619478], [0.0, 0]], 
-				[[-80.659862291483364, -9.1741400602619478], 'arc', [-113.57222708519996, 13.970950046102505], 0.35839544931925449, [-74.632434078480856, 3.8412179203116503], [0, 0.0]], [[-74.632434078480856, 3.8412179203116503], 'arc', [-123.29952147104802, 16.50139201379266], 0.28786601840183579, [-73.040683513823339, 18.179072121095203], [0.0, 0]], [[-73.040683513823339, 18.179072121095203], 'arc', [-130.51313237667037, 16.260611088742387], 0.25092876314976509, [-75.316953837975106, 32.389614335989407], [0, 0.0]], [[-75.316953837975106, 32.389614335989407], 'arc', [-152.6163882640202, 9.8017674618810595], 0.1796392454900575, [-80.596715068893772, 45.837583837561851], [0.0, 0]], [[-80.596715068893772, 45.837583837561851], 'arc', [-170.69976437116662, 0.75337892628185443], 0.14330936851212084, [-87.959277819542677, 58.243873020964465], [0, 0.0]]
-				, [[-87.959277819542677, 58.243873020964465], 'arc', [-253.85996566267437, -57.028745164548155], 0.071565466675909684, [-96.626435028817795, 69.811436065925278], [0.0, 0]], [[-96.626435028817795, 69.811436065925278], 'arc', [-283.44346705144983, -80.893572239789805], 0.22843217427941387, [-135.60670605327681, 108.20136444477635], [0, 0.0]], [[-135.60670605327681, 108.20136444477635], 'arc', [-238.25630147012626, -23.095605368332784], 0.32746979905912632, [-183.29303611080263, 134.24120908520783], [0.0, 0]], [[-183.29303611080263, 134.24120908520783], 'arc', [-229.93278507054811, 0.7311388802664851], 0.33428175338127364, [-229.67814444150082, 142.15299075368253], [0, 0.0]]
-				, [[-229.67814444150082, 142.15299075368253], 'arc', [-229.8679619295682, 36.732497641430683], 0.44516273853423649, [-275.09121051153068, 131.96050920527253], [0.0, 0]], [[-275.09121051153068, 131.96050920527253], 'arc', [-232.81421018934645, 42.936471492836503], 0.40719316490535729, [-306.89098158974338, 107.93844058424611], [0, 0.0]], [[-306.89098158974338, 107.93844058424611], 'arc', [-234.42195876519796, 44.3472622340973], 0.41597118943437295, [-326.40696345451875, 73.232485885828197], [0.0, 0]], [[-326.40696345451875, 73.232485885828197], 'arc', [-241.49122495122745, 46.56721622103489], 0.33993368486659037, [-330.43866749672804, 43.393619449174118], [0, 0.0]], [[-330.43866749672804, 43.393619449174118], 'arc', [-261.13588455560034, 45.86630536266054], 0.43361780765654423, [-322.98589387906014, 14.504445633050352], [0.0, 0]]
-				, [[-322.98589387906014, 14.504445633050352], 'arc', [-259.85085455676233, 46.518038351090915], 0.23697037962119039, [-313.70602974131538, 0.57760501850621937], [0, 0.0]], [[-313.70602974131538, 0.57760501850621937], 'arc', [-235.76742604095466, 67.062083345100945], 0.16414654081413582, [-301.79413753354902, -11.264701183535465], [0.0, 0]], [[-301.79413753354902, -11.264701183535465], 'arc', [-216.7010107244684, 89.680035953639518], 0.12714130281044689, [-288.3076061733388, -21.239645230811568], [0, 0.0]], [[-288.3076061733388, -21.239645230811568], 'arc', [-119.15727487458238, 240.77673332102609], 0.053882459269447125, [-273.950860571563, -29.969204847909737], [0.0, 0]], [[-273.950860571563, -29.969204847909737], 'arc', [-39.050890184548877, 380.88882255253975], 0.10293489850554849, [-230.49052195713728, -51.931211819701481], [0, 0.0]], [[-230.49052195713728, -51.931211819701481], 'arc', [-39.052032894654445, 380.88623903387889], 0.10293549635748267, [-185.00355960964291, -69.31126507679312], [0.0, 0]]
-				, [[-185.00355960964291, -69.31126507679312], 'line', 0, 0, [-239.74035955031167, -73.302508211124348], [0, 0]], [[-239.74035955031167, -73.302508211124348], 'arc', [-333.23117783824853, -175.18941946015067], 0.41257042380838715, [-288.43800090424185, -44.364929825473446], [0, 0.0]], [[-288.43800090424185, -44.364929825473446], 'arc', [-333.23125093444293, -175.18963294740661], 0.4125697506141266, [-344.65254556066748, -37.381461113254829], [0.0, 0]], [[-344.65254556066748, -37.381461113254829], 'arc', [-337.00000248101713, -129.7156486328185], 0.083486358250985493, [-352.3255853799534, -38.341198652030563], [0, 0.0]], [[-352.3255853799534, -38.341198652030563], 'arc', [-345.70718749543187, -77.801522637102778], 0.19283441465962325, [-359.76515053747818, -40.340956241583626], [0.0, 0]], [[-359.76515053747818, -40.340956241583626], 'arc', [-348.82601522308329, -69.490997150408262], 0.24880436319098309, [-366.60636860492946, -43.932268699456444], [0, 0.0]]
-				, [[-366.60636860492946, -43.932268699456444], 'arc', [-354.27231212689856, -61.662107553087822], 0.35669963706802887, [-372.02096105322414, -49.355134071803889], [0.0, 0]], [[-372.02096105322414, -49.355134071803889], 'arc', [-355.13903207554654, -61.061164478830776], 0.26681798229050679, [-374.51004119887261, -54.220500809155411], [0, 0.0]], [[-374.51004119887261, -54.220500809155411], 'arc', [-353.0903579242094, -61.784631735949937], 0.24155821056714855, [-375.69761107461409, -59.564043242308173], [0.0, 0]], [[-375.69761107461409, -59.564043242308173], 'arc', [-351.82343900706235, -61.909056156785333], 0.22851192462468051, [-375.60820355955309, -65.033180460123063], [0, 0.0]], [[-375.60820355955309, -65.033180460123063], 'arc', [-348.83312247720374, -61.516278648938368], 0.20317772159911529, [-374.3477986223167, -70.36358708291533], [0.0, 0]], [[-374.3477986223167, -70.36358708291533], 'arc', [-346.17281058549287, -60.593995927169303], 0.3668441666190585, [-368.96907216697122, -79.819118036909401], [0, 0.0]], [[-368.96907216697122, -79.819118036909401], 'arc', [-337.41597971572344, -53.208962983767762], 0.26645998733896503, [-360.84860165489255, -87.188518958576822], [0.0, 0]]
-				, [[-360.84860165489255, -87.188518958576822], 'arc', [-327.9500115542026, -39.482448879460598], 0.37656296427025637, [-341.0007466243901, -95.94362728670427], [0, 0.0]], [[-341.0007466243901, -95.94362728670427], 'arc', [-505.45707345406402, -807.42830300828393], -0.030238675891371969, [-319.56485252582399, -101.24106904033141], [0.0, 0]], [[-319.56485252582399, -101.24106904033141], 'arc', [-359.56148657712913, -253.1847527699949], -0.19385699005177948, [-291.04284896843365, -111.7923553045632], [0, 0.0]], [[-291.04284896843365, -111.7923553045632], 'arc', [-349.50599921257123, -232.4346398696614], -0.22693506446305101, [-265.39823461069466, -128.03931097401545], [0.0, 0]], [[-265.39823461069466, -128.03931097401545], 'arc', [-318.9463197981417, -194.50355041725265], -0.11819894025338762, [-257.93413642931341, -134.81765566331194], [0, 0.0]], [[-257.93413642931341, -134.81765566331194], 'arc', [-283.89147744550445, -160.21073354447452], -0.27637484963342906, [-251.99018695491182, -142.86427506026376], [0.0, 0]], [[-251.99018695491182, -142.86427506026376], 'arc', [-278.23959431347362, -157.13749874426259], -0.16847073160666959, [-249.96855539494632, -147.4677180085742], [0, 0.0]]
-				, [[-249.96855539494632, -147.4677180085742], 'arc', [-272.83387060591474, -155.28853369135246], -0.20804028027593979, [-248.84625395884333, -152.35902089327988], [0.0, 0]], [[-248.84625395884333, -152.35902089327988], 'arc', [-270.73634811805397, -155.03234889764104], -0.22830511791895169, [-248.80922527950818, -157.38270821939173], [0, 0.0]], [[-248.80922527950818, -157.38270821939173], 'arc', [-267.4798232576228, -155.38141446445672], -0.26768556337175919, [-250.00350901002045, -162.24980917304453], [0.0, 0]], [[-250.00350901002045, -162.24980917304453], 'arc', [-268.08677855466362, -155.14285484574589], -0.30740395629060568, [-253.00167098639793, -167.3883832903818], [0, 0.0]], [[-253.00167098639793, -167.3883832903818], 'arc', [-274.33433258777217, -150.07132318608538], -0.21823471247072579, [-257.25691367444136, -171.5963036718648], [0.0, 0]], [[-257.25691367444136, -171.5963036718648], 'arc', [-278.81367409905806, -144.42573710495301], -0.17238418150961454, [-262.23702784456214, -174.89126527244909], [0, 0.0]], [[-262.23702784456214, -174.89126527244909], 'arc', [-297.01120755460101, -110.98124781808609], -0.082331886540313981, [-267.610710090233, -177.5345697064123], [0.0, 0]], [[-267.610710090233, -177.5345697064123], 'arc', [-440.04271351917743, 212.79959571351637], -0.028191088655825425, [-278.68171221977292, -182.23987542860499], [0, 0.0]]
-				, [[-278.68171221977292, -182.23987542860499], 'arc', [-265.08597184106475, -215.52458515237927], 0.33153807206859542, [-288.77542390225352, -188.47784932563343], [0.0, 0]], [[-288.77542390225352, -188.47784932563343], 'arc', [-269.77070086724342, -210.17584560187498], 0.38087355153567204, [-295.47938054642015, -197.09737745018725], [0, 0.0]], [[-295.47938054642015, -197.09737745018725], 'arc', [-267.73382383897297, -211.21204161332105], 0.35351343430123672, [-298.65009729303551, -207.57560143673993], [0.0, 0]], [[-298.65009729303551, -207.57560143673993], 'arc', [-266.45072380237826, -211.36296266564591], 0.33888245378793957, [-298.07785976264847, -218.49514530630032], [0, 0.0]], [[-298.07785976264847, -218.49514530630032], 'arc', [-263.60502280291553, -210.72123338309802], 0.31137780864136611, [-294.0384450439837, -228.68277578175901], [0.0, 0]], [[-294.0384450439837, -228.68277578175901], 'arc', [-262.16387783670598, -209.87082459821846], 0.29688001074659631, [-287.14084260374887, -237.18435188798964], [0, 0.0]], [[-287.14084260374887, -237.18435188798964], 'arc', [-259.56422731668988, -207.0279801579693], 0.26924727416795013, [-278.12552275140587, -243.43340253424151], [0.0, 0]], [[-278.12552275140587, -243.43340253424151], 'arc', [-258.54110745574786, -205.02159717748845], 0.25487243168330931, [-267.80839756376071, -247.13018831150538], [0, 0.0]]
-				, [[-267.80839756376071, -247.13018831150538], 'arc', [-257.39717839549201, -199.82382733072376], 0.2271229755457167, [-256.88879429452197, -248.25962834009715], [0.0, 0]], [[-256.88879429452197, -248.25962834009715], 'arc', [-257.44897764187613, -194.87892372974073], 0.41059267293269741, [-235.62829598138154, -243.59926118703009], [0, 0.0]], [[-235.62829598138154, -243.59926118703009], 'arc', [-265.59096637133695, -176.69981985733875], 0.30099862272409261, [-217.14144037439178, -231.70836735491673], [0.0, 0]], [[-217.14144037439178, -231.70836735491673], 'arc', [-276.78958264159468, -163.98513495495581], 0.24325943485304968, [-202.58528163122315, -215.34717146237995], [0, 0.0]], [[-202.58528163122315, -215.34717146237995], 'arc', [-340.01796484065312, -120.22030689788082], 0.13180398796952808, [-191.27548569057606, -196.4603073720736], [0.0, 0]], [[-191.27548569057606, -196.4603073720736], 'arc', [-380.53710426528153, -99.451586533944962], 0.13266961954638035, [-180.10627414927805, -170.57214982739524], [0, 0.0]], [[-180.10627414927805, -170.57214982739524], 'arc', [-380.53827069487511, -99.451172639860729], 0.13266882588031059, [-172.45971026999896, -143.43402528580066], [0.0, 0]], [[-172.45971026999896, -143.43402528580066], 'arc', [-153.95607597173449, -107.49364614355082], 0.48671720700364496, [-153.50065999144894, -147.91502577633278], [0, 0.0]]
-				, [[-153.50065999144894, -147.91502577633278], 'arc', [-153.95607394925679, -107.49382565267743], 0.48671948085742756, [-134.64738480557079, -143.00798261665534], [0.0, 0]], [[-134.64738480557079, -143.00798261665534], 'arc', [-153.95612642265866, -107.49372044149541], 0.4867178989023131, [-120.27866057350327, -129.85258031091695], [0, 0.0]], [[-120.27866057350327, -129.85258031091695], 'arc', [-153.95606674600117, -107.49376006151954], 0.48671897200007308, [-113.73168695055458, -111.50422132226237], [0.0, 0]], [[-113.73168695055458, -111.50422132226237], 'arc', [-155.87086755520232, -107.30284601252727], 0.42585590626536707, [-115.75973736359984, -93.721265424220263], [0, 0.0]], [[-115.75973736359984, -93.721265424220263], 'arc', [-165.27231042881391, -110.48616329689202], 0.34678664864335962, [-124.40524679042876, -77.891074682264104], [0.0, 0]], [[-124.40524679042876, -77.891074682264104], 'arc', [-170.74061887430446, -114.84751102564189], 0.30452774975250751, [-137.61831654766331, -65.698167368417259], [0, 0.0]], [[-137.61831654766331, -65.698167368417259], 'arc', [-182.75066621825903, -132.66891542036575], 0.2242888020558137, [-153.64393484942184, -57.337592118244061], [0.0, 0]], [[-153.64393484942184, -57.337592118244061], 'arc', [-196.93950287745534, -169.39096754889221], 0.28954042698327065, [-187.43866688006193, -49.640396478753587], [0, 0.0]]
-				, [[-187.43866688006193, -49.640396478753587], 'arc', [-164.34006629895561, 241.49931073003452], -0.11978832656245952, [-222.06493406970225, -44.793745600822319], [0.0, 0]], [[-222.06493406970225, -44.793745600822319], 'arc', [-191.09884093893049, 108.78660803579001], -0.19866778108612326, [-251.76699759920754, -35.661302002308517], [0, 0.0]], [[-251.76699759920754, -35.661302002308517], 'arc', [-191.09850341511108, 108.78741166346566], -0.19866670173462797, [-279.08243389030628, -20.846399683724258], [0.0, 0]], [[-279.08243389030628, -20.846399683724258], 'arc', [-243.12380862237845, 0.9690994718461674], -0.38016951598425663, [-284.61030014745199, -5.9453604134912075], [0, 0.0]], [[-284.61030014745199, -5.9453604134912075], 'arc', [-243.12420247075582, 0.96903383002560095], -0.38017361442605413, [-284.2140072090495, 9.9430571620686123], [0.0, 0]], [[-284.2140072090495, 9.9430571620686123], 'arc', [-243.12388106209778, 0.96905456818960012], -0.34549979691314725, [-278.74664147295312, 23.328619189133434], [0, 0.0]], [[-278.74664147295312, 23.328619189133434], 'arc', [-243.12407999260378, 0.96917943216544344], -0.34550130435846071, [-269.069118832051, 34.071541769109444], [0.0, 0]], [[-269.069118832051, 34.071541769109444], 'arc', [-243.12384107839915, 0.96888686278499137], -0.34549813530420792, [-256.32520664630573, 40.902170558266363], [0, 0.0]], [[-256.32520664630573, 40.902170558266363], 'arc', [-243.12392947380846, 0.96915425322123383], -0.34550076914959504, [-242.02105943024696, 43.013216710019037], [0.0, 0]], [[-242.02105943024696, 43.013216710019037], 'end', 0, 0]]
-		curve1 = curve[:]
 		self.get_info()	 
 		if  gcodetools.selected_paths != {}:
 			curve =[]
@@ -3598,27 +3860,19 @@ class Gcodetools(inkex.Effect):
 		biarc = Biarc()
 		biarc.from_old_style(curve)
 		#self.error(biarc.items,"warning")
-		biarc.draw(self.layers[-1])
-#		for i in [1,2,3,4,5,6,7] :
-#			biarc.from_old_style(curve)
-#			biarc.offset(i)
-#			biarc.draw(self.layers[-1])
-#			biarc.draw_bounds()
-
-		i = 10
-		biarc.from_old_style(curve)
-		biarc.offset(i)
-		biarc.draw(self.layers[-1])
-
-		biarc1 = Biarc()
-		biarc1.from_old_style(curve)
-		biarc1.offset(-i)
-		biarc1.draw(self.layers[-1])
-
-		biarc1.rebuild_bounds_tree()
-		biarc.rebuild_bounds_tree()
-		biarc.intersect_bounds_trees(biarc1)
-		biarc1.draw(self.layers[-1])
+#		biarc.draw(self.layers[-1])
+		i = 20
+		#biarc.offset(i)
+#		biarc.draw(self.layers[-1])
+#		biarc.offset(i)
+#		biarc.draw(self.layers[-1])
+#		biarc1 = Biarc()
+#		biarc1.from_old_style(curve)
+#		biarc.intersect(biarc1)
+		test_runs = int(ceil(self.options.test_1))
+		for i in range(test_runs) :
+			biarc.from_old_style(curve)
+			biarc.offset(self.options.test_2/test_runs*(i+1)+self.options.test_3)
 
 
 
@@ -3955,8 +4209,7 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--path-to-gcode-sort-paths",	action="store", type="inkbool",		dest="path_to_gcode_sort_paths", default=True,		help="Sort paths to reduce rapid distance.")		
 		self.OptionParser.add_option("",   "--comment-gcode",				action="store", type="string", 		dest="comment_gcode", default="",					help="Comment Gcode")				
 		self.OptionParser.add_option("",   "--comment-gcode-from-properties",action="store", type="inkbool", 	dest="comment_gcode_from_properties", default=False,help="Get additional comments from Object Properties")				
-
-
+		self.OptionParser.add_option("",   "--debug-level",					action="store", type="str", 		dest="debug_level", default=1,						help="Debug level")
 
 		self.OptionParser.add_option("",   "--tool-diameter",				action="store", type="float", 		dest="tool_diameter", default="3",					help="Tool diameter used for area cutting")		
 		self.OptionParser.add_option("",   "--max-area-curves",				action="store", type="int", 		dest="max_area_curves", default="100",				help="Maximum area curves for each area")
@@ -4038,6 +4291,10 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--plasma-prepare-corners",		action="store", type="inkbool",		dest="plasma_prepare_corners", default=True,	help="Prepare corners")
 		self.OptionParser.add_option("",   "--plasma-prepare-corners-distance", action="store", type="float",	dest="plasma_prepare_corners_distance", default=10.,help="Stepout distance for corners")
 		self.OptionParser.add_option("",   "--plasma-prepare-corners-tolerance", action="store", type="float",	dest="plasma_prepare_corners_tolerance", default=10.,help="Maximum angle for corner (0-180 deg)")
+
+		self.OptionParser.add_option("",   "--test-1", action="store", type="float",	dest="test_1", default=10.,help="Test parameters")
+		self.OptionParser.add_option("",   "--test-2", action="store", type="float",	dest="test_2", default=10.,help="Test parameters")
+		self.OptionParser.add_option("",   "--test-3", action="store", type="float",	dest="test_3", default=10.,help="Test parameters")
 
 		self.default_tool = {
 					"name": "Default tool",
@@ -4133,8 +4390,27 @@ class Gcodetools(inkex.Effect):
 		else :
 			return draw_csp(csp, group=group, fill=fill, stroke=stroke, width=width, gcodetools_tag=gcodetools_tag)
 
+	def get_preview_group(self, layer=None, group=None, transform=None, reverse_angle= None):
+		if layer==None : layer = gcodetools.layers[-1]
+		if group==None : 
+			if "preview_groups" not in dir(options.self) :
+				gcodetools.preview_groups = { layer: inkex.etree.SubElement( gcodetools.layers[min(1,len(gcodetools.layers)-1)], inkex.addNS('g','svg'), {"gcodetools": "Preview group"} ) }
+			elif layer not in gcodetools.preview_groups :
+				gcodetools.preview_groups[layer] = inkex.etree.SubElement( gcodetools.layers[min(1,len(gcodetools.layers)-1)], inkex.addNS('g','svg'), {"gcodetools": "Preview group"} )
+			group = gcodetools.preview_groups[layer]
+		if transform == None :	
+			transform = gcodetools.get_transforms(group)
+			if transform != [] : 
+				transform = gcodetools.reverse_transform(transform)
+				transform = simpletransform.formatTransform(transform)
+		if reverse_angle == None :
+			a,b,c = [0.,0.], [1.,0.], [0.,1.]
+			k = (b[0]-a[0])*(c[1]-a[1])-(c[0]-a[0])*(b[1]-a[1])
+			a,b,c = gcodetools.transform(a, layer, True), gcodetools.transform(b, layer, True), gcodetools.transform(c, layer, True)
+			if ((b[0]-a[0])*(c[1]-a[1])-(c[0]-a[0])*(b[1]-a[1]))*k > 0 : reverse_angle = 1
+			else : reverse_angle = -1 
+		return layer, group, transform, reverse_angle
 
-				
 	def draw_arc(self, c, r, ry=None, start=None, end=None, open_=None, layer=None, group=None, fill='none', stroke='#178ade', width=0.354, style=None, gcodetools_tag = None):
 	#	Transforms (using orientation points[layer]) and draws an arc
 
@@ -7099,6 +7375,17 @@ G01 Z1 (going to cutting z)\n""",
 			except :
 				print_  = lambda *x : None 
 		else : print_  = lambda *x : None 
+		
+		try :
+			self.options.debug_level = eval(self.options.debug_level)
+		except :		
+			self.options.debug_level = 0
+		if self.options.debug_level > 16 :
+			exec("import inspect") in globals() # import inspect module only if debug level > 16
+		else : 
+			debugger.add_debugger_to_class = lambda *x: None	
+
+		
 		if self.options.active_tab == '"help"' :
 			self.help()
 			return
