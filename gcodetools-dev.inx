@@ -64,6 +64,7 @@ Gcodetools ver. 1.6
 				<_item value='regex("G01 Z([0-9\.\-]+).*\(Penetrate\)", lambda match: "G00 Z%f (Fast pre-penetrate)\n%s" %(float(match.group(1))+5, match.group(0)));'>Fast pre-penetrate</_item>
 			</param>
 			<param name="postprocessor-custom" type="string" _gui-text="Additional post-processor:"></param>			
+			<param name="preprocessor-custom" type="string" _gui-text="Additional pre-processor:"></param>			
 			
 
 			<param name="create-log" type="boolean" _gui-text="Generate log file">false</param>			
