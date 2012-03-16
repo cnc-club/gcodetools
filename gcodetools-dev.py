@@ -1813,6 +1813,7 @@ class CSP() :
 		self.apply_transforms(el)
 		self.transform(layer)
 
+
 	def length(self) :
 		return sum([subpath.length() for subpath in self.items()])
 
@@ -1835,8 +1836,9 @@ class CSP() :
 	def apply_transforms(self, el, reverse = False) :	
 		# applies inkscape's transforms to csp, el element in inkscape object tree
 		matrix = gcodetools.get_transforms(el)
+		if matrix == [] : return
 		if reverse : 
-			matrix = reverse_transform(self,matrix)
+			matrix = gcodetools.reverse_transform(matrix)
 		self.transform_by_matrix( matrix )
 
 	def clean(self) : 
@@ -1851,31 +1853,39 @@ class CSP() :
 	def point(i,j,t) :
 		return self.items[i].point(j,t)
 		
-	def draw(self, stroke = "#f00", fill = "none", comment = "", width = 0.354, group = None, style = None, gcodetools_tag = None) :
-		if group == None and layer == None :
-			layer = gcodetools.layers[-1]
-		#TODO
-		"""		if layer != None :
-			x1 = x[:]
-			x = []
-			for x1,y1 in zip(x1[::2], x1[1::2]):
-				x1,y1 = gcodetools.transform([x1,y1], layer, True)
-				x += [x1,y1]
-		size = size/2
-		if attrib == None : attrib = {}
-		if pointer_type == None: 
-			pointer_type = "Pointer"
-		attrib["gcodetools"] = pointer_type
-		if gcodetools_tag != None :
-			attrib["gcodetools"] = gcodetools_tag
-		if group == None:
-			group = options.self.current_layer
-		if text != None	:
-			if font_size == None : font_size = 7
-			group = inkex.etree.SubElement( group, inkex.addNS('g','svg'), {"gcodetools": pointer_type+" group"} )		
-			draw_text(text,x[0]+size*2.2,x[1]-size, group = group, font_size = font_size) 
-		return inkex.etree.SubElement( group, inkex.addNS('path','svg'), attributes) 	
-		"""
+	def draw(self, near=None, group=None, style_from=None, layer=None, transform=None, stroke=None, fill=None, width=None,  text="", gcodetools_tag = None) :
+		# near mean draw net to element 
+		# style should be an element to copy style from
+		if near!=None : 
+			group = near.getparent()
+			layer = gcodetools.get_layer(near)
+			if style_from == None : style_from = near
+		layer, group, transform, reverse_angle = gcodetools.get_preview_group(layer, group, transform)
+		if style_from!=None and "style" in style_from.keys() : 
+			style = simplestyle.parseStyle(style_from.get("style"))
+		else :
+			style = {}	
+		if width != None  : style['stroke-width'] = "%s"%width
+		if stroke != None : style['stroke'] = "%s"%stroke
+		if fill != None   : style['fill'] = "%s"%fill
+		style = simplestyle.formatStyle(style)
+
+		csp = self.copy()
+		csp.transform(layer,True)	
+		
+		if text!="" :
+			st = csp.items[0].points[0][1]
+			draw_text(text, st.x+10,st.y , group = group) 
+		attr = {
+				"style":	style,
+				"d": 		cubicsuperpath.formatPath(csp.to_list()),
+				"gcodetools": "Preview %s"%self,
+				}	
+		if transform != [] :
+			attr["transform"] = transform	
+		return inkex.etree.SubElement(	group, inkex.addNS('path','svg'), attr)
+		
+		
 			
 class CSPsubpath() :
 	def __init__(self, subpath=[]) :
@@ -1907,6 +1917,11 @@ class CSPsubpath() :
 			res.append(cp_)
 		return res	
 
+	def draw(self, *args,**kwargs):
+		csp = CSP()
+		csp.items.append(self)
+		return csp.draw(*args,**kwargs)
+
 	def reverse(self) : 
 		for p in self.points :
 			p.reverse()
@@ -1933,7 +1948,7 @@ class CSPsubpath() :
 	def t_at_l(self, i, l, self_l=None, tolerance=0.001) :
 		if self_l == None : self_l = self.l(i)
 		if self_l == 0 : return 0.
-		return bezmisc.beziertatlength(self.cp_to_list(i)[1:]+self.cp_to_list(i)[:2] , l/self_l, tolerance)
+		return bezmisc.beziertatlength(self.cp_to_list(i)[1:]+self.cp_to_list(i+1)[:2] , l/self_l, tolerance)
 	
 	def at_l(self, l, tolerance=0.001) :
 		i = 0
@@ -1967,17 +1982,18 @@ class CSPsubpath() :
 	def taili(self, i, t) :
 		return self.split(i,t)[1:]
 	
-	def head(self,i,t=0) :
-		res = self.copy(end=i-1)
-		res.points[-1:] = []
+	def head(self,i,t=0) : # like [:i] for list
+		res = self.copy(end=i)
 		if t==0 : return res
+		res.points[-1:] = []
 		res.points+=self.headi(i,t)
 		return res
-
-	def tail(self,i,t=0) :
+	
+	def tail(self,i,t=0) :	# like [i:] for list
+		if t==0 : return self.copy(st=i)
 		res = self.copy(st=i+1)
-		res.points[:1] = []
 		if t==1 : return res
+		res.points[:1] = []
 		res.points = self.taili(i,t) + res.points
 		return res
 				
@@ -2006,14 +2022,12 @@ class CSPsubpath() :
 			cp[2].transform(matrix)
 
 	def zerro_segment(self, j) :
-		cp1 = self.points[j]
-		cp2 = self.points[j+1]
+		cp1, cp2 = self.get_segment(j)
 		return (cp1[1]-cp2[1]).l2() + (cp1[1]-cp1[2]).l2() + (cp1[1]-cp2[0]).l2() < 1e-7
 	
 	def parameterize_segment(self,j) :
 		# from bezmisc.bezierparameterize 
-		cp1 = self.points[j]
-		cp2 = self.points[j+1]
+		cp1, cp2 = self.get_segment(j)
 		x0=cp1[1].x
 		y0=cp1[1].y
 		cx=3*(cp1[2].x-x0)
@@ -2037,10 +2051,13 @@ class CSPsubpath() :
 			self.points[0][0]  = self.points[-1][0]
 			self.points[-1][2] = self.points[0][2]
 
+	
+	def get_segment(self,i): 
+		if i>=0 : return self.points[i], self.points[i+1]
+		else : return self.points[i-1], self.points[i]
 			
 	def slope(self,j,t) :
-		cp1 = self.points[j]
-		cp2 = self.points[j+1]
+		cp1, cp2 = self.get_segment(j)
 		if self.zerro_segment(j) : return P(1.,0.)
 		ax,ay,bx,by,cx,cy,dx,dy=self.parameterize_segment(j)
 		slope = P(3*ax*t*t+2*bx*t+cx, 3*ay*t*t+2*by*t+cy)
@@ -2051,14 +2068,14 @@ class CSPsubpath() :
 			slope = cp2[0]-cp1[1]
 			if slope.l2() > 1e-9 :  
 				return slope.unit()
-		elif t == 1 :
+		if t == 1 :
 			slope = cp2[1]-cp1[2]
 			if slope.l2() > 1e-9 :  
 				return slope.unit()
-		else : # probably segment straight
-			slope = cp2[1]-cp1[1]
-			if slope.l2() > 1e-9 :  
-				return slope.unit()
+		# probably segment straight
+		slope = cp2[1]-cp1[1]
+		if slope.l2() > 1e-9 :  
+			return slope.unit()
 		# probably something went wrong		
 		return P(1.,0.)
 	
@@ -3381,9 +3398,14 @@ class Preprocessor(Processors) :
 					"clip_angles": self.clip_angles,
 					}
 	
-	def clip_angles(self, radius, tolerance=10, error="warning") :
-		radius = float(radius)
-		tolerance = float(tolerance)
+	def clip_angles(self, parameters) :
+		tolerance=10
+		error="warning"
+		parameters = parameters.split(",")
+		if len(parameters)==0 : return 
+		else : radius = float(parameters[0])
+		if len(parameters)>1 : tolerance=float(parameters[1])
+		if len(parameters)>2 : error=error[2]
 		gcodetools.clip_angles(radius, tolerance, error)
 
 			
@@ -4232,28 +4254,48 @@ class Gcodetools(inkex.Effect):
 	
 		if self.selected_paths == {} and self.options.auto_select_paths:
 			self.selected_paths = self.paths
+		result = {}	
 		tolerance = cos(tolerance/180*pi) 
 		for layer in self.layers :
 			if layer in self.selected_paths :
+				result[layer] = []
 				r = radius
 				for path in self.selected_paths[layer] :
 					csp = CSP(path)
+					csp_ = CSP() # result
 					for sp in csp.items :
-						for i in range(len(sp.points)-1) :
-							n1 = sp.slope(i,0)
-							n2 = sp.slope(i-1,1)
-							self.error((n1.dot(n2),tolerance))
-
+						if not sp.is_closed() or sp.slope(0,0).dot(sp.slope(-1,1))<tolerance :
+							# Make clip at path's start and end
+							j,t = sp.at_l(r)
+							sp=sp.tail(j,t)
+							sp.reverse()
+							j,t = sp.at_l(r)
+							sp=sp.tail(j,t)
+							sp.reverse()
+						i = 0	
+						while i<len(sp.points)-2 :
+							n1 = sp.slope(i,1)
+							n2 = sp.slope(i+1,0)
+							#draw_pointer([ sp.points[i+1][1]+n1,sp.points[i+1][1], sp.points[i+1][1]+n2],figure="line",text=(n1,n2,n1.dot(n2), tolerance) )
 							if n1.dot(n2)<tolerance :
-								p1 = sp.points[i][1]
-								draw_pointer( sp.points[i][1], size=10, width=1)
-								sp1 = sp.tail(i)
-								draw_pointer( sp1.points[0][1], size=10, width=1, color="blue")
-								warn(sp1.points)
-								j,t = sp1.at_l(r)
-								p = sp1.point(j,t)
-								draw_pointer( [sp.points[i][1],p1, p], figure="line", width=1)
-								#draw_pointer( sp.points[i][1], size=10)
+								#draw_pointer(sp.point(i,1),width=2)
+								sp1 = sp.head(i+1)
+								if len(sp1.points)>1 :
+									sp1.reverse()
+									j,t = sp1.at_l(r)
+									#draw_pointer( [sp1.points[0][1], sp1.point(j,t)], figure="line", width=1)
+									sp1 = sp1.tail(j,t)
+									sp1.reverse()
+									csp_.items.append(sp1)
+								sp = sp.tail(i+1)
+								j,t = sp.at_l(r)
+								sp=sp.tail(j,t) 
+								i = 0
+							else : i+=1	
+						csp_.items.append(sp)
+					path = csp_.draw(layer=layer, style_from=path, stroke="red")		
+					result[layer].append(path)
+		self.selected_paths = result				
 				
 
 		
