@@ -3424,7 +3424,8 @@ class Postprocessor(Processors) :
 					"flip_axis"	: self.flip_axis,
 					"round"		: self.round_coordinates,
 					"parameterize"	: self.parameterize,
-					"regex"			: self.re_sub_on_gcode_lines
+					"regex"			: self.re_sub_on_gcode_lines,
+					"remove_a_turns" : self.remove_a_turns,
 					}
 			
 	def re_sub_on_gcode_lines(self, parameters):
@@ -3437,7 +3438,23 @@ class Postprocessor(Processors) :
 		except Exception as ex :	
 			self.error("Bad parameters for regexp. They should be as re.sub pattern and replacement parameters! For example: r\"G0(\d)\", r\"G\\1\" \n(Parameters: '%s')\n %s"%(parameters, ex), "error")				
 		
-	
+	def remove_a_turns(self, ascale) :
+		if ascale.strip() == "" : ascale = 180/pi
+		ascale = float(ascale)
+		gcode = []
+		p = pi*ascale
+		for s in self.gcode.split("\n") :
+			gcode.append(s)
+			r=re.match("\s*G0?[0123]\s*[^\(]*A\s*([-\.0-9]+).*",s)
+			if r : 
+				a = float(r.group(1))
+			if "subpath end" in s.lower() :
+				gcode.append("(Offset A axis full turns)") 
+				gcode.append("G92 A%f"%( (a+p)%(p*2)-p )    ) 
+		self.gcode = "\n".join(gcode)
+		
+		
+		
 	def remapi(self,parameters):
 		self.remap(parameters, case_sensitive = True)
 	
@@ -5047,13 +5064,13 @@ class Gcodetools(inkex.Effect):
 					a = atan2_(-s[2][1]+s[0][1],s[2][0]-s[0][0]) + pi
 			# calculate all vars		
 			a = calculate_angle(a, current_a)
-			axis4 = " A%s"%((a+s[3])*tool['4th axis scale']+tool['4th axis offset']) if s[1]=="arc" else ""
+			axis4 = " A%f"%((a+s[3])*tool['4th axis scale']+tool['4th axis offset']) if s[1]=="arc" else ""
 			if not forse and ( abs((a-current_a)%pi2)<1e-5 or abs((a-current_a)%pi2 - pi2)<1e-5 ) : 
 				g = ""
 			else :	
-				g = "A%s  (Turn knife)\n" % (a*tool['4th axis scale']+tool['4th axis offset'])
+				g = "A%f  (Turn knife)\n" % (a*tool['4th axis scale']+tool['4th axis offset'])
 				if tool['lift knife at corner']!=0. :
-					g = "G00 Z%s  (Lift up)\n"%(depth+tool['lift knife at corner']) + "G00 "+ g + "G01 Z%s %s (Penetrate back)\n"%(depth,penetration_feed)
+					g = "G00 Z%f  (Lift up)\n"%(depth+tool['lift knife at corner']) + "G00 "+ g + "G01 Z%f %s (Penetrate back)\n"%(depth,penetration_feed)
 				else : 	
 					g = "G01 "+g
 			return a, axis4, g	
@@ -5072,6 +5089,7 @@ class Gcodetools(inkex.Effect):
 		
 		if tool != self.last_used_tool :
 			g += ( "(Change tool to %s)\n" % re.sub("\"'\(\)\\\\"," ",tool["name"]) ) + tool["tool change gcode"] + "\n"
+			self.last_used_tool = tool
 
 		lg, zs, f =  'G00', self.options.Zsafe, " F%f"%tool['feed'] 
 		current_a = None
@@ -5084,8 +5102,10 @@ class Gcodetools(inkex.Effect):
 			feed = f if lg not in ['G01','G02','G03'] else ''
 			if s[1]	== 'move':
 				g += go_to_safe_distance + "G00" + c(si[0]) + "\n" + tool['gcode before path'] + "\n"
+				g += "(Subpath start)\n"
 				lg = 'G00'
 			elif s[1] == 'end':
+				g += "(Subpath end)\n"
 				g += go_to_safe_distance + tool['gcode after path'] + "\n"
 				lg = 'G00'
 			elif s[1] == 'line':
@@ -5118,7 +5138,9 @@ class Gcodetools(inkex.Effect):
 					g += "G01" +c(si[0]+[s[5][1]+depth]) + feed + "\n"
 					lg = 'G01'
 		if si[1] == 'end':
+			g += "(Subpath end)\n"
 			g += go_to_safe_distance + tool['gcode after path'] + "\n"
+			
 		return g
 
 
