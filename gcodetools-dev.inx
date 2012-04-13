@@ -13,7 +13,7 @@
 <!-- Gcodetools: /header block -->
 <!-- Gcodetools: help block -->
 		<page name='help' _gui-text='Help'>
-			<_param name="fullhelp" type="description">
+			<_param name="fullhelp" type="description" xml:space="preserve">
 Gcodetools plug-in: converts paths to Gcode (using circular interpolation), makes offset paths and engraves sharp corners using cone cutters. 
 This plug-in calculates Gcode for paths using circular interpolation or linear motion when needed.
 
@@ -74,7 +74,7 @@ Gcodetools ver. 1.6
 <!-- Gcodetools: /preferences block -->
 <!-- Gcodetools: dxfpoints block -->
 		<page name='dxfpoints' _gui-text='DXF points'>
-			<_param name="help" type="description">
+			<_param name="help" type="description" xml:space="preserve">
 
 Convert selected objects to drill points (as dxf_import plugin does). Also you can save original shape. Only the start point of each curve will be used.
 
@@ -101,7 +101,7 @@ Also you can manually select object, open XML editor (Shift+Ctrl+X) and add or r
 				<param name="path-to-gcode-depth-function" type="string" _gui-text="Depth function:">d</param>			
 				<param name="path-to-gcode-sort-paths" type="boolean" _gui-text="Sort paths to reduce rapid distance">True</param>			
 				
-				<_param name="help" type="description">
+				<_param name="help" type="description" xml:space="preserve">
 Biarc interpolation tolerance is the maximum distance between path and its approximation.
 The segment will be split into two segments if the distance between path's segment and its approximation exceeds biarc interpolation tolerance.
 For depth function c=color intensity from 0.0 (white) to 1.0 (black), d is the depth defined by orientation points, s - surface defined by orientation points. 
@@ -128,7 +128,7 @@ For depth function c=color intensity from 0.0 (white) to 1.0 (black), d is the d
 			<param name="area-inkscape-radius" type="float" min="-1000" max="1000" _gui-text="Area width:">-10</param>
 			<param name="area-tool-overlap" type="float" min="0" max="1" _gui-text="Area tool overlap (0..0.9):">0</param>
 
-			<_param name="help" type="description">
+			<_param name="help" type="description" xml:space="preserve">
 "Create area offset": creates several Inkscape path offsets to fill original path's area up to "Area radius" value. 
 
 Outlines start from "1/2 D" up to "Area width" total width with "D" steps where D is taken from the nearest tool definition ("Tool diameter" value).
@@ -144,7 +144,7 @@ Only one offset will be created if the "Area width" is equal to "1/2 D".
 				<_option value="mark with style">mark with style</_option>
 				<_option value="delete">delete</_option>
 			</param>	
-			<_param name="help" type="description">
+			<_param name="help" type="description" xml:space="preserve">
 Usage: 
 1. Select all Area Offsets (gray outlines)
 2. Object/Ungroup (Shift+Ctrl+G)
@@ -162,7 +162,7 @@ Suspected small objects will be marked out by colored arrows.
 			<param name="engraving-newton-iterations" type="int" min="2" max="10" _gui-text="Accuracy factor (2 low to 10 high):">4</param>
 			<param name="engraving-draw-calculation-paths" type="boolean" _gui-text="Draw additional graphics to see engraving path">false</param>
 			
-			<_param name="help" type="description">
+			<_param name="help" type="description" xml:space="preserve">
 This function creates path to engrave letters or any shape with sharp angles.
 Cutter's depth as a function of radius is defined by the tool.
 Depth may be any Python expression. For instance:
@@ -194,7 +194,7 @@ different X/Y scale)</_option>
 				<_item value="G20 (All units in inches)">in</_item>
 			</param>
 
-			<_param name="help" type="description">
+			<_param name="help" type="description" xml:space="preserve">
 Orientation points are used to calculate transformation (offset,scale,mirror,rotation in XY plane) of the path.
 3-points mode only: do not put all three into one line (use 2-points mode instead).
 
@@ -225,7 +225,7 @@ Now press apply to create control points (independent set for each layer).
 
 			</param>
 			
-			<_param name="help" type="description">
+			<_param name="help" type="description" xml:space="preserve">
 Selected tool type fills appropriate default values. You can change these values using the Text tool later on.
 
 The topmost (z order) tool in the active layer is used. If there is no tool inside the current layer it is taken from the upper layer.
@@ -251,7 +251,7 @@ Press Apply to create new tool.
 
 <!-- Gcodetools: lathe_modify_path block -->
 	<page name='lathe_modify_path' _gui-text='Lathe modify path'>	
-		<_param name="help" type="description">	
+		<_param name="help" type="description" xml:space="preserve">	
 			This function modifies path so it will be able to be cut with the rectangular cutter.
 		</_param>
 		<param name="lathe-rectangular-cutter-width" type="float" precision="5" min="0" max="1000" _gui-text="Lathe width:">4</param>
@@ -293,7 +293,7 @@ packets will be needed)">false</param>
 		<param name='in-out-path-replace-original-path' type="boolean" _gui-text="Replace original path" >False</param>
 		<param name='in-out-path-do-not-add-reference-point' type="boolean" _gui-text="Do not add in-out reference points" >False</param>
 
-		<_param name="help" type="description">-------------------------------------------------</_param>
+		<_param name="help" type="description" xml:space="preserve">-------------------------------------------------</_param>
 		<param name='plasma-prepare-corners' type="boolean" _gui-text="Prepare corners" >True</param>
 		<param name='plasma-prepare-corners-distance' type="float" precision="5" min="0" max="1000000" _gui-text='Stepout distance for corners:'>10</param>
 		<param name='plasma-prepare-corners-tolerance' type="float" precision="5" min="0" max="180" _gui-text='Maximum angle for corner (0-180 deg):'>170</param>
@@ -321,13 +321,13 @@ packets will be needed)">false</param>
 
 <!-- Gcodetools: update block -->
 	<page name='update' _gui-text='Check for updates'>	
-		<_param name="help" type="description">Check for Gcodetools latest stable version and try to get the updates.</_param>
+		<_param name="help" type="description" xml:space="preserve">Check for Gcodetools latest stable version and try to get the updates.</_param>
 	</page>
 <!-- Gcodetools: /update block -->
 
 <!-- Gcodetools: test block -->
 	<page name='test' _gui-text='Test'>	
-		<_param name="help" type="description">This page was created for testing purpouses.</_param>
+		<_param name="help" type="description" xml:space="preserve">This page was created for testing purpouses.</_param>
 		<param name="test-1" type="float" precision="5" min="0" max="1000" _gui-text="Test parameter 1:">10</param>
 		<param name="test-2" type="float" precision="5" min="0" max="1000" _gui-text="Test parameter 2:">10</param>
 		<param name="test-3" type="float" precision="5" min="0" max="1000" _gui-text="Test parameter 3:">10</param>
@@ -338,7 +338,7 @@ packets will be needed)">false</param>
 
 <!-- Gcodetools: about block -->
 	<page name='about' _gui-text='About'>	
-		<_param name="help" type="description">Gcodetools was developed to make simple Gcode from Inkscape's paths. Gcode is a special format which is used in most of CNC machines. So Gcodetools allows you to use Inkscape as CAM program. 
+		<_param name="help" type="description" xml:space="preserve">Gcodetools was developed to make simple Gcode from Inkscape's paths. Gcode is a special format which is used in most of CNC machines. So Gcodetools allows you to use Inkscape as CAM program. 
 
 It can be used with a lot of machine types:  
 	Mills 
