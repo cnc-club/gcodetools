@@ -2290,6 +2290,15 @@ class Arc():
 							P([P2.x+h*(P1.y-P0.y)/d, P2.y-h*(P1.x-P0.x)/d]),
 							P([P2.x-h*(P1.y-P0.y)/d, P2.y+h*(P1.x-P0.x)/d]),
 						] ))
+
+	def point_d2(self, p):
+		if self.point_inside_angle(p) :
+			l = (p-self.c).mag()
+			if l == 0 : return self.r**2
+			else : return ((p-self.c)*(1 - self.r/l)).l2()
+		else :
+			return min( (p-self.st).l2(), (p-self.end).l2() )	
+
 				
 				
 			
@@ -2418,19 +2427,60 @@ class Line():
 				(self.st.y-1e-7<=p.y<=self.end.y+1e-7 or self.end.y-1e-7<=p.y<=self.st.y+1e-7)) :
 			   		res.append(p)
 		return res
-				
-				
+	
+	def point_d2(self, p) : 
+		w0 = p - self.st
+		v = self.end - self.st
+		c1 = w0.dot(v)
+		if c1 <= 0 :
+			return w0.l2()
+		c2 = v.dot(v)
+		if c2 <= c1 :	
+			return (p-self.end).l2()
+			
+		return ((self.st+c1/c2*v)-p).l2()
+
+
 class Biarc_Bounds_Tree_Node:
-	def __init__(self,i,x1,y1,x2,y2,l,r) :
+	def __init__(self,i,x1,y1,x2,y2,l,r, item=None) :
 		self.x1, self.y1, self.x2, self.y2,  = min(x1,x2),min(y1,y2), max(x1,x2),max(y1,y2)
 		self.l = l
 		self.r = r
 		self.i = i
-	def intersect(self,b) :
+		self.item = item
+		
+	def intersect(self, b) :
 		return not ( b.x1 > self.x2 or self.x1 > b.x2 or  
 				  b.y1 > self.y2 or self.y1 > b.y2 )
-				
 	
+	def point_inside(self, p): 
+		p1 = P(self.x1,self.y1)-p
+		p2 = P(self.x2,self.y1)-p
+		p3 = P(self.x2,self.y2)-p
+		p4 = P(self.x1,self.y2)-p
+		c1 = p1.cross(p2)
+		c2 = p2.cross(p3)
+		c3 = p3.cross(p4)
+		c4 = p4.cross(p1)
+
+		if c1*c2*c3*c4 == 0 : return True 
+		if c1>0 and c2>0 and c3>0 and c4>0 or c1<0 and c2<0 and c3<0 and c4<0 : return True
+		return False
+					
+	def point_d2(self, p) :
+		pa = [P(self.x1,self.y1), P(self.x2,self.y1), P(self.x1,self.y2), P(self.x2,self.y2)]
+		mind = 1e100
+		maxd = None
+		i = self.point_inside(p)
+		for p1 in pa :
+			l = (p-p1).l2()
+			if l<mind :
+				mind = l
+			if l>maxd :
+				maxd = l
+		if i : mind = 0
+		return mind, maxd
+				
 class Biarc:
 	def __init__(self, items=None):
 		debugger.add_debugger_to_class(self.__class__)
@@ -2481,9 +2531,42 @@ class Biarc:
 			draw_pointer(l.end,color="blue", size=10)
 			draw_pointer(l.st,color="blue", size=10, text=count)		
 		return count
+	
+	
+	def point_d2_recursion(self, a, p, mind,maxd) : 
+		# returns (exit,d)
+		mind2, maxd2 = a.point_d2(p)
+		if maxd2<mind : return maxd2
+		if mind2>maxd : return mind2
+		
+		if a.r != None : 
+			d = self.point_d2_recursion(a.r, p, mind,maxd )
+			if d<mind : return d
+		if a.l != None :
+			d1 = self.point_d2_recursion(a.l, p, mind,maxd )
+			if d1<mind : return d1
+		if a.r != None and a.l != None : 
+			return min(d,d1)
+		# we are at the bottom. and we are in the bounds so:
+		draw_pointer([a.item.st,p], figure="line", color="blue")
+		return a.item.point_d2(p)
+		
 		
 	
-	def rebuild_bounds_tree (self) :
+	def point_d2(self, p, mind,maxd, rebuild_bounds = True ) :
+		if rebuild_bounds : 
+			self.rebuild_bounds_tree()
+		d = 1e100	
+		for a in self.bounds_tree :
+			d1 = self.point_d2_recursion(a, p, mind,maxd)
+			if d1<mind : return d1 
+			else : d = min(d,d1)
+			#maxd = min(d, maxd)
+		return d	
+			
+		
+	
+	def rebuild_bounds_tree(self) :
 		""" Bounds tree is needed to increase biarcs intersection speed
 			Tree is firstly bounds of subcurves as roots, then binary tree of their elements."""
 		self.bounds_tree = []
@@ -2505,7 +2588,7 @@ class Biarc:
 			else : 
 				self.tree_len += 1
 				x1,y1, x2,y2 = self.items[k][i].bounds()
-				return Biarc_Bounds_Tree_Node (i,x1,y1,x2,y2,None,None)		
+				return Biarc_Bounds_Tree_Node (i,x1,y1,x2,y2,None,None, item = self.items[k][i])		
 		for i in range(len(self.items)) :
 			self.bounds_tree.append( create_tree(0,len(self.items[i])-1,i) ) 	
 	
@@ -2705,6 +2788,12 @@ class Biarc:
 		self.connect_subitems()
 		self.draw()
 		self.check()	
+		orig.draw()
+		for subitems in self.items :
+			for i in subitems :
+				d = orig.point_d2(i.st,0,100)
+				draw_pointer(i.st, figure="cross", size=d, text="%f"%d)
+				
 
 		# remove floating ends. 
 		ends = [i[-1] for i in b.items]
@@ -2712,6 +2801,7 @@ class Biarc:
 		for i in range(len(ends)) : 
 			for j in range(i+1,len(ends)) :
 				pass
+	
 		#self.clip()
 
 	def connect_subitems(self) :
