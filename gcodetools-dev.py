@@ -2653,10 +2653,7 @@ class Biarc:
 				points[i].sort()
 				si = self.items[i]
 				j0, last_p = 0, None
-				for j in points[i] :
-					warn(j)
 				for j,t,p in points[i] :
-
 					items.append( si[j0:j] )
 					items[-1].append(si[j].copy())
 					items[-1][-1].head(p)
@@ -2714,17 +2711,20 @@ class Biarc:
 	
 	def clean(self) :			
 		# clean biarc from 0 length elements.
+		
 		i = 0
 		while i<len(self.items) :
 			j = 0
-			
+			closed = self.items[i][0].st.near(self.items[i][-1].end)
 			while j<len(self.items[i]) :
 				item = self.items[i][j]
 				if ( item.__class__==Line and item.l<1e-3 or
 					 item.__class__==Arc and abs(item.r)<1e-3 or
 					 (item.st-item.end).l2()<1e-5   )  :
-					 		
-					 		self.items[i][j-1].rebuild(end=self.items[i][j].end)
+					 		if not closed and j==0 : 
+					 			self.items[i][j+1].rebuild(st=self.items[i][j].st)
+					 		else: 
+					 			self.items[i][j-1].rebuild(end=self.items[i][j].end)
 							self.items[i][j:j+1] = []
 							continue
 				j += 1		
@@ -2747,49 +2747,16 @@ class Biarc:
 		self.clean()
 		orig = self.copy()
 
-		#b = self.copy()		
-
-		#if debugger.get_debug_level() :
-		#	self.draw(width=.1,)
-
-		"""if r>0 : 
-			b.offset_items(r-0.01)
-		else: 
-			b.offset_items(r+0.01)
-		if debugger.get_debug_level() :
-			b.draw(width=.1,style="biarc_style_dark")
-		"""
-		"""
-		i = 0
-		b1 = Biarc()
-		while i<len(self.items):
-			b1.items = [self.items[i]]
-			if len(b1.intersect(b))>0 : 
-				if debugger.get_debug_level("Offset clip") : 
-					for i1 in b1.intersect(b) : 
-						draw_pointer(i1[4], figure="cross", width=.1, size=1., color="green", text="Offset clipping intersection")
-				self.items[i:i+1] = []
-				continue
-
-			c = b.point_inside(self.items[i][0].st)
-			if c==True or c%2==1 : 
-				if debugger.get_debug_level("Offset clip") : 
-					draw_pointer(self.items[i][0].st, figure="cross", width=.1, size=1., color="purple", text="Offset clipping point inside c=%s"%c)
-				self.items[i:i+1] = []
-				continue
-	
-			i += 1	
-		"""
 		self.offset_items(r)
-		self.rebuild_bounds_tree()
 		self.check()	
 
+		self.rebuild_bounds_tree()
 		self.split_by_points(self.intersect(self))
-#		self.draw(width=.1)		
-#		self.draw(width=.1)
-#		return		
-				
+
 		self.clean()
+#		self.draw(width=.1)
+#		return 
+
 		orig.rebuild_bounds_tree()
 		i = 0
 		while i<len(self.items):
@@ -2810,11 +2777,10 @@ class Biarc:
 				continue
 			i += 1		
 				
-		self.clean()		
 		self.connect_subitems()		
-		
+		self.clean()		
 
-		orig.draw(width=.1)
+#		orig.draw(width=.1)
 		self.draw(width=.1)
 
 	def connect_subitems(self) :
