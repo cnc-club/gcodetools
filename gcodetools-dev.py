@@ -127,11 +127,13 @@ def isset(variable):
 debug_level = {
 	"offset": 					0b000001*256,
 	"offset clip": 				0b000010*256,
+	"point inside":				0b1000000*256,
 	"split_by_points": 			0b000010*256,
 	"intersect": 				0b000100*256,
 	"check_intersection":	 	0b001000*256,
 	"bounds": 					0b010000*256,
 	"intersect_bounds_trees":	0b10000000000000000000000*256,
+	"timing":					0b1000000000000000000000*256,
 }
 
 debug_classes = {
@@ -139,6 +141,7 @@ debug_classes = {
 	"Arc" : ["intersect","check_intersections"],
 	"Line" : ["intersect","check_intersections"],
 }
+
 
 class Debugger:
 	def get_debug_level(self, level_name=None, fname=None) :
@@ -2165,19 +2168,17 @@ class Arc():
 		self.__init__(st,end,c,a,r)
 
 	def get_t_at_point(self, p, y=None) :
-		if not p.__class__ == P : p = P(p,y) 
-		a1,a2,a = (self.st-self.c).angle(), (self.end-self.c).angle(), (p-self.c).angle()
-		inside = ( self.a>=0 and (a1<=a<=a2 or a2<=a1<=a or a<=a2<=a1) or
-				 self.a<0 and (a2<=a<=a1 or a1<=a2<=a or a<=a1<=a2) )
-		return abs( asin( (self.st-self.c).cross((p-self.c))/(self.r**2) ) ) if inside else -1. # consuming all arcs les than 180 deg
+		if y!=None : p = P(p,y)
+		if not self.point_inside_angle(p) : return -1.
+		return abs( acos( (self.st-self.c).dot((p-self.c))/(self.r**2) )/pi ) # consuming all arcs les than 180 deg
 
 		
-	def point_inside_angle(self,p,y=None) : 
-		if not p.__class__ == P : p = P(p,y) 
-		a1,a2,a = (self.st-self.c).angle(), (self.end-self.c).angle(), (p-self.c).angle()
-		return ( self.a>=0 and (a1<=a<=a2 or a2<=a1<=a or a<=a2<=a1) or
-				 self.a<0 and (a2<=a<=a1 or a1<=a2<=a or a<=a1<=a2) )
-	
+	def point_inside_angle(self,p,y=None) :  # TODO need to be done faster! 
+		if y!=None : p = P(p,y)
+		if (p-self.c).l2() != self.r**2 :  # p is not on the arc, lets move it there
+			p = self.c+(p-self.c).unit()*self.r
+		return abs(  acos( (self.cp-self.c).dot(p-self.c) /self.r**2  )  )  <  abs(self.a/2) 
+
 	def bounds(self) : 
 		# first get bounds of start/end 
 		x1,y1, x2,y2 =  ( min(self.st.x,self.end.x),min(self.st.y,self.end.y),
@@ -2193,17 +2194,12 @@ class Arc():
 			x2 = max(x2, self.c.x+self.r)
 		return x1,y1, x2,y2
 
-	def clip_by_point(self, p, from_start) :
-		if from_start : 
-			self.rebuild(st=p) 
-		else :
-			self.rebuild(end=p)
-	
-	def split_by_point(self, p) :
-		n = self.copy().clip_by_point(p, False)
-		self.clip_by_point(p, True)
-		return n		
-		
+	def head(self,p):
+		self.rebuild(end=p)
+
+	def tail(self,p):
+		self.rebuild(st=p)
+
 	def offset(self, r):
 		oldr = self.r
 		if self.a>0 :
@@ -2252,13 +2248,11 @@ class Arc():
 			attr["transform"] = transform	
 		inkex.etree.SubElement(	group, inkex.addNS('path','svg'), attr)
 	
-	def check_intersection(self, points):
+	def check_intersection(self, points): 
 		res = []
-		cp = self.cp-self.c
  		for p in points :
-			a = acos(cp.dot(p-self.c)/(self.r**2))
-			if abs(a)<abs(self.a/2) :
-				res.append(p)
+ 			if self.point_inside_angle(p) :
+ 				res.append(p)
 		return res		
 		
 	def intersect(self,b) :
@@ -2337,17 +2331,12 @@ class Line():
 		return  ( min(self.st.x,self.end.x),min(self.st.y,self.end.y),
 				  max(self.st.x,self.end.x),max(self.st.y,self.end.y) )
 	
-	def clip_by_point(self, p, from_start) :
-		if from_start : 
-			self.rebuild(st=p)
-		else :
-			self.rebuild(end=p)
+	def head(self,p):
+		self.rebuild(end=p)
 
-	def split_by_point(self, p) :
-		n = self.copy().clip_by_point(p, False)
-		self.clip_by_point(p, True)
-		return n
-			
+	def tail(self,p):
+		self.rebuild(st=p)
+
 	def offset(self, r):
 		self.st -= self.n*r
 		self.end -= self.n*r
@@ -2443,7 +2432,18 @@ class Line():
 
 class Biarc_Bounds_Tree_Node:
 	def __init__(self,i,x1,y1,x2,y2,l,r, item=None) :
-		self.x1, self.y1, self.x2, self.y2,  = min(x1,x2),min(y1,y2), max(x1,x2),max(y1,y2)
+		if x1<x2 : 
+			self.x1 = x1
+			self.x2 = x2
+		else :
+			self.x1 = x2
+			self.x2 = x1
+		if y1<y2 : 
+			self.y1 = y1
+			self.y2 = y2
+		else :
+			self.y1 = y2
+			self.y2 = y1
 		self.l = l
 		self.r = r
 		self.i = i
@@ -2454,31 +2454,22 @@ class Biarc_Bounds_Tree_Node:
 				  b.y1 > self.y2 or self.y1 > b.y2 )
 	
 	def point_inside(self, p): 
-		p1 = P(self.x1,self.y1)-p
-		p2 = P(self.x2,self.y1)-p
-		p3 = P(self.x2,self.y2)-p
-		p4 = P(self.x1,self.y2)-p
-		c1 = p1.cross(p2)
-		c2 = p2.cross(p3)
-		c3 = p3.cross(p4)
-		c4 = p4.cross(p1)
-
-		if c1*c2*c3*c4 == 0 : return True 
-		if c1>0 and c2>0 and c3>0 and c4>0 or c1<0 and c2<0 and c3<0 and c4<0 : return True
-		return False
+		return self.x1<=p.x<=self.x2 and self.y1<=p.y<=self.y2
 					
 	def point_d2(self, p) :
-		pa = [P(self.x1,self.y1), P(self.x2,self.y1), P(self.x1,self.y2), P(self.x2,self.y2)]
+		pa = [P(self.x1,self.y1), P(self.x2,self.y1), P(self.x2,self.y2), P(self.x1,self.y2)]
 		mind = 1e100
-		maxd = None
-		i = self.point_inside(p)
-		for p1 in pa :
-			l = (p-p1).l2()
-			if l<mind :
-				mind = l
-			if l>maxd :
-				maxd = l
-		if i : mind = 0
+		maxd = 0.
+		for pl in pa :
+			l = (p-pl).l2()
+			if l>maxd :	maxd = l
+			
+		if self.point_inside(p) : mind = 0
+		else :
+			for i in range(len(pa)) :
+				l = Line(pa[i-1],pa[i]).point_d2(p)
+				if l<mind : mind = l
+
 		return mind, maxd
 				
 class Biarc:
@@ -2518,15 +2509,16 @@ class Biarc:
 		for subitems in self.items :
 			for item in subitems :
 				p = l.intersect(item)
-				if debugger.get_debug_level() :
+				if debugger.get_debug_level("point inside"):
 					[draw_pointer(p,size=.5, width=.1, text="x") for i in p ]
 				if item.__class__==Arc and len(p)==1 and abs(l.n.dot(p[0]-item.c))<1e-10 : count +=2 # touches intem at tangent point.
 				else : count += len(p)
-		if debugger.get_debug_level() :
+		if debugger.get_debug_level("point inside") :
 			if count%2==1 :		
-				l.draw(width=.1)
+				warn(l)
+				l.draw(width=.1, color="red")
 			else :
-				l.draw(width=.1)	
+				l.draw(width=.1, color="blue")	
 			draw_pointer(l.st,color="red",size=10	)
 			draw_pointer(l.end,color="blue", size=10)
 			draw_pointer(l.st,color="blue", size=10, text=count)		
@@ -2548,14 +2540,11 @@ class Biarc:
 		if a.r != None and a.l != None : 
 			return min(d,d1)
 		# we are at the bottom. and we are in the bounds so:
-		draw_pointer([a.item.st,p], figure="line", color="blue")
+		#draw_pointer([a.item.st,p], figure="line", color="blue")
 		return a.item.point_d2(p)
 		
-		
-	
-	def point_d2(self, p, mind,maxd, rebuild_bounds = True ) :
-		if rebuild_bounds : 
-			self.rebuild_bounds_tree()
+
+	def point_d2(self, p, mind,maxd) :
 		d = 1e100	
 		for a in self.bounds_tree :
 			d1 = self.point_d2_recursion(a, p, mind,maxd)
@@ -2564,7 +2553,6 @@ class Biarc:
 			#maxd = min(d, maxd)
 		return d	
 			
-		
 	
 	def rebuild_bounds_tree(self) :
 		""" Bounds tree is needed to increase biarcs intersection speed
@@ -2628,8 +2616,8 @@ class Biarc:
 		selfintersect = b==self  
 		
 		# rebuild bounds trees, just in case
-		self.rebuild_bounds_tree()
-		if not selfintersect : b.rebuild_bounds_tree()
+#		self.rebuild_bounds_tree()
+#		if not selfintersect : b.rebuild_bounds_tree()
 		
 		# get the intersections
 		bounds_int = self.intersect_bounds_trees(b)
@@ -2665,16 +2653,24 @@ class Biarc:
 				points[i].sort()
 				si = self.items[i]
 				j0, last_p = 0, None
+				for j in points[i] :
+					warn(j)
 				for j,t,p in points[i] :
+
 					items.append( si[j0:j] )
 					items[-1].append(si[j].copy())
-					items[-1][-1].rebuild(end=p)
+					items[-1][-1].head(p)
+#					draw_pointer([items[-1][-1].st,items[-1][-1].end],figure="line",text="%s"%items[-1][-1])
 					if last_p!=None :
-						items[-1][0].rebuild(st=last_p)
+#						draw_pointer([items[-1][0].st,items[-1][0].end],figure="line",text="%s--- %s"%(items[-1][0],last_p))
+						items[-1][0].tail(last_p)
+#						draw_pointer([items[-1][0].st,items[-1][0].end],figure="line",text="%s--- %s"%(items[-1][0],last_p))
 					last_p = p
 					j0 = j
 				items.append(si[j0:])
-				if last_p!=None : items[-1][0].clip_by_point(last_p,True)
+				if last_p!=None : 
+					items[-1][0].tail(last_p)
+#					draw_pointer([items[-1][0].st,items[-1][0].end],figure="line",text="%s"%items[-1][0])
 				
 		self.items = items		
 											
@@ -2712,6 +2708,7 @@ class Biarc:
 				if i.__class__ == Arc :
 					if ((i.st-i.c).rot(i.a)+i.c-i.end).l2()>1e-8 : 
 						i.draw(color="red",width=5)
+						draw_pointer(i.st, text="Bad Arc %s"%i)
 		if check_close : self.check_close()
 				
 	
@@ -2737,8 +2734,6 @@ class Biarc:
 			i += 1	
 	
 	def offset_items(self,r) :
-		self.close()
-		self.clean()		
 		for subitems in self.items :
 			for item in subitems :
 				item.offset(r)
@@ -2746,26 +2741,25 @@ class Biarc:
 		self.connect(r)
 		
 		
-	def offset(self,r) :
-		orig = self.copy()
-		if debugger.get_debug_level() :
-			orig.draw(width=.1,)
-
-		b = self.copy()		
-		self.offset_items(r)
-		if debugger.get_debug_level() :
-			self.draw(width=.1,)
-
+	def offset(self,r, tolerance = 0.0001) :
+		self.close()
 		self.check()
-		if r>0 : 
+		self.clean()
+		orig = self.copy()
+
+		#b = self.copy()		
+
+		#if debugger.get_debug_level() :
+		#	self.draw(width=.1,)
+
+		"""if r>0 : 
 			b.offset_items(r-0.01)
 		else: 
 			b.offset_items(r+0.01)
 		if debugger.get_debug_level() :
 			b.draw(width=.1,style="biarc_style_dark")
-
-		self.split_by_points(self.intersect(self))
-		
+		"""
+		"""
 		i = 0
 		b1 = Biarc()
 		while i<len(self.items):
@@ -2773,36 +2767,55 @@ class Biarc:
 			if len(b1.intersect(b))>0 : 
 				if debugger.get_debug_level("Offset clip") : 
 					for i1 in b1.intersect(b) : 
-						draw_pointer(i1[4], figure="cross", width=.1, color="green", text="Offset clipping intersection")
+						draw_pointer(i1[4], figure="cross", width=.1, size=1., color="green", text="Offset clipping intersection")
 				self.items[i:i+1] = []
 				continue
 
 			c = b.point_inside(self.items[i][0].st)
 			if c==True or c%2==1 : 
-				pass
+				if debugger.get_debug_level("Offset clip") : 
+					draw_pointer(self.items[i][0].st, figure="cross", width=.1, size=1., color="purple", text="Offset clipping point inside c=%s"%c)
 				self.items[i:i+1] = []
 				continue
 	
 			i += 1	
-		self.clean()		
-		self.connect_subitems()
-		self.draw()
+		"""
+		self.offset_items(r)
+		self.rebuild_bounds_tree()
 		self.check()	
-		orig.draw()
-		for subitems in self.items :
-			for i in subitems :
-				d = orig.point_d2(i.st,0,100)
-				draw_pointer(i.st, figure="cross", size=d, text="%f"%d)
-				
 
-		# remove floating ends. 
-		ends = [i[-1] for i in b.items]
-		sts = [i[0] for i in b.items]
-		for i in range(len(ends)) : 
-			for j in range(i+1,len(ends)) :
-				pass
-	
-		#self.clip()
+		self.split_by_points(self.intersect(self))
+#		self.draw(width=.1)		
+#		self.draw(width=.1)
+#		return		
+				
+		self.clean()
+		orig.rebuild_bounds_tree()
+		i = 0
+		while i<len(self.items):
+			items = self.items[i]
+			if len(items) == 1:  
+				if items[0].__class__ == Line :
+					p = (items[0].end+items[0].st)*.5
+				else : 	
+					p = items[0].cp 
+			elif len(items) > 1 : 
+				p = items[1].st
+			d =	orig.point_d2(p,r**2-tolerance,r**2+tolerance)		
+			if abs(d-r**2)>tolerance : 
+				if debugger.get_debug_level("Offset clip") : 
+						draw_pointer(p, figure="cross", width=.1, size=1., color="purple", text="Offset clip on a distance d=%s at r=%.4f"%(sqrt(d),r))
+						items[0].draw(color="red", width=.1)
+				self.items[i:i+1] = []					
+				continue
+			i += 1		
+				
+		self.clean()		
+		self.connect_subitems()		
+		
+
+		orig.draw(width=.1)
+		self.draw(width=.1)
 
 	def connect_subitems(self) :
 		joined = True
@@ -2870,8 +2883,8 @@ class Biarc:
 						for p in points :
 							if l2==None or (point-a.st).l2()<l2 : point = p 
 						# now we've got only one point		
-						a.clip_by_point(point, from_start=False)
-						b.clip_by_point(point, from_start=True)
+						a.head(point)
+						b.tail(point)
 #					for p in a.intersect(b) : 
 #						draw_pointer(p.to_list(), layer=gcodetools.layers[-1], color="orange")
 				i += 1				
@@ -4305,7 +4318,8 @@ class Arangement_Genetic:
 
 class Gcodetools(inkex.Effect):
 
-	def test(self):
+	def test_prof(self) :
+		
 		self.get_info()	 
 		if  gcodetools.selected_paths != {}:
 			curve =[]
@@ -4318,22 +4332,28 @@ class Gcodetools(inkex.Effect):
 					for subpath in csp:
 						curve += gcodetools.parse_curve([subpath], layer)
 		biarc = Biarc()
-		biarc.from_old_style(curve)
-		#self.error(biarc.items,"warning")
-#		biarc.draw(self.layers[-1])
-		i = 20
-		#biarc.offset(i)
-#		biarc.draw(self.layers[-1])
-#		biarc.offset(i)
-#		biarc.draw(self.layers[-1])
-#		biarc1 = Biarc()
-#		biarc1.from_old_style(curve)
-#		biarc.intersect(biarc1)
 		test_runs = int(ceil(self.options.test_1))
 		for i in range(test_runs) :
 			biarc.from_old_style(curve)
 			biarc.offset(self.options.test_2/test_runs*(i+1)+self.options.test_3)
 
+	def test(self) :
+		if self.options.test_string == "" :
+			self.options.test_string = "gcodetools.test_prof()" 
+		if 	self.options.test_profile : 
+			import profile
+			from cStringIO import StringIO
+			old_stdout = sys.stdout
+			sys.stdout = mystdout = StringIO()
+			profile.run(self.options.test_string,"stats")
+			import pstats
+			p = pstats.Stats('stats')
+			p.sort_stats('cumulative').print_stats()
+			warn(mystdout.getvalue())
+			sys.stdout = old_stdout
+		else: 
+	#		gcodetools.test_prof()
+			eval(self.options.test_string)
 
 
 	def export_gcode(self,gcode, no_headers = False) :
@@ -4815,6 +4835,8 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--test-1", action="store", type="float",	dest="test_1", default=10.,help="Test parameters")
 		self.OptionParser.add_option("",   "--test-2", action="store", type="float",	dest="test_2", default=10.,help="Test parameters")
 		self.OptionParser.add_option("",   "--test-3", action="store", type="float",	dest="test_3", default=10.,help="Test parameters")
+		self.OptionParser.add_option("",   "--test-string",	action="store", type="string", 	dest="test_string", default='',	help="See inx.")		
+		self.OptionParser.add_option("",   "--test-profile",	action="store", type="inkbool", 	dest="test_profile", default=False,	help="See inx.")		
 
 		self.default_tool = {
 					"name": "Default tool",

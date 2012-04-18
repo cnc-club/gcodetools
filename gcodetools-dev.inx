@@ -331,7 +331,8 @@ packets will be needed)">false</param>
 		<param name="test-1" type="float" precision="5" min="0" max="1000" _gui-text="Test parameter 1:">10</param>
 		<param name="test-2" type="float" precision="5" min="0" max="1000" _gui-text="Test parameter 2:">10</param>
 		<param name="test-3" type="float" precision="5" min="0" max="1000" _gui-text="Test parameter 3:">10</param>
-		
+		<param name="test-string" type="string"  _gui-text="Exec this string as a test:">gcodetools.test_prof()</param>
+		<param name="test-profile" type="boolean" _gui-text="Profile test function">false</param> 
 	</page>
 <!-- Gcodetools: /test block -->
 
