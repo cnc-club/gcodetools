@@ -2177,6 +2177,12 @@ class Arc():
 		if y!=None : p = P(p,y)
 		if (p-self.c).l2() != self.r**2 :  # p is not on the arc, lets move it there
 			p = self.c+(p-self.c).unit()*self.r
+		warn( (self.cp-self.c).dot(p-self.c),self.r**2, (self.cp-self.c).dot(p-self.c)/self.r**2)
+		try:
+			abs(  acos( (self.cp-self.c).dot(p-self.c) /self.r**2  )  )  <  abs(self.a/2)
+		except :
+			self.draw()
+			return True	 
 		return abs(  acos( (self.cp-self.c).dot(p-self.c) /self.r**2  )  )  <  abs(self.a/2) 
 
 	def bounds(self) : 
