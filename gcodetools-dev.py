@@ -1632,7 +1632,7 @@ def draw_csp(csp, stroke = "#f00", fill = "none", comment = "", width = 0.354, g
 		
 	return inkex.etree.SubElement( group, inkex.addNS('path','svg'), attributes) 
 	
-def draw_pointer(x1,color = "#f00", figure = "cross", group = None, comment = "", fill="none", width = .1, size = 2., text = None, font_size=None, pointer_type=None, style= None, attrib = None, gcodetools_tag = None, layer=None) :
+def draw_pointer(x1, color = "#f00", figure = "cross", group = None, comment = "", fill="none", width = .1, size = 2., text = None, font_size=None, pointer_type=None, style= None, attrib = None, gcodetools_tag = None, layer=None) :
 	if x1.__class__ == P : x1 =[x1]	 
 	x = []
 	for i in x1 :
@@ -1739,8 +1739,8 @@ def cubic_solver(a,b,c,d):
 			t = m-sqrt(n)
 			n1 = pow(t/2,1./3) if t>=0 else -pow(-t/2,1./3)
 		else :
-			m1 = pow(complex((m+cmath.sqrt(n))/2),1./3)
-			n1 = pow(complex((m-cmath.sqrt(n))/2),1./3)
+			m1 = complex((m+cmath.sqrt(n))/2)**(1./3) 
+			n1 = complex((m-cmath.sqrt(n))/2)**(1./3)
 		x1 = -1./3 * (a + m1 + n1)
 		x2 = -1./3 * (a + w1*m1 + w2*n1)
 		x3 = -1./3 * (a + w2*m1 + w1*n1)
@@ -7094,7 +7094,7 @@ class Gcodetools(inkex.Effect):
 			draw_text(axis,graffiti_reference_points_count*100+10,-10, group = g, gcodetools_tag = "Gcodetools graffiti reference point text")
 
 		elif self.options.orientation_points_count == "in-out reference point" :
-			draw_pointer(group = self.current_layer, x = self.view_center, figure="arrow", pointer_type = "In-out reference point", text = "In-out point")
+			draw_pointer(self.view_center, group = self.current_layer, figure="arrow", size=10, fill="#0072a7", pointer_type = "In-out reference point", text = "In-out point")
 	
 		else :
 			print_("Inserting orientation points")
