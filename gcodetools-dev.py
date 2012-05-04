@@ -1791,6 +1791,64 @@ class CSP() :
 			self.from_el(csp)
 		self.clean()		
 	
+	def join(self, others=None, tolerance=None) :
+		if type( others == CSP) :
+			others = [others]
+		if others != None :	
+			for csp in others :
+				self.items += csp.copy().items
+		joined_smf = True
+		while joined_smf : 
+			joined_smf = False
+			i=0
+			while i<len(self.items) :
+				j=i+1
+				while j<len(self.items) :
+					if self.items[i].points[-1][1].near(self.items[j].points[0][1], tolerance) :
+						self.concat_subpaths(i,j)
+						joined_smf = True
+						continue
+					if self.items[i].points[0][1].near(self.items[j].points[-1][1], tolerance) :
+						self.reverse(i)
+						self.reverse(j)						
+						self.concat_subpaths(i,j)
+						joined_smf = True
+						continue
+					if self.items[i].points[0][1].near(self.items[j].points[0][1], tolerance) :
+						self.reverse(i)
+						self.concat_subpaths(i,j)
+						joined_smf = True
+						continue
+					if self.items[i].points[-1][1].near(self.items[j].points[-1][1], tolerance) :
+						self.reverse(j)
+						self.concat_subpaths(i,j)
+						joined_smf = True
+						continue
+					j += 1
+				i += 1
+						
+						
+	
+	def concat_subpaths(self, i,j) :
+		if not self.items[i].points[-1][1].near(self.items[j].points[0][1]):
+			self.items[i].points[-1][2] = self.items[i].points[-1][1].copy()
+			self.items[j].points[0][0] = self.items[j].points[0][1].copy()
+		else :
+			self.items[i].points[-1][2] = self.items[j].points[0][2].copy()
+			self.items[j].points[0:1] = []
+		self.items[i].points += self.items[j].points	
+		self.items[j:j+1] = []
+	
+	def reverse(self, i=None) :
+		if i==None : 
+			for i in range(len(self.items())) :
+				self.reverse(i)
+		else :
+			item = self.items[i]
+			for cp in item.points : 
+				cp.reverse()
+			item.points.reverse()	  
+	
 	def copy(self) : 
 		res = CSP()
 		for subpath in self.items :
@@ -2129,9 +2187,10 @@ class P:
 		x = self.x
 		self.x = x*matrix[0][0] + self.y*matrix[0][1] + matrix[0][2] 
 		self.y = x*matrix[1][0] + self.y*matrix[1][1] + matrix[1][2] 
-	def near(self, b) :
-		return (self-b).l2() < 1e-7
-			
+	def near(self, b, tolerance=None ) :
+		if tolerance==None : tolerance = 1e-7
+		return (self-b).l2() < tolerance
+	def copy(self) : return P(self.x,self.y)
 	
 ################################################################################
 ###		Biarc classes - Arc, Line and Biarc
@@ -3471,6 +3530,7 @@ class Preprocessor(Processors) :
 		self.error = error_function_handler 
 		self.functions = {
 					"clip_angles": self.clip_angles,
+					"join_paths": self.join_paths,
 					}
 	
 	def clip_angles(self, parameters) :
@@ -3484,6 +3544,9 @@ class Preprocessor(Processors) :
 		gcodetools.clip_angles(radius, tolerance, error)
 
 			
+	def join_paths(self, tolerance) :
+		tolerance = float(tolerance) if tolerance.strip() != "" else None
+		gcodetools.join_paths(tolerance)
 	
 	
 class Postprocessor(Processors) :
@@ -3527,7 +3590,6 @@ class Postprocessor(Processors) :
 				gcode.append("(Offset A axis full turns)") 
 				gcode.append("G92 A%f"%( (a+p)%(p*2)-p )    ) 
 		self.gcode = "\n".join(gcode)
-		
 		
 		
 	def remapi(self,parameters):
@@ -4344,6 +4406,27 @@ class Gcodetools(inkex.Effect):
 		f.write(postprocessor.gcode)
 		f.close()							
 
+################################################################################
+###		Join paths: (for preprocessor)
+###		TODO move it to the bottom
+################################################################################
+	def join_paths(self, tolerance) :
+		result = {}
+		if self.selected_paths == {} and self.options.auto_select_paths:
+			self.selected_paths = self.paths
+
+		for layer in self.layers :
+			if layer in self.selected_paths :
+				result[layer] = []
+				csp = CSP()
+				for path in self.selected_paths[layer] :
+					csp.join(CSP(path), tolerance)
+				if len(csp.items)>0 : 
+					path = csp.draw(layer=layer, style_from=path, stroke="red")		
+					result[layer] = [path]
+
+		self.selected_paths = result				
+			
 
 ################################################################################
 ###		Clip paths angles:
