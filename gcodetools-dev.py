@@ -1633,6 +1633,7 @@ def draw_csp(csp, stroke = "#f00", fill = "none", comment = "", width = 0.354, g
 	return inkex.etree.SubElement( group, inkex.addNS('path','svg'), attributes) 
 	
 def draw_pointer(x1, color = "#f00", figure = "cross", group = None, comment = "", fill="none", width = .1, size = 2., text = None, font_size=None, pointer_type=None, style= None, attrib = None, gcodetools_tag = None, layer=None) :
+	layer, group, transform, reverse_angle = gcodetools.get_preview_group(layer, group, None)
 	if x1.__class__ == P : x1 =[x1]	 
 	x = []
 	for i in x1 :
@@ -4545,8 +4546,7 @@ class Gcodetools(inkex.Effect):
 
 			if self.selected_paths == {}:
 				self.error(_("Nothing is selected. Please select something."),"warning")
-			a = self.options.plasma_prepare_corners_tolerance
-			corner_tolerance = cross([1.,0.], [cos(a),sin(a)])
+			corner_tolerance = cos((180-self.options.plasma_prepare_corners_tolerance)*pi/180)
 
 			for layer in self.layers :
 				if layer in self.selected_paths :
@@ -4579,17 +4579,18 @@ class Gcodetools(inkex.Effect):
 										# remove last node to make iterations easier
 										subpath[0][0] = subpath[-1][0]
 										del subpath[-1]
-										max_cross = [-1e100, None]
+										min_ang = [1., None]
 										for j in range(len(subpath)) :
 											sp1,sp2,sp3 = subpath[j-2],subpath[j-1],subpath[j]
 											if point_to_point_d2(sp2[1],p_)<max_dist**2:
-												s1,s2 = csp_normalized_slope(sp1,sp2,1.), csp_normalized_slope(sp2,sp3,0.)
-												max_cross = max(max_cross,[cross(s1,s2),j-1])
+												N1, N2 = P(csp_normalized_normal(sp1,sp2,1.)), P(csp_normalized_normal(sp2,sp3,0.))
+												if N1.cross(N2) < 0 :
+													min_ang = min(min_ang,[N1.dot(N2),j-1])
 										# return back last point		
 										subpath.append(subpath[0])
-										if max_cross[1] !=None  and max_cross[0]>corner_tolerance :
+										if min_ang[1] !=None  and min_ang[0]<corner_tolerance :
 											# there's an angle near the point
-											j = max_cross[1]
+											j = min_ang[1]
 											if j<0 : j -= 1
 											if j!=0 :
 												subpath	= csp_concat_subpaths(subpath[j:],subpath[:j+1])
@@ -4607,7 +4608,9 @@ class Gcodetools(inkex.Effect):
 								for sp2, sp3 in zip(subpath[1:],subpath[2:]) :
 									sp1 = res_[-1]
 									s1,s2 = csp_normalized_slope(sp1,sp2,1.), csp_normalized_slope(sp2,sp3,0.)
-									if cross(s1,s2) > corner_tolerance :
+									N1, N2 = P(csp_normalized_normal(sp1,sp2,1.)), P(csp_normalized_normal(sp2,sp3,0.))
+									tolerance = cos((180-self.options.plasma_prepare_corners_tolerance)*pi/180)
+									if N1.cross(N2) < 0  and N1.dot(N2) < tolerance :
 										# got a corner to process
 										S1,S2 = P(s1),P(s2)
 										N = (S1-S2).unit()*plasma_l
