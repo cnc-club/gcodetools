@@ -7822,6 +7822,9 @@ G01 Z1 (going to cutting z)\n""",
 					start_point = [0.,0.]
 				last_sp1 = [[start_point[0],start_point[1]-10] for i in range(3)]	
 				last_sp2 = [start_point for i in range(3)]
+				
+				real_pos, g = get_gcode_coordinates(start_point,layer)
+				gcode += "(Start point %s )\n"%g
 
 				self.set_tool(layer)
 				self.tool = self.tools[layer][0]
@@ -7918,7 +7921,7 @@ G01 Z1 (going to cutting z)\n""",
 					if self.options.graffiti_create_linearization_preview :
 						t += 1
 						csp = [ [polyline[i],polyline[i],polyline[i]] for i in range(len(polyline))]
-						draw_csp(self.transform_csp([csp],layer,reverse=True), color = "#00cc00;" if polyline_[0]=='draw' else "#ff5555;")
+						draw_csp(self.transform_csp([csp],layer,reverse=True), stroke = "#00cc00;" if polyline_[0]=='draw' else "#ff5555;")
 
 	
 				# Export polyline to gcode
