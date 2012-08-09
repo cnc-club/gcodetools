@@ -113,7 +113,6 @@ For depth function c=color intensity from 0.0 (white) to 1.0 (black), d is the d
 		<page name='area_fill' _gui-text='Fill area'>
 			<param name="area-fill-angle" type="float" min="-360" max="360" _gui-text="Area fill angle">0</param>
 			<param name="area-fill-shift" type="float" min="-1" max="1" _gui-text="Area fill shift">0</param>
-			<param name="area-fill-method" type="float" min="-1" max="1" _gui-text="Area fill shift">0</param>
 			<param name="area-fill-method"  _gui-text="Filling method" type="optiongroup">
 				<_option value="zig-zag">Zig zag</_option>
 				<_option value="spiral">Spiral</_option>
