@@ -1,0 +1,2 @@
+stable/gcodetools.py /usr/share/inkscape/extensions/
+stable/*.inx /usr/share/inkscape/extensions/

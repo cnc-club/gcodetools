@@ -1,0 +1,13 @@
+Source: gcodetools
+Priority: extra
+Maintainer: Pavel Shramov <shramov@mexmat.net>
+Build-Depends: debhelper (>= 5.0.0)
+Standards-Version: 3.8.0
+Section: devel
+Homepage: http://www.cnc-club.ru/forum/viewtopic.php?t=34
+
+Package: gcodetools
+Section: devel
+Architecture: all
+Depends: inkscape
+Description: Inkscape extension to create G-code from image
