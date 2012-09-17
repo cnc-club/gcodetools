@@ -1,4 +1,5 @@
 #!/usr/bin/env python 
+# -*- coding: utf-8 -*-
 """
 Comments starting "#LT" or "#CLT" are by Chris Lusby Taylor who rewrote the engraving function in 2011.
 History of CLT changes to engraving and other functions it uses:
@@ -69,6 +70,7 @@ gcodetools_current_version = "1.7"
 
 import inkex, simplestyle, simplepath
 import cubicsuperpath, simpletransform, bezmisc
+from simplepath import formatPath
 
 import os
 from math import *
@@ -290,6 +292,7 @@ styles = {
 		"area artefact": 		simplestyle.formatStyle({ 'stroke': '#ff0000', 'fill': '#ffff00', 'stroke-width':'1' }),
 		"area artefact arrow":	simplestyle.formatStyle({ 'stroke': '#ff0000', 'fill': '#ffff00', 'stroke-width':'1' }),
 		"dxf_points":		 	simplestyle.formatStyle({ "stroke": "#ff0000", "fill": "#ff0000"}),
+		"dxf_points_save":		 	simplestyle.formatStyle({ "stroke": "#ff0000", "fill": "none"}),
 		
 	}
 
@@ -4851,6 +4854,8 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--tools-library-type",			action="store", type="string", 		dest="tools_library_type", default='cylinder cutter',	help="Create tools definition")
 
 		self.OptionParser.add_option("",   "--dxfpoints-action",			action="store", type="string", 		dest="dxfpoints_action", default='replace',			help="dxfpoint sign toggle")
+		
+		self.OptionParser.add_option("",   "--drilling-strategy",			action="store", type="string", 		dest="drilling_strategy", default='drillg83',			help="d")
 																										  
 		self.OptionParser.add_option("",   "--help-language",				action="store", type="string", 		dest="help_language", default='http://www.cnc-club.ru/forum/viewtopic.php?f=33&t=35',	help="Open help page in webbrowser.")
 
@@ -5839,7 +5844,12 @@ class Gcodetools(inkex.Effect):
 		def print_dxfpoints(points):
 			gcode=""
 			for point in points:
-				gcode +="(drilling dxfpoint)\nG00 Z%f\nG00 X%f Y%f\nG01 Z%f F%f\nG04 P%f\nG00 Z%f\n" % (self.options.Zsafe,point[0],point[1],self.Zcoordinates[layer][1],self.tools[layer][0]["penetration feed"],0.2,self.options.Zsafe) 
+				if self.options.drilling_strategy == 'drillg01':
+					gcode +="(drilling dxfpoint)\nG00 Z%f\nG00 X%f Y%f\nG01 Z%f F%f\nG04 P%f\nG00 Z%f\n" % (self.options.Zsafe,point[0],point[1],self.Zcoordinates[layer][1],self.tools[layer][0]["penetration feed"],0.2,self.options.Zsafe) 
+				if self.options.drilling_strategy == 'drillg73':
+					gcode +="(drilling dxfpoint)\nG00 Z%f\nG73 X%f Y%f Z%f R%f Q%f F%f\n" % (self.options.Zsafe,point[0],point[1],self.Zcoordinates[layer][1], self.options.Zsafe, self.tools[layer][0]["depth step"], self.tools[layer][0]["penetration feed"]) 
+				if self.options.drilling_strategy == 'drillg83':
+					gcode +="(drilling dxfpoint)\nG00 Z%f\nG83 X%f Y%f Z%f R%f Q%f F%f\n" % (self.options.Zsafe,point[0],point[1],self.Zcoordinates[layer][1], self.options.Zsafe, self.tools[layer][0]["depth step"], self.tools[layer][0]["penetration feed"])
 #			print_(("got dxfpoints array=",points))
 			return gcode
 		
@@ -6002,25 +6012,61 @@ class Gcodetools(inkex.Effect):
 			self.error(_("Nothing is selected. Please select something to convert to drill point (dxfpoint) or clear point sign."),"warning")
 		for layer in self.layers :
 			if layer in self.selected_paths :
+				group_number=0
 				for path in self.selected_paths[layer]:
 #					print_(("processing path",path.get('d')))
 					if self.options.dxfpoints_action == 'replace':
 #						print_("trying to set as dxfpoint")
-						
-						path.set("dxfpoint","1")
-						r = re.match("^\s*.\s*(\S+)",path.get("d"))
-						if r!=None:
-							print_(("got path=",r.group(1)))
-							path.set("d","m %s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z" % r.group(1))
-							path.set("style",styles["dxf_points"])
+						# creates the group of dxfpoints
+						group_name='dxfpoints_group_'+str(group_number)
+						group_id = self.uniqueId(group_name)
+						g = inkex.etree.SubElement(layer, 'g', {'id':group_id})
+						pathstring=path.get('d')
+						p = cubicsuperpath.parsePath(pathstring)    # (node.get('d'))
+						for sub in p:
+							for csp in sub[:len(sub)-1]:
+								arrowpath = inkex.etree.Element(inkex.addNS('path','svg'))
+								arrow = [[ 'M', [ csp[1][0],csp[1][1] ] ],[ 'l', [ 2.9375,-6.34375 ] ],[ 'l', [ 0.8125,1.90625 ] ],[ 'l', [ 6.843748640396,-6.84374864039 ] ],[ 'l', [ 0,0 ] ],[ 'l', [ 0.6875,0.6875 ] ],[ 'l', [ -6.84375,6.84375 ] ],[ 'l', [ 1.90625,0.812500000001 ] ],[ 'z', [] ]]
+								arrowpath.set("style",styles["dxf_points"])
+								arrowpath.set('d',formatPath(arrow))
+								arrowpath.set("dxfpoint","1")
+								g.append(arrowpath)
+						# delete the original path
+						parent=path.getparent()
+						parent.remove(path)
 
 					if self.options.dxfpoints_action == 'save':
-						path.set("dxfpoint","1")
+						# creates the group of dxfpoints
+						group_name='dxfpoints_group_'+str(group_number)
+						group_id = self.uniqueId(group_name)
+						g = inkex.etree.SubElement(layer, 'g', {'id':group_id})
+						pathstring=path.get('d')
+						p = cubicsuperpath.parsePath(pathstring)    # (node.get('d'))
+						for sub in p:
+							prev_node=[]
+							prev_handle=[]
+							for csp in sub:
+								if (prev_node==[]):
+									prev_node   = [ csp[1][0],csp[1][1] ]
+									prev_handle = [ csp[2][0],csp[2][1] ]
+								else :
+									segment = inkex.etree.Element(inkex.addNS('path','svg'))
+									segment_array = [['M',prev_node ] , ['C',prev_handle] , [' ',[csp[0][0],csp[0][1]]] , [' ',[csp[1][0],csp[1][1]]]]
+									segment.set("style",styles["dxf_points_save"])
+									segment.set('d',formatPath(segment_array))
+									segment.set("dxfpoint","1")
+									g.append(segment)
+									prev_node   = [ csp[1][0],csp[1][1] ]
+									prev_handle = [ csp[2][0],csp[2][1] ]
+						# delete the original path
+						parent=path.getparent()
+						parent.remove(path)
 
 					if self.options.dxfpoints_action == 'clear' and path.get("dxfpoint") == "1":
 						path.set("dxfpoint","0")
 #						for id, node in self.selected.iteritems():
 #							print_((id,node,node.attrib))
+					group_number+=1
 
 
 ################################################################################
