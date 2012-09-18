@@ -5866,11 +5866,12 @@ class Gcodetools(inkex.Effect):
 			return res
 		
 		def get_depth_from_path_description(node):
-			desc = get_path_properties(path, True, {inkex.addNS('desc','svg'):"Description"})
-			# self.error(desc["Description"])
-			r = re.search("depth\s*:\s*(-?[0-9.]+)",desc["Description"],re.M)
-			if r:
-				depth = float(r.group(1)) 
+			desc = get_path_properties(node, True, {inkex.addNS('desc','svg'):"Description"})
+			# self.error(len(desc))
+			if (len(desc)>0):
+				r = re.search("depth\s*:\s*(-?[0-9.]+)",desc["Description"],re.M)
+				if r:
+					depth = float(r.group(1)) 
 			else: 
 				depth = self.Zcoordinates[layer][1]
 			# self.error(depth)
