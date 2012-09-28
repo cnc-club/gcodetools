@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+    <_name>Besier console creator</_name>
+    <id>ru.cnc-club.filter.bezier-console</id>
+    <dependency type="executable" location="extensions">bezier-console.py</dependency>
+    <dependency type="executable" location="extensions">inkex.py</dependency>
+    
+        <param name="string"    type="string" _gui-text="Console string:"></param>
+        
+   	    <param name="silent" type="boolean" _gui-text="Do not show warnings, use with live preview">False</param>
+   	    
+		<param name="units" type="enum" _gui-text="Units (mm, in, px):">
+			<_item value="3.543307">mm</_item>
+			<_item value="90">in</_item>
+			<_item value="1">px</_item>
+			<_item value="1.25">pt</_item>
+			<_item value="15">pc</_item>
+			<_item value="35.43307">cm</_item>
+		</param>
+	    
+    <effect>
+	<object-type>all</object-type>
+        <effects-menu>
+            <submenu _name="Render"/>
+        </effects-menu>						    		
+    </effect>
+    <script>
+        <command reldir="extensions" interpreter="python">bezier-console.py</command>
+    </script>
+</inkscape-extension>
