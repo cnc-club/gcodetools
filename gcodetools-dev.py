@@ -5276,7 +5276,7 @@ class Gcodetools(inkex.Effect):
 			if s[1] in ["line","arc"] and point_to_point_d2(s[0],si[0]) < 1e-7 : continue
 			feed = f if lg not in ['G01','G02','G03'] else ''
 			if s[1]	== 'move':
-				g += go_to_safe_distance + "G00" + c(si[0]) + "\n" + tool['gcode before path'] + "\n"
+				g += go_to_safe_distance + "G00" + c(si[0]) + "\n" + tool['gcode before path']
 				g += "(Subpath start)\n"
 				lg = 'G00'
 			elif s[1] == 'end':
@@ -5845,11 +5845,11 @@ class Gcodetools(inkex.Effect):
 			gcode=""
 			for point in points:
 				if self.options.drilling_strategy == 'drillg01':
-					gcode +="(drilling dxfpoint)\nG00 Z%f\nG00 X%f Y%f\nG01 Z%f F%f\nG04 P%f\nG00 Z%f\n" % (self.options.Zsafe,point[0],point[1],self.Zcoordinates[layer][1],self.tools[layer][0]["penetration feed"],0.2,self.options.Zsafe) 
+					gcode +="(drilling dxfpoint)\nG00 Z%f\nG00 X%f Y%f\nG01 Z%f F%f\nG04 P%f\nG00 Z%f\n" % (self.options.Zsafe,point[0],point[1],point[2],self.tools[layer][0]["penetration feed"],0.2,self.options.Zsafe) 
 				if self.options.drilling_strategy == 'drillg73':
-					gcode +="(drilling dxfpoint)\nG00 Z%f\nG73 X%f Y%f Z%f R%f Q%f F%f\n" % (self.options.Zsafe,point[0],point[1],self.Zcoordinates[layer][1], self.options.Zsafe, self.tools[layer][0]["depth step"], self.tools[layer][0]["penetration feed"]) 
+					gcode +="(drilling dxfpoint)\nG00 Z%f\nG73 X%f Y%f Z%f R%f Q%f F%f\n" % (self.options.Zsafe,point[0],point[1],point[2], self.options.Zsafe, self.tools[layer][0]["depth step"], self.tools[layer][0]["penetration feed"]) 
 				if self.options.drilling_strategy == 'drillg83':
-					gcode +="(drilling dxfpoint)\nG00 Z%f\nG83 X%f Y%f Z%f R%f Q%f F%f\n" % (self.options.Zsafe,point[0],point[1],self.Zcoordinates[layer][1], self.options.Zsafe, self.tools[layer][0]["depth step"], self.tools[layer][0]["penetration feed"])
+					gcode +="(drilling dxfpoint)\nG00 Z%f\nG83 X%f Y%f Z%f R%f Q%f F%f\n" % (self.options.Zsafe,point[0],point[1],point[2], self.options.Zsafe, self.tools[layer][0]["depth step"], self.tools[layer][0]["penetration feed"])
 #			print_(("got dxfpoints array=",points))
 			return gcode
 		
@@ -5864,6 +5864,18 @@ class Gcodetools(inkex.Effect):
 					done = True	
 				node =	node.getparent()
 			return res
+		
+		def get_depth_from_path_description(node):
+			desc = get_path_properties(node, True, {inkex.addNS('desc','svg'):"Description"})
+			# self.error(len(desc))
+			if (len(desc)>0):
+				r = re.search("depth\s*:\s*(-?[0-9.]+)",desc["Description"],re.M)
+				if r:
+					depth = float(r.group(1)) 
+			else: 
+				depth = self.Zcoordinates[layer][1]
+			# self.error(depth)
+			return depth
 
 		if self.selected_paths == {} and self.options.auto_select_paths:
 			paths=self.paths
@@ -5923,11 +5935,12 @@ class Gcodetools(inkex.Effect):
 						tmp_curve=self.transform_csp(csp, layer)
 						x=tmp_curve[0][0][0][0]
 						y=tmp_curve[0][0][0][1]
-						print_("got dxfpoint (scaled) at (%f,%f)" % (x,y))
-						dxfpoints += [[x,y]]
+						z = get_depth_from_path_description(path)
+						print_("got dxfpoint (scaled) at (%f,%f,%f)" % (x,y,z))
+						dxfpoints += [[x,y,z]]
 					else:
-						
-						zd,zs = self.Zcoordinates[layer][1],	self.Zcoordinates[layer][0]
+						zd = get_depth_from_path_description(path)
+						zs = self.Zcoordinates[layer][0]
 						c = 1. - float(sum(colors[id_]))/255/3
 						curves += 	[
 										 [  
@@ -5960,17 +5973,18 @@ class Gcodetools(inkex.Effect):
 						keys = range(len(curves))
 					for key in keys:
 						d = curves[key][0][1]
+						gcode += gcode_comment_str("\nStart cutting path id: %s at depth: %s" % (curves[key][0][0],d))
 						for step in range( 0,  int(ceil( abs((zs-d)/self.tools[layer][0]["depth step"] )) ) ):
 							z = max(d, zs - abs(self.tools[layer][0]["depth step"]*(step+1)))
 							
-							gcode += gcode_comment_str("\nStart cutting path id: %s"%curves[key][0][0])
+							gcode += gcode_comment_str("path id: %s at depth step: %s" % (curves[key][0][0],z))
 							if curves[key][0][2] != "()" :
 								gcode += curves[key][0][2] # add comment
 								
 							for curve in curves[key][1]:
 								gcode += self.generate_gcode(curve, layer, z)
 								
-							gcode += gcode_comment_str("End cutting path id: %s\n\n"%curves[key][0][0])
+						gcode += gcode_comment_str("End cutting path id: %s at depth: %s" % (curves[key][0][0],d))
 							
 				else:	# pass by pass
 					mind = min( [curve[0][1] for curve in curves] )	
@@ -5990,14 +6004,14 @@ class Gcodetools(inkex.Effect):
 							keys = range(len(curves_))
 						for key in keys:
 				
-							gcode += gcode_comment_str("Start cutting path id: %s"%curves[key][0][0])
+							gcode += gcode_comment_str("Start cutting path id: %s at depth %s"%(curves[key][0][0],max(z,curves_[key][0][1])))
 							if curves[key][0][2] != "()" :
 								gcode += curves[key][0][2] # add comment
 
 							for subcurve in curves_[key][1]:
 								gcode += self.generate_gcode(subcurve, layer, max(z,curves_[key][0][1]))
 				
-							gcode += gcode_comment_str("End cutting path id: %s\n\n"%curves[key][0][0])
+							gcode += gcode_comment_str("End cutting path id: %s at depth %s\n\n"%(curves[key][0][0],max(z,curves_[key][0][1])))
 
 							
 		self.export_gcode(gcode)
