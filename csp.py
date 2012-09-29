@@ -92,8 +92,6 @@ class CSP() :
 		for subpath in csp :
 			self.items.append(CSPsubpath(subpath))	
 
-			
-			
 	def to_list(self) :
 		res = []
 		for subpath in self.items :
@@ -113,9 +111,12 @@ class CSP() :
 	def to_string(self) : 
 		return cubicsuperpath.formatPath(self.to_list()) 
 
-
 	def length(self) :
 		return sum([subpath.length() for subpath in self.items()])
+
+	def slope(self,i,j,t) :
+		# slope - normalized slope, i.e. l(n)=1
+		return self.items[i].slope(j,t)
 
 	def normal(self,i,j,t) :
 		# normal - normalized normal, i.e. l(n)=1

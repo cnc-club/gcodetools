@@ -1,13 +1,15 @@
-import points
+from points import P
 from math import *
 import inkex
+from csp import CSP, CSPsubpath
+pi2 = pi*2
 
 ################################################################################
 ###		Biarc classes - Arc, Line and Biarc
 ################################################################################
 class Arc():
 	def __init__(self,st,end,c,a,r=None) :
-		debugger.add_debugger_to_class(self.__class__)
+		#debugger.add_debugger_to_class(self.__class__)
 		# a - arc's angle, it's not defining actual angle before now, but defines direction so it's value does not mather matters only the sign.
 		if st.__class__ == P :  st = st.to_list()
 		if end.__class__ == P : end = end.to_list()
@@ -28,6 +30,27 @@ class Arc():
 	def copy(self) :
 		return Arc(self.st,self.end,self.c,self.a,self.r)	
 
+	def to_csp(self) :
+		# Taken from cubicsuperpath's ArcToCsp	
+		O = self.c
+		sectors = int(abs(self.a)*2/pi)+1
+		da = self.a/sectors
+		v = 4*tan(da/4)/3
+		angle = (self.st-self.c).angle()
+		cspsubpath = CSPsubpath()
+		for i in range(sectors+1) :
+			c,s = cos(angle)*self.r, sin(angle)*self.r
+			v1=P([O.x+c - (-v)*s,	O.y+s + (-v)*c])
+			pt=P([O.x+c,			O.y+s])
+			v2=P([O.x+c - v*s,		O.y+s + v*c])
+			cspsubpath.points.append([v1,pt,v2])
+			angle += da 
+		cspsubpath.points[0][0] = cspsubpath.points[0][1].copy()
+		cspsubpath.points[-1][2] = cspsubpath.points[-1][1].copy()
+		csp = CSP()	
+		csp.items.append(cspsubpath)
+		return csp 
+		
 	def rebuild(self,st=None,end=None,c=None,a=None,r=None) : 
 		if st==None: st=self.st
 		if end==None: end=self.end
@@ -59,7 +82,7 @@ class Arc():
 		x1,y1, x2,y2 =  ( min(self.st.x,self.end.x),min(self.st.y,self.end.y),
 						  max(self.st.x,self.end.x),max(self.st.y,self.end.y) )
 		# Then check 0,pi/2,pi and 2pi angles. 
-		if self.point_inside_angle(self.c+P(0,self.r)) :
+		if self.point_Gde_angle(self.c+P(0,self.r)) :
 			y2 = max(y2, self.c.y+self.r)
 		if self.point_inside_angle(self.c+P(0,-self.r)) :
 			y1 = min(y1, self.c.y-self.r)
@@ -174,7 +197,7 @@ class Arc():
 class Line():
 
 	def __init__(self,st,end):
-		debugger.add_debugger_to_class(self.__class__)
+		#debugger.add_debugger_to_class(self.__class__)
 		if st.__class__ == P :  st = st.to_list()
 		if end.__class__ == P :	end = end.to_list()
 		self.st = P(st)
@@ -233,7 +256,7 @@ class Line():
 			attr["transform"] = transform		
 		inkex.etree.SubElement(	group, inkex.addNS('path','svg'),  attr	)
 	
-	def intersect(self,b) :
+	def intersect(self,b, false_intersection = False) :
 		if b.__class__ == Line :
 			if self.l < 10e-8 or b.l < 10e-8 : return []
 			v1 = self.end - self.st
@@ -260,7 +283,7 @@ class Line():
 				t1 = ( v2.x*(self.st.y-b.st.y) - v2.y*(self.st.x-b.st.x) ) / x
 				t2 = ( v1.x*(self.st.y-b.st.y) - v1.y*(self.st.x-b.st.x) ) / x
 				
-				if 0<=t1<=1 and 0<=t2<=1 : return [ self.st+v1*t1 ]	
+				if 0<=t1<=1 and 0<=t2<=1 or false_intersection : return [ self.st+v1*t1 ]	
 				else : return []					
 		else: 
 			# taken from http://mathworld.wolfram.com/Circle-LineIntersection.html
@@ -277,10 +300,14 @@ class Line():
 			if descr==0 : return self.check_intersection(b.check_intersection([ P([D*dy/dr+b.c.x,-D*dx/dr+b.c.y]) ]))
 			sign = -1. if dy<0 else 1.
 			descr = sqrt(descr)
-			return self.check_intersection(b.check_intersection([
-						 P( [ (D*dy+sign*dx*descr)/dr+b.c.x, (-D*dx+abs(dy)*descr)/dr+b.c.y ]  ), 
+			points = [
+						 P( [ (D*dy+sign*dx*descr)/dr+b.c.x, (-D*dx+abs(dy)*descr)/dr+b.c.y ] ), 
 						 P( [ (D*dy-sign*dx*descr)/dr+b.c.x, (-D*dx-abs(dy)*descr)/dr+b.c.y ] )
-						]))
+					]
+			if false_intersection :
+				return points
+			else: 
+				return self.check_intersection(b.check_intersection( points ))
 							
 
 	def check_intersection(self, points):
@@ -349,7 +376,7 @@ class Biarc_Bounds_Tree_Node:
 				
 class Biarc:
 	def __init__(self, items=None):
-		debugger.add_debugger_to_class(self.__class__)
+		#debugger.add_debugger_to_class(self.__class__)
 		if items == None :
 			self.items = []
 		else: 	

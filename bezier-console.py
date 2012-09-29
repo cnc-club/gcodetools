@@ -22,14 +22,14 @@
 #		all values are relative if the case is lover to use absolute coordinates use upper case.
 ################################################################################
 
-from csp import CSP
+from csp import CSP, CSPsubpath
 from points import P
 from math import *
 import inkex
 import re
 import sys
 import traceback
-
+from biarc import Arc, Line
 
 def warn(s) :
 	if bezier_console.options.silent : return
@@ -102,6 +102,42 @@ class BezierConsole(inkex.Effect):
 		p1 = self.get_line_xy(x,y,a,l)
 		self.path.join( CSP([[[self.p,self.p,self.p],[p1,p1,p1]]]) )
 		
+
+	def move_to(self,x,y,a,l) :
+		p1 = self.get_line_xy(x,y,a,l)
+		self.path.items.append(CSPSubpath([[p1,p1,p1]])) 
+
+	def arc_on_two_points_and_slope(self,st,end,slope) :
+		# find the center 
+		m = (end - st)/2
+		n = slope.ccw()
+		# get the intersection of lines throught st and m normal to slope and st-end line
+		l1 = Line(st,st+n)
+		l2 = Line(st+m,st+m+m.ccw())
+		p = l1.intersect(l2,True) 
+		if len(p)!=1 : 
+			warn((p,l1,l2,slope))
+			error("Bad parameters for arc on two points. Command: %s"%self.command)
+		c = p[0]
+		a = (st-c).cross(slope)
+		return Arc(st,end,c,a)		 
+		
+		
+	def get_arc_param(self,x,y,a,r,i,j,l) :
+		st = self.p
+
+		if a==None and r==None and i==None and j==None and l==None :
+			# using two points and slope.
+			if x==None and y==None : error("To few parametersfor arc. Command: %s"%self.command) 
+			end = P(x if x!=None else self.p.x, y if y!=None else self.p.y)
+			return self.arc_on_two_points_and_slope(self.p,end,self.slope)
+
+					
+	def draw_arc(self,x,y,a,r,i,j,l) :
+		st = self.p
+		arc = self.get_arc_param(x,y,a,r,i,j,l)
+		warn(arc)
+		self.path.join(arc.to_csp())
 		
 	def parse_command(self, a) :
 		if a.strip() == "" : return
@@ -115,10 +151,15 @@ class BezierConsole(inkex.Effect):
 				t = self.last_command 
 			# parse the parameters 
 			x,y,a,l,r,i,j = None, None, None, None, None, None, None
+			try:
+				self.slope = self.path.slope(-1,-1,1)
+			except: 
+				self.slope = P(1.,0.)	
 			for p in re.findall("([alxyrijALXYRIJ])\s*(\-?\d*\.?\d*)",params) :
 				#warn(p)				
 				p = list(p)
-				if p[0] in ("a","A") : a = -float(p[1])/180*pi
+				if p[0] == "A" : a = -float(p[1])/180*pi
+				elif p[0] == "a" : a = self.slope.angle() -float(p[1])/180*pi
 				else :	p[1] = float(p[1])*self.options.units
 				if   p[0] == "x" : x = self.p.x + p[1]
 				elif p[0] == "X" : x = p[1]
@@ -128,15 +169,13 @@ class BezierConsole(inkex.Effect):
 				elif p[0] == "I" : I = p[1]
 				elif p[0] == "j" : j = self.p.y - p[1]
 				elif p[0] == "J" : J = -p[1]
-
-				# TODO add relative angles
+				elif p[0] in ("r","R") : r = -p[1]
 				elif p[0] in ("l","L") : l = p[1]
 				
 			# exec command
 			if t in ("l","L") : self.draw_line(x,y,a,l)
-			if t in ("h","H") : self.draw_line(x,self.p.y,None,l)
-			if t in ("v","V") : self.draw_line(self.p.x,y,None,l)
-			if t in ("a","A") : self.draw_line(self.p.x,y,None,l)
+			if t in ("a","A") : self.draw_arc(x,y,a,r,i,j,l)
+			if t in ("m","M") : self.move_to(x,y,a,l)
 			self.last_command = t
 
 	def effect(self) :
