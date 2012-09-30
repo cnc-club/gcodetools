@@ -122,61 +122,95 @@ class BezierConsole(inkex.Effect):
 		a = (st-c).cross(slope)
 		return Arc(st,end,c,a)		 
 		
+	def get_arg_comb(self,s,args):
+		s = list(s)
+		args = {"x":x,"y":y,"a":a,"r":r,"i":i,"j":j,"l":l}
+		for i in args:
+			if (args[i] == None and i in s or
+			    args[i] != None and i not in s) :
+			    return False
+		return True	
 		
 	def get_arc_param(self,x,y,a,r,i,j,l) :
 		st = self.p
-
-		if a==None and r==None and i==None and j==None and l==None :
+		c = None
+		# asume not enought params use slope. 
+		if x !=None or y!=None:
 			# using two points and slope.
-			if x==None and y==None : error("To few parametersfor arc. Command: %s"%self.command) 
 			end = P(x if x!=None else self.p.x, y if y!=None else self.p.y)
 			return self.arc_on_two_points_and_slope(self.p,end,self.slope)
+		
+		if a != None :
+			if l !=None : 
+				r = l/a/2
+			if r != None :
+				c = self.p+self.slope.ccw()*r
+			if i != None or j != None : 	
+				c = P(i if i!=None else self.p.x, j if j!=None else self.p.y)
+			if c != None :	
+				end = (self.p - c).rotate(a) + c
+				return self.arc_on_two_points_and_slope(self.p,end,self.slope)
+		
+		if l != None :
+			if i != None or j != None : 	
+				c = P(i if i!=None else self.p.x, j if j!=None else self.p.y)
+				r = (self.p - c).mag()
+			if r != None :
+				a = l/r/2
+				return get_arc_param(None, None, a, r, None, None, None)
+		
+		error("To few parametersfor arc. Command: %s"%self.command) 
 
-					
+		
 	def draw_arc(self,x,y,a,r,i,j,l) :
 		st = self.p
 		arc = self.get_arc_param(x,y,a,r,i,j,l)
-		warn(arc)
+		#warn(arc)
 		self.path.join(arc.to_csp())
 		
-	def parse_command(self, a) :
-		if a.strip() == "" : return
-		r = re.match("\s*([almhvALMHV])?\s*([alxyrijALXYRIJ\d\.\-\s]*)",a) 
-		self.command = a
+	def parse_command(self, command) :
+		if command.strip() == "" : return
+		self.command = command
+		r = re.match("\s*([almhvALMHV]?)\s*((\s*[alxyrijdALXYRIJD]\s*\-?[\d\.]+)*)\s*", command) 
 		if not r: 
-			error("Cannot parse command: \"%s\""% a)
-		else : 
-			t,params = r.groups()
-			if t == None or t == "" :
-				t = self.last_command 
-			# parse the parameters 
-			x,y,a,l,r,i,j = None, None, None, None, None, None, None
-			try:
-				self.slope = self.path.slope(-1,-1,1)
-			except: 
-				self.slope = P(1.,0.)	
-			for p in re.findall("([alxyrijALXYRIJ])\s*(\-?\d*\.?\d*)",params) :
-				#warn(p)				
-				p = list(p)
-				if p[0] == "A" : a = -float(p[1])/180*pi
-				elif p[0] == "a" : a = self.slope.angle() -float(p[1])/180*pi
-				else :	p[1] = float(p[1])*self.options.units
-				if   p[0] == "x" : x = self.p.x + p[1]
-				elif p[0] == "X" : x = p[1]
-				elif p[0] == "y" : y = self.p.y - p[1]
-				elif p[0] == "Y" : y = - p[1]
-				elif p[0] == "i" : i = self.p.x + p[1]
-				elif p[0] == "I" : I = p[1]
-				elif p[0] == "j" : j = self.p.y - p[1]
-				elif p[0] == "J" : J = -p[1]
-				elif p[0] in ("r","R") : r = -p[1]
-				elif p[0] in ("l","L") : l = p[1]
-				
-			# exec command
-			if t in ("l","L") : self.draw_line(x,y,a,l)
-			if t in ("a","A") : self.draw_arc(x,y,a,r,i,j,l)
-			if t in ("m","M") : self.move_to(x,y,a,l)
-			self.last_command = t
+			error("Cannot parse command: \"%s\""% command)
+			
+		r = re.match("\s*([almhvALMHV])\s*([alxyrijdALXYRIJD].*)", command)
+		if r :
+			warn(r.groups())
+			t, command = r.groups()
+		else :
+			t = self.last_command
+		 
+		# parse the parameters 
+		x,y,a,l,r,i,j = None, None, None, None, None, None, None
+		try:
+			self.slope = self.path.slope(-1,-1,1)
+		except: 
+			self.slope = P(1.,0.)	
+		for p in re.findall("([alxyrijALXYRIJ])\s*(\-?\d*\.?\d*)", command) :
+			#warn(p)				
+			p = list(p)
+			if p[0] == "A" : a = -float(p[1])/180*pi
+			elif p[0] == "a" : a = self.slope.angle() -float(p[1])/180*pi
+			else :	p[1] = float(p[1])*self.options.units
+			if   p[0] == "x" : x = self.p.x + p[1]
+			elif p[0] == "X" : x = p[1]
+			elif p[0] == "y" : y = self.p.y - p[1]
+			elif p[0] == "Y" : y = - p[1]
+			elif p[0] == "i" : i = self.p.x + p[1]
+			elif p[0] == "I" : I = p[1]
+			elif p[0] == "j" : j = self.p.y - p[1]
+			elif p[0] == "J" : J = -p[1]
+			elif p[0] in ("r","R") : r = p[1]
+			elif p[0] in ("d","D") : r = p[1]/2
+			elif p[0] in ("l","L") : l = p[1]
+			
+		# exec command
+		if t in ("l","L") : self.draw_line(x,y,a,l)
+		if t in ("a","A") : self.draw_arc(x,y,a,r,i,j,l)
+		if t in ("m","M") : self.move_to(x,y,a,l)
+		self.last_command = t
 
 	def effect(self) :
 		if self.options.silent :

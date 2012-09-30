@@ -31,6 +31,10 @@ class P:
 	def rot(self, theta):
 		c = cos(theta)
 		s = sin(theta)
+		return P(self.x * c - self.y * s,  self.x * s + self.y * c)	
+	def rotate(self, theta):
+		c = cos(theta)
+		s = sin(theta)
 		return P(self.x * c - self.y * s,  self.x * s + self.y * c)
 	def angle(self): return atan2(self.y, self.x)
 	def __repr__(self): return '%.2f,%.2f' % (self.x, self.y)

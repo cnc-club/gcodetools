@@ -4910,12 +4910,12 @@ class Gcodetools(inkex.Effect):
 					"penetration feed":100.,
 					"depth step":1.,
 					"feed":400.,
-					"in trajectotry":"",
-					"out trajectotry":"",
+					"in trajectory":"",
+					"out trajectory":"",
 					"gcode before path":"",
 					"gcode after path":"",
 					"sog":"",
-					"spinlde rpm":"",
+					"spindle rpm":"",
 					"CW or CCW":"",
 					"tool change gcode":" ",
 					"4th axis meaning": " ",
@@ -4935,12 +4935,12 @@ class Gcodetools(inkex.Effect):
 					'penetration feed',
 					"passing feed",
 					'depth step',
-					"in trajectotry",
-					"out trajectotry",
+					"in trajectory",
+					"out trajectory",
 					"gcode before path",
 					"gcode after path",
 					"sog",
-					"spinlde rpm",
+					"spindle rpm",
 					"CW or CCW",
 					"tool change gcode",
 				]
@@ -5265,7 +5265,8 @@ class Gcodetools(inkex.Effect):
 		if tool != self.last_used_tool :
 			g += ( "(Change tool to %s)\n" % re.sub("\"'\(\)\\\\"," ",tool["name"]) ) + tool["tool change gcode"] + "\n"
 			self.last_used_tool = tool
-
+			if "" != self.tool["spindle rpm"] :
+				gcode += "S%s\n" % (self.tool["spindle rpm"])
 		lg, zs, f =  'G00', self.options.Zsafe, " F%f"%tool['feed'] 
 		current_a = None
 		go_to_safe_distance = "G00" + c([None,None,zs]) + "\n" 
@@ -7528,6 +7529,8 @@ G01 Z1 (going to cutting z)\n""",
 					self.tool["feed"]			= float(self.tool["feed"])
 					self.tool["fine feed"]		= float(self.tool["fine feed"] if "fine feed" in self.tool else self.tool["feed"]) 
 					gcode += ( "(Change tool to %s)\n" % re.sub("\"'\(\)\\\\"," ",self.tool["name"]) ) + self.tool["tool change gcode"] + "\n"
+					if "" != self.tool["spindle rpm"] :
+						gcode += "S%s\n" % (self.tool["spindle rpm"])
 					
 				for path in paths[layer]:
 					csp = self.transform_csp(cubicsuperpath.parsePath(path.get("d")),layer)
