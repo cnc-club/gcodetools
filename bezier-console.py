@@ -157,7 +157,7 @@ class BezierConsole(inkex.Effect):
 				r = (self.p - c).mag()
 			if r != None :
 				a = l/r/2
-				return get_arc_param(None, None, a, r, None, None, None)
+				return self.get_arc_param(None, None, a, r, None, None, None)
 		
 		error("To few parametersfor arc. Command: %s"%self.command) 
 
