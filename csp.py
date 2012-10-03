@@ -3,7 +3,7 @@ from math import *
 import inkex
 import cubicsuperpath
 import simplestyle
-
+import cmath
 ################################################################################
 ###		CSP - cubic super path class
 ################################################################################
@@ -11,6 +11,53 @@ import simplestyle
 	# subpath = [ [p01,p02,p03]...[pm1,pm2,pm3] ] - points
 	# [p01,p02,p03] - control point - cp
 	# p0k = P(x,y) - point
+
+def cubic_solver_real(a,b,c,d):
+	# returns only real roots of a cubic equation.
+	roots = cubic_solver(a,b,c,d)
+	res = []
+	for root in roots :
+		if type(root) is complex :	
+			if -1e-10<root.imag<1e-10 :
+				res.append(root.real)
+		else :
+			res.append(root)
+	return res 
+	
+	
+def cubic_solver(a,b,c,d):	
+	if a!=0:
+		#	Monics formula see http://en.wikipedia.org/wiki/Cubic_function#Monic_formula_of_roots
+		a,b,c = (b/a, c/a, d/a)
+		m = 2*a**3 - 9*a*b + 27*c
+		k = a**2 - 3*b
+		n = m**2 - 4*k**3
+		w1 = -.5 + .5*cmath.sqrt(3)*1j
+		w2 = -.5 - .5*cmath.sqrt(3)*1j
+		if n>=0 :
+			t = m+sqrt(n)
+			m1 = pow(t/2,1./3) if t>=0 else -pow(-t/2,1./3)
+			t = m-sqrt(n)
+			n1 = pow(t/2,1./3) if t>=0 else -pow(-t/2,1./3)
+		else :
+			m1 = complex((m+cmath.sqrt(n))/2)**(1./3) 
+			n1 = complex((m-cmath.sqrt(n))/2)**(1./3)
+		x1 = -1./3 * (a + m1 + n1)
+		x2 = -1./3 * (a + w1*m1 + w2*n1)
+		x3 = -1./3 * (a + w2*m1 + w1*n1)
+		return [x1,x2,x3]
+	elif b!=0:
+		det = c**2-4*b*d
+		if det>0 :
+			return [(-c+sqrt(det))/(2*b),(-c-sqrt(det))/(2*b)]
+		elif d == 0 :
+			return [-c/(b*b)] 	
+		else :
+			return [(-c+cmath.sqrt(det))/(2*b),(-c-cmath.sqrt(det))/(2*b)]
+	elif c!=0 :
+		return [-d/c]
+	else : return []
+
 	
 class CSP() :
 	def __init__(self, csp=[], clean = True ) :
@@ -190,6 +237,18 @@ class CSP() :
 		if transform != [] and transform != None :
 			attr["transform"] = transform	
 		return inkex.etree.SubElement(	group, inkex.addNS('path','svg'), attr)
+		
+	def bounds(self,i=None): 
+		if i!=None : 
+			return self.bounds.items[i].bounds()
+		else :	
+			b = [1e100, 1e100, -1e100, -1e100]
+			for i in range(len(self.items)) :
+				b1 = self.items[i].bounds()
+				b = [min(b[0],b1[0]), min(b[1],b1[1]), max(b[2],b1[2]), max(b[3],b1[3])]
+			if b == [1e100, 1e100, -1e100, -1e100] : return None
+			return b
+	
 		
 		
 			
@@ -387,5 +446,41 @@ class CSPsubpath() :
 	
 	def normal(self,j,t) :
 		return self.slope(j,t).ccw()
+	
+	def bounds(self,i=None): 
+		if i!=None : 
+			return self.boundsi(i)
+		else :	
+			b = [1e100, 1e100, -1e100, -1e100]
+			for i in range(len(self.points)-1) :
+				b1 = self.boundsi(i)
+				b = [min(b[0],b1[0]), min(b[1],b1[1]), max(b[2],b1[2]), max(b[3],b1[3])]
+			if b ==	[1e100, 1e100, -1e100, -1e100] : return None
+			return b
+				
+	def boundsi(self,i): 
+		minx, miny, maxx, maxy  = 1e100, 1e100, -1e100, -1e100
+		ax,ay,bx,by,cx,cy,x0,y0 = self.parameterize_segment(i)
+		roots = cubic_solver(0, 3*ax, 2*bx, cx)	 + [0,1]
+		for root in roots :
+			if type(root) is complex and abs(root.imag)<1e-10:
+				root = root.real
+			if type(root) is not complex and 0<=root<=1:
+				y = ay*(root**3)+by*(root**2)+cy*root+y0  
+				x = ax*(root**3)+bx*(root**2)+cx*root+x0  
+				maxx = max(x,maxx)
+				minx = min(x,minx)
+
+			roots = cubic_solver(0, 3*ay, 2*by, cy)	 + [0,1]
+			for root in roots :
+				if type(root) is complex and root.imag==0:
+					root = root.real
+				if type(root) is not complex and 0<=root<=1:
+					y = ay*(root**3)+by*(root**2)+cy*root+y0  
+					x = ax*(root**3)+bx*(root**2)+cx*root+x0  
+					maxy = max(y,maxy)
+					miny = min(y,miny)
+		return minx,miny,maxx,maxy
+		
 		
 		

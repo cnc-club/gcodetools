@@ -1618,7 +1618,7 @@ def draw_text(text,x,y, group = None, style = None, font_size = 10, gcodetools_t
 						})					
 		y += font_size
 		span.text = str(s)
-
+	return t
 
 def draw_csp(csp, stroke = "#f00", fill = "none", comment = "", width = 0.354, group = None, style = None, gcodetools_tag = None) :
 	if style == None : 
@@ -5265,8 +5265,8 @@ class Gcodetools(inkex.Effect):
 		if tool != self.last_used_tool :
 			g += ( "(Change tool to %s)\n" % re.sub("\"'\(\)\\\\"," ",tool["name"]) ) + tool["tool change gcode"] + "\n"
 			self.last_used_tool = tool
-			if "" != self.tool["spindle rpm"] :
-				gcode += "S%s\n" % (self.tool["spindle rpm"])
+			if "" != tool["spindle rpm"] :
+				gcode += "S%s\n" % (tool["spindle rpm"])
 		lg, zs, f =  'G00', self.options.Zsafe, " F%f"%tool['feed'] 
 		current_a = None
 		go_to_safe_distance = "G00" + c([None,None,zs]) + "\n" 
