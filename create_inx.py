@@ -40,7 +40,7 @@ def main():
 #					"Arrangement: arrangement no_options",
 					"Graffiti: graffiti orientation",
 					"Check for updates: update no_options no_preferences",
-					"Prepare path for plasma: plasma-prepare-path no_options no_preferences",
+					"Path preparations: plasma-prepare-path box-prepare-path no_options no_preferences",
 					"Test: test",					
 					"About: about no_options no_preferences",					
 				]

@@ -301,12 +301,26 @@ packets will be needed)">false</param>
 		<param name='plasma-prepare-corners' type="boolean" _gui-text="Prepare corners" >True</param>
 		<param name='plasma-prepare-corners-distance' type="float" precision="5" min="0" max="1000000" _gui-text='Stepout distance for corners:'>10</param>
 		<param name='plasma-prepare-corners-tolerance' type="float" precision="5" min="0" max="180" _gui-text='Maximum angle for corner (0-180 deg):'>170</param>
-		
-
-
 	</page>
 <!-- Gcodetools: /plasma-prepare-path block -->
 
+<!-- Gcodetools: box-prepare-path block -->
+	<page name='box-prepare-path' _gui-text='Box cutter prepare path.'>	
+		<param name="box-in-len" type="string" _gui-text="In-going length formula (if &lt;0 will add some path):"></param>
+		<param name="box-out-len" type="string" _gui-text="Out-going length formula (if &lt;0 will add some path):"></param>
+		
+		<param name='box-prepare-a' type="float" precision="5" min="0" max="1000000" _gui-text='Paramater boxa:'>0</param>
+		<param name='box-prepare-b' type="float" precision="5" min="0" max="1000000" _gui-text='Paramater boxb:'>0</param>
+		<param name='box-prepare-c' type="float" precision="5" min="0" max="1000000" _gui-text='Paramater boxc:'>0</param>
+
+		<param name='box-prepare-corners-tolerance' type="float" precision="5" min="0" max="180" _gui-text='Maximum angle for corner (0-180 deg):'>170</param>
+		<_param name="help" type="description" xml:space="preserve">This extension will cutt out or add some path in corners.
+Extension will eval() formulas as Python code.
+You can use a - for angle value, boxa, boxb, boxc - parameters.  
+</_param>
+		
+	</page>
+<!-- Gcodetools: /box-prepare-path block -->
 
 
 

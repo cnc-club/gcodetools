@@ -2002,7 +2002,7 @@ class CSPsubpath() :
 		return self.points[0][1].near(self.points[-1][1])
 			
 	def length(self) :
-		return sum([self.len(i) for i in range(len(self.points()))])
+		return sum([self.l(i) for i in range(len(self.points)-1)])
 	
 	def cp_to_list(self,i) :
 		return [point.to_list() for point in self.points[i]]
@@ -2061,7 +2061,29 @@ class CSPsubpath() :
 		res.points[:1] = []
 		res.points = self.taili(i,t) + res.points
 		return res
-				
+
+	def headl(self,l): # Cuts subpath to fit defined l
+		i,t = self.at_l(l)
+		if i==len(self.points) and t==1 : return CSPSubpath([])
+		return self.head(i,t)
+
+	def taill(self,l,cut=False): # Cuts subpath to fit defined l
+		res = self.copy()
+		res.reverse()
+		i,t = res.at_l(l)
+		if i==len(res.points) and t==1 : return CSPSubpath([])
+		warn(i,t)
+		res = res.head(i,t)
+		res.reverse()
+		return res
+		
+	def cut_head_l(self,l):
+		return self.taill(self.length()-l)
+	
+	def cut_tail_l(self,l):
+		return self.headl(self.length()-l)
+	
+			
 	def split(self,i,t=.5) :
 		sp1,sp2 = self.cp_to_list(i), self.cp_to_list(i+1)
 		[x1,y1],[x2,y2],[x3,y3],[x4,y4] = sp1[1], sp1[2], sp2[0], sp2[1] 
@@ -2269,6 +2291,19 @@ class Arc():
 	def tail(self,p):
 		self.rebuild(st=p)
 
+	def headl(self,l): # return arc to fit defined l
+		if l*l>self.l2 : return None
+		a = l/2/self.r
+		self.end = (self.st-self.c).rot(a)
+		self.rebuild()
+		
+	def taill(self,l): # return arc to fit defined l
+		if l*l>self.l2 : return None
+		a = l/2/self.r
+		self.st = (self.end-self.c).rot(-a)
+		self.rebuild()
+		
+		
 	def offset(self, r):
 		oldr = self.r
 		if self.a>0 :
@@ -2405,6 +2440,16 @@ class Line():
 
 	def tail(self,p):
 		self.rebuild(st=p)
+
+	def headl(self,l): # Cut line to fit defined l
+		if l>self.l : return None
+		self.end = (self.end-self.st)*l/self.l+self.st
+		self.rebuild()
+
+	def taill(self,l):
+		if l>self.l : return None
+		self.st = (self.st-self.end)*l/self.l+self.end
+		self.rebuild()
 
 	def offset(self, r):
 		self.st -= self.n*r
@@ -4486,8 +4531,63 @@ class Gcodetools(inkex.Effect):
 
 		
 							
+################################################################################
+###		Box cutter prepare path.
+###		Prepare path for decorative box plotter cutter.
+###		TODO move it to the bottom
+################################################################################
+	def box_cutter_prepare_path(self) :
+		if self.selected_paths == {} and self.options.auto_select_paths:
+			self.selected_paths = self.paths
+			self.error(_("No paths are selected! Trying to work on all available paths."),"warning")
 
-							
+		if self.selected_paths == {}:
+			self.error(_("Nothing is selected. Please select something."),"warning")
+		tolerance = cos((180-self.options.box_prepare_corners_tolerance)*pi/180)
+		
+		box_in_len = self.options.box_in_len
+		box_out_len = self.options.box_out_len
+
+		boxa = self.options.box_prepare_a
+		boxb = self.options.box_prepare_b
+		boxc = self.options.box_prepare_c
+
+		
+		for layer in self.layers :
+			if layer in self.selected_paths :
+
+				for path in self.selected_paths[layer]:
+					csp = CSP(path)
+					res = CSP([])
+					for sp in csp.items :
+						i = 0 if sp.is_closed() else 1
+						while i < len(sp.points)-1 :
+							n1,n2 = sp.normal(i-1,1), sp.normal(i,0)
+							if n1.cross(n2) < 0  and n1.dot(n2) < tolerance : 
+								draw_pointer(sp.points[i][1],size=100)
+								a = n2.angle()-n1.angle()
+								warn(sp)
+								warn(i)
+
+								res.items.append( sp.head(i).cut_tail_l(eval(box_in_len)) )
+								warn ( sp.tail(i) )
+								sp=sp.tail(i)
+								warn()
+								
+								sp = sp.cut_head_l(eval(box_in_len))
+								res.draw(stroke="red")
+								res.items.append(sp)
+								res.draw(stroke="red")
+								return
+
+								sp = sp.tail(i).cut_head_l(eval(box_out_len))
+								warn(sp)
+							i += 1
+				res.draw()				
+							#got angle to process 
+
+
+
 
 
 ################################################################################
@@ -4895,6 +4995,14 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--plasma-prepare-corners-distance", action="store", type="float",	dest="plasma_prepare_corners_distance", default=10.,help="Stepout distance for corners")
 		self.OptionParser.add_option("",   "--plasma-prepare-corners-tolerance", action="store", type="float",	dest="plasma_prepare_corners_tolerance", default=10.,help="Maximum angle for corner (0-180 deg)")
 
+		self.OptionParser.add_option("",   "--box-prepare-corners-tolerance", action="store", type="float",	dest="box_prepare_corners_tolerance", default=10.,help="See inx-file.")
+		self.OptionParser.add_option("",   "--box-in-len",		action="store", type="string", 		dest="box_in_len", default='',	help="See inx-file.")
+		self.OptionParser.add_option("",   "--box-out-len",		action="store", type="string", 		dest="box_out_len", default='',	help="See inx-file.")
+		self.OptionParser.add_option("",   "--box-prepare-a",		action="store", type="float", 		dest="box_prepare_a", default=0.,	help="See inx-file.")
+		self.OptionParser.add_option("",   "--box-prepare-b",		action="store", type="float", 		dest="box_prepare_b", default=0.,	help="See inx-file.")
+		self.OptionParser.add_option("",   "--box-prepare-c",		action="store", type="float", 		dest="box_prepare_c", default=0.,	help="See inx-file.")
+
+
 		self.OptionParser.add_option("",   "--test-1", action="store", type="float",	dest="test_1", default=10.,help="Test parameters")
 		self.OptionParser.add_option("",   "--test-2", action="store", type="float",	dest="test_2", default=10.,help="Test parameters")
 		self.OptionParser.add_option("",   "--test-3", action="store", type="float",	dest="test_3", default=10.,help="Test parameters")
@@ -5266,7 +5374,7 @@ class Gcodetools(inkex.Effect):
 			g += ( "(Change tool to %s)\n" % re.sub("\"'\(\)\\\\"," ",tool["name"]) ) + tool["tool change gcode"] + "\n"
 			self.last_used_tool = tool
 			if "" != tool["spindle rpm"] :
-				gcode += "S%s\n" % (tool["spindle rpm"])
+				g += "S%s\n" % (tool["spindle rpm"])
 		lg, zs, f =  'G00', self.options.Zsafe, " F%f"%tool['feed'] 
 		current_a = None
 		go_to_safe_distance = "G00" + c([None,None,zs]) + "\n" 
@@ -8076,12 +8184,12 @@ G01 Z1 (going to cutting z)\n""",
 		elif self.options.active_tab ==  '"test"' :
 			self.test()
 			
-		elif self.options.active_tab not in ['"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"', '"offset"', '"arrangement"', '"update"', '"graffiti"', '"lathe_modify_path"', '"plasma-prepare-path"']:
+		elif self.options.active_tab not in ['"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"', '"offset"', '"arrangement"', '"update"', '"graffiti"', '"lathe_modify_path"', '"plasma-prepare-path"', '"box-prepare-path"']:
 			self.error(_("Select one of the action tabs - Path to Gcode, Area, Engraving, DXF points, Orientation, Offset, Lathe or Tools library.\n Current active tab id is %s" % self.options.active_tab),"error")
 		else:
 			# Get all Gcodetools data from the scene.
 			self.get_info()
-			if self.options.active_tab in ['"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"lathe"', '"graffiti"', '"plasma-prepare-path"']:
+			if self.options.active_tab in ['"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"lathe"', '"graffiti"', '"plasma-prepare-path"', '"box-cutter-prepare-path"']:
 				if self.orientation_points == {} :
 					self.error(_("Orientation points have not been defined! A default set of orientation points has been automatically added."),"warning")
 					self.orientation( self.layers[min(1,len(self.layers)-1)] )		
@@ -8163,6 +8271,8 @@ G01 Z1 (going to cutting z)\n""",
 
 			elif self.options.active_tab == '"plasma-prepare-path"': 
 				self.plasma_prepare_path()		
+			elif self.options.active_tab == '"box-prepare-path"': 
+				self.box_cutter_prepare_path()		
 
 
 		print_("------------------------------------------")
