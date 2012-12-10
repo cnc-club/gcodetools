@@ -2208,6 +2208,7 @@ class P:
 	def pr(self): return "%.2f,%.2f" % (self.x, self.y)
 	def to_list(self): return [self.x, self.y]	
 	def ccw(self): return P(-self.y,self.x)
+	def cw(self): return P(self.y,-self.x)
 	def l2(self): return self.x*self.x + self.y*self.y
 	def transform(self, matrix) :
 		x = self.x
@@ -4563,27 +4564,39 @@ class Gcodetools(inkex.Effect):
 						i = 0 if sp.is_closed() else 1
 						while i < len(sp.points)-1 :
 							n1,n2 = sp.normal(i-1,1), sp.normal(i,0)
+#							draw_pointer([sp.points[i][1],sp.points[i][1]+n1*10],"#ff00ff",figure="line")
+#							draw_pointer([sp.points[i][1],sp.points[i][1]+n2*10],"#ff00ff",figure="line")
+#							warn(n1.cross(n2),n1.dot(n2)) 
 							if n1.cross(n2) < 0  and n1.dot(n2) < tolerance : 
-								draw_pointer(sp.points[i][1],size=100)
+#								warn("!!!") 
+								#draw_pointer(sp.points[i][1],size=100)
 								a = n2.angle()-n1.angle()
-								warn(sp)
-								warn(i)
 
-								res.items.append( sp.head(i).cut_tail_l(eval(box_in_len)) )
-								warn ( sp.tail(i) )
+								l = eval(box_in_len)
+								h = sp.head(i)
+								if l>0 :
+									h = h.cut_tail_l(l)
+								elif l<0: 
+									end = h.points[-1][1]
+									h.points[-1][2] = end.copy()
+									end = end-n1.cw()*l
+									h.points.append([end.copy(),end.copy(),end.copy()])
+									
+								res.items.append(h)
+
+								l = eval(box_out_len)
 								sp=sp.tail(i)
-								warn()
-								
-								sp = sp.cut_head_l(eval(box_in_len))
-								res.draw(stroke="red")
-								res.items.append(sp)
-								res.draw(stroke="red")
-								return
-
-								sp = sp.tail(i).cut_head_l(eval(box_out_len))
-								warn(sp)
+								if l>0 :
+									sp = sp.cut_head_l(l)
+								elif l<0 :	
+									st = sp.points[0][1]
+									sp.points[0][0] = st.copy()
+									st = st+n2.cw()*l
+									sp.points = [ [st.copy(),st.copy(),st.copy()] ] + sp.points
+								i=0	
 							i += 1
-				res.draw()				
+						res.items.append(sp)
+				res.draw(stroke="#005577", fill="none")
 							#got angle to process 
 
 
@@ -8189,7 +8202,7 @@ G01 Z1 (going to cutting z)\n""",
 		else:
 			# Get all Gcodetools data from the scene.
 			self.get_info()
-			if self.options.active_tab in ['"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"lathe"', '"graffiti"', '"plasma-prepare-path"', '"box-cutter-prepare-path"']:
+			if self.options.active_tab in ['"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"lathe"', '"graffiti"', '"plasma-prepare-path"', '"box-prepare-path"']:
 				if self.orientation_points == {} :
 					self.error(_("Orientation points have not been defined! A default set of orientation points has been automatically added."),"warning")
 					self.orientation( self.layers[min(1,len(self.layers)-1)] )		
