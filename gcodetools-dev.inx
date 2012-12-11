@@ -323,6 +323,12 @@ You can use a - for angle value, boxa, boxb, boxc - parameters.
 <!-- Gcodetools: /box-prepare-path block -->
 
 
+<!-- Gcodetools: ignore block -->
+	<page name='ignore' _gui-text='Ignore'>	
+		<_param name="help" type="description" xml:space="preserve">Add gcodetools Ignore tag to selected objects so gcodetools will ignore them.</_param>
+	</page>
+<!-- Gcodetools: /ignore block -->
+
 
 <!-- Gcodetools: graffiti block -->
 	<page name='graffiti' _gui-text='Graffiti'>	

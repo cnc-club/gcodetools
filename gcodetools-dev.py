@@ -1933,6 +1933,7 @@ class CSP() :
 		if width != None  : style['stroke-width'] = "%s"%width
 		if stroke != None : style['stroke'] = "%s"%stroke
 		if fill != None   : style['fill'] = "%s"%fill
+		if gcodetools_tag == None : gcodetools_tag = "Preview %s"%self
 		style = simplestyle.formatStyle(style)
 
 		csp = self.copy()
@@ -1944,7 +1945,7 @@ class CSP() :
 		attr = {
 				"style":	style,
 				"d": 		cubicsuperpath.formatPath(csp.to_list()),
-				"gcodetools": "Preview %s"%self,
+				"gcodetools":gcodetools_tag,
 				}	
 		if transform != [] :
 			attr["transform"] = transform	
@@ -4596,7 +4597,7 @@ class Gcodetools(inkex.Effect):
 								i=0	
 							i += 1
 						res.items.append(sp)
-				res.draw(stroke="#005577", fill="none")
+				res.draw(stroke="#005577", fill="none", gcodetools_tag="")
 							#got angle to process 
 
 
@@ -5693,6 +5694,9 @@ class Gcodetools(inkex.Effect):
 			items = g.getchildren()
 			items.reverse()
 			for i in items:
+				gct = i.get('gcodetools')
+				if gct!=None and gct.lower()=="ignore" :
+					continue
 				if selected:
 					self.selected[i.get("id")] = i
 				if i.tag == inkex.addNS("g",'svg') and i.get(inkex.addNS('groupmode','inkscape')) == 'layer':
@@ -5702,7 +5706,7 @@ class Gcodetools(inkex.Effect):
 						self.layers += [i]
 						recursive_search(i,i)
 
-				elif i.get('gcodetools') == "Gcodetools orientation group" :
+				elif gct == "Gcodetools orientation group" :
 					points = self.get_orientation_points(i)
 					if points != None :
 						self.orientation_points[layer] = self.orientation_points[layer]+[points[:]] if layer in self.orientation_points else [points[:]]
@@ -5711,12 +5715,12 @@ class Gcodetools(inkex.Effect):
 						self.error(_("Warning! Found bad orientation points in '%s' layer. Resulting Gcode could be corrupt!") % layer.get(inkex.addNS('label','inkscape')), "bad_orientation_points_in_some_layers") 
 
 				#Need to recognise old files ver 1.6.04 and earlier
-				elif i.get("gcodetools") == "Gcodetools tool definition" or i.get("gcodetools") == "Gcodetools tool defenition"  :
+				elif gct == "Gcodetools tool definition" or gct == "Gcodetools tool defenition"  :
 					tool = self.get_tool(i)
 					self.tools[layer] = self.tools[layer] + [tool.copy()] if layer in self.tools else [tool.copy()]
 					print_("Found tool in '%s' layer: %s" % (layer.get(inkex.addNS('label','inkscape')), tool))
 
-				elif i.get("gcodetools") == "Gcodetools graffiti reference point" :
+				elif gct == "Gcodetools graffiti reference point" :
 					point = self.get_graffiti_reference_points(i)
 					if point != [] :
 						self.graffiti_reference_points[layer] = self.graffiti_reference_points[layer]+[point[:]] if layer in self.graffiti_reference_points else [point]
@@ -5724,12 +5728,12 @@ class Gcodetools(inkex.Effect):
 						self.error(_("Warning! Found bad graffiti reference point in '%s' layer. Resulting Gcode could be corrupt!") % layer.get(inkex.addNS('label','inkscape')), "bad_orientation_points_in_some_layers") 
 				
 				elif i.tag == inkex.addNS('path','svg'):
-					if "gcodetools"  not in i.keys() :
+					if "gcodetools"  not in i.keys() or gct=="" :
 						self.paths[layer] = self.paths[layer] + [i] if layer in self.paths else [i]  
 						if i.get("id") in self.selected :
 							self.selected_paths[layer] = self.selected_paths[layer] + [i] if layer in self.selected_paths else [i]  
 
-				elif i.get("gcodetools") == "In-out reference point group" :
+				elif gct == "In-out reference point group" :
 					items_ = i.getchildren()
 					items_.reverse()
 					for j in items_ :
@@ -5851,6 +5855,11 @@ class Gcodetools(inkex.Effect):
 		else :
 			self.error(_("Can not find tool for '%s' layer! Please add one with Tools library tab!") % layer.get(inkex.addNS('label','inkscape')), "no_tool_error")
 
+	def ignore(self) :
+		# Add gcodetools Ignore tag to selection
+		for i in self.selected :
+			i.set("gcodetools","Ignore")
+			
 
 ################################################################################
 ###
@@ -8197,7 +8206,7 @@ G01 Z1 (going to cutting z)\n""",
 		elif self.options.active_tab ==  '"test"' :
 			self.test()
 			
-		elif self.options.active_tab not in ['"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"', '"offset"', '"arrangement"', '"update"', '"graffiti"', '"lathe_modify_path"', '"plasma-prepare-path"', '"box-prepare-path"']:
+		elif self.options.active_tab not in ['"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"', '"offset"', '"arrangement"', '"update"', '"graffiti"', '"lathe_modify_path"', '"plasma-prepare-path"', '"box-prepare-path"', '"ignore"']:
 			self.error(_("Select one of the action tabs - Path to Gcode, Area, Engraving, DXF points, Orientation, Offset, Lathe or Tools library.\n Current active tab id is %s" % self.options.active_tab),"error")
 		else:
 			# Get all Gcodetools data from the scene.
@@ -8243,6 +8252,8 @@ G01 Z1 (going to cutting z)\n""",
 				self.lathe_modify_path()
 			elif self.options.active_tab == '"update"': 
 				self.update()
+			elif self.options.active_tab == '"ignore"': 
+				self.ignore()
 			elif self.options.active_tab == '"offset"': 
 				if self.options.offset_just_get_distance :
 					for layer in self.selected_paths :

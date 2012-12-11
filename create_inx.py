@@ -41,6 +41,7 @@ def main():
 					"Graffiti: graffiti orientation",
 					"Check for updates: update no_options no_preferences",
 					"Path preparations: plasma-prepare-path box-prepare-path no_options no_preferences",
+					"Ignore: ignore no_options no_preferences",
 					"Test: test",					
 					"About: about no_options no_preferences",					
 				]
