@@ -4574,16 +4574,26 @@ class Gcodetools(inkex.Effect):
 								a = n2.angle()-n1.angle()
 
 								l = eval(box_in_len)
-								h = sp.head(i)
-								if l>0 :
-									h = h.cut_tail_l(l)
-								elif l<0: 
-									end = h.points[-1][1]
-									h.points[-1][2] = end.copy()
-									end = end-n1.cw()*l
-									h.points.append([end.copy(),end.copy(),end.copy()])
+								if i==0 : #work on sp tail
+									if l>0 :
+										sp = sp.cut_tail_l(l)
+									elif l<0: 
+										end = sp.points[-1][1]
+										sp.points[-1][2] = end.copy()
+										end = end-n1.cw()*l
+										sp.points.append([end.copy(),end.copy(),end.copy()])
+								else : 	
+									h = sp.head(i)
+									if l>0 :
+										h = h.cut_tail_l(l)
+									elif l<0: 
+										end = h.points[-1][1]
+										h.points[-1][2] = end.copy()
+										end = end-n1.cw()*l
+										h.points.append([end.copy(),end.copy(),end.copy()])
 									
-								res.items.append(h)
+									res.items.append(h)
+									
 
 								l = eval(box_out_len)
 								sp=sp.tail(i)
@@ -4598,7 +4608,10 @@ class Gcodetools(inkex.Effect):
 							i += 1
 						res.items.append(sp)
 				res.draw(stroke="#005577", fill="none", gcodetools_tag="")
-							#got angle to process 
+				# delete the original path
+				parent=path.getparent()
+				parent.remove(path)
+
 
 
 
