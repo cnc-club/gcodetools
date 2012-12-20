@@ -4550,9 +4550,9 @@ class Gcodetools(inkex.Effect):
 		box_in_len = self.options.box_in_len
 		box_out_len = self.options.box_out_len
 
-		boxa = self.options.box_prepare_a
-		boxb = self.options.box_prepare_b
-		boxc = self.options.box_prepare_c
+		boxa = eval(self.options.box_prepare_a)
+		boxb = eval(self.options.box_prepare_b)
+		boxc = eval(self.options.box_prepare_c)
 
 		
 		for layer in self.layers :
