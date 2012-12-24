@@ -2073,7 +2073,7 @@ class CSPsubpath() :
 		res.reverse()
 		i,t = res.at_l(l)
 		if i==len(res.points) and t==1 : return CSPSubpath([])
-		warn(i,t)
+		#warn(i,t)
 		res = res.head(i,t)
 		res.reverse()
 		return res
@@ -5025,9 +5025,9 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--box-prepare-corners-tolerance", action="store", type="float",	dest="box_prepare_corners_tolerance", default=10.,help="See inx-file.")
 		self.OptionParser.add_option("",   "--box-in-len",		action="store", type="string", 		dest="box_in_len", default='',	help="See inx-file.")
 		self.OptionParser.add_option("",   "--box-out-len",		action="store", type="string", 		dest="box_out_len", default='',	help="See inx-file.")
-		self.OptionParser.add_option("",   "--box-prepare-a",		action="store", type="float", 		dest="box_prepare_a", default=0.,	help="See inx-file.")
-		self.OptionParser.add_option("",   "--box-prepare-b",		action="store", type="float", 		dest="box_prepare_b", default=0.,	help="See inx-file.")
-		self.OptionParser.add_option("",   "--box-prepare-c",		action="store", type="float", 		dest="box_prepare_c", default=0.,	help="See inx-file.")
+		self.OptionParser.add_option("",   "--box-prepare-a",		action="store", type="string", 		dest="box_prepare_a", default="0.",	help="See inx-file.")
+		self.OptionParser.add_option("",   "--box-prepare-b",		action="store", type="string", 		dest="box_prepare_b", default="0.",	help="See inx-file.")
+		self.OptionParser.add_option("",   "--box-prepare-c",		action="store", type="string", 		dest="box_prepare_c", default="0.",	help="See inx-file.")
 
 
 		self.OptionParser.add_option("",   "--test-1", action="store", type="float",	dest="test_1", default=10.,help="Test parameters")

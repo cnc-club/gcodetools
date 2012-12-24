@@ -309,9 +309,9 @@ packets will be needed)">false</param>
 		<param name="box-in-len" type="string" _gui-text="In-going length formula (if &lt;0 will add some path):"></param>
 		<param name="box-out-len" type="string" _gui-text="Out-going length formula (if &lt;0 will add some path):"></param>
 		
-		<param name='box-prepare-a' type="float" precision="5" min="0" max="1000000" _gui-text='Paramater boxa:'>0</param>
-		<param name='box-prepare-b' type="float" precision="5" min="0" max="1000000" _gui-text='Paramater boxb:'>0</param>
-		<param name='box-prepare-c' type="float" precision="5" min="0" max="1000000" _gui-text='Paramater boxc:'>0</param>
+		<param name='box-prepare-a' type="string" _gui-text='Paramater boxa:'>0/180*3.14159265</param>
+		<param name='box-prepare-b' type="string" _gui-text='Paramater boxb:'>0/180*3.14159265</param>
+		<param name='box-prepare-c' type="string" _gui-text='Paramater boxc:'>0/180*3.14159265</param>
 
 		<param name='box-prepare-corners-tolerance' type="float" precision="5" min="0" max="180" _gui-text='Maximum angle for corner (0-180 deg):'>170</param>
 		<_param name="help" type="description" xml:space="preserve">This extension will cutt out or add some path in corners.
