@@ -4572,7 +4572,7 @@ class Gcodetools(inkex.Effect):
 #								warn("!!!") 
 								#draw_pointer(sp.points[i][1],size=100)
 								a = n2.angle()-n1.angle()
-
+								warn(a, boxb, tan(boxb))
 								l = eval(box_in_len)
 								if i==0 : #work on sp tail
 									if l>0 :
