@@ -4607,9 +4607,9 @@ class Gcodetools(inkex.Effect):
 								i=0	
 							i += 1
 						res.items.append(sp)
-				res.draw(stroke="#005577", fill="none", gcodetools_tag="")
 				# delete the original path
 				parent=path.getparent()
+				res.draw(group=parent, stroke="#005577", fill="none", gcodetools_tag="")
 				parent.remove(path)
 
 
