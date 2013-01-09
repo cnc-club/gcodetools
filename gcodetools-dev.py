@@ -4547,9 +4547,6 @@ class Gcodetools(inkex.Effect):
 			self.error(_("Nothing is selected. Please select something."),"warning")
 		tolerance = cos((180-self.options.box_prepare_corners_tolerance)*pi/180)
 		
-		box_in_len = self.options.box_in_len
-		box_out_len = self.options.box_out_len
-
 		boxa = eval(self.options.box_prepare_a)
 		boxb = eval(self.options.box_prepare_b)
 		boxc = eval(self.options.box_prepare_c)
@@ -4568,7 +4565,13 @@ class Gcodetools(inkex.Effect):
 #							draw_pointer([sp.points[i][1],sp.points[i][1]+n1*10],"#ff00ff",figure="line")
 #							draw_pointer([sp.points[i][1],sp.points[i][1]+n2*10],"#ff00ff",figure="line")
 #							warn(n1.cross(n2),n1.dot(n2)) 
-							if n1.cross(n2) < 0  and n1.dot(n2) < tolerance : 
+							if abs(n1.dot(n2)) < tolerance : 
+								if n1.cross(n2) < 0 :
+									box_in_len = self.options.box_in_len
+									box_out_len = self.options.box_out_len
+								else :
+									box_in_len = self.options.box_in_len_inside
+									box_out_len = self.options.box_out_len_inside
 #								warn("!!!") 
 								#draw_pointer(sp.points[i][1],size=100)
 								a = n2.angle()-n1.angle()
@@ -5025,6 +5028,10 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--box-prepare-corners-tolerance", action="store", type="float",	dest="box_prepare_corners_tolerance", default=10.,help="See inx-file.")
 		self.OptionParser.add_option("",   "--box-in-len",		action="store", type="string", 		dest="box_in_len", default='',	help="See inx-file.")
 		self.OptionParser.add_option("",   "--box-out-len",		action="store", type="string", 		dest="box_out_len", default='',	help="See inx-file.")
+
+		self.OptionParser.add_option("",   "--box-in-len-inside",		action="store", type="string", 		dest="box_in_len_inside", default='',	help="See inx-file.")
+		self.OptionParser.add_option("",   "--box-out-len-inside",		action="store", type="string", 		dest="box_out_len_inside", default='',	help="See inx-file.")
+		
 		self.OptionParser.add_option("",   "--box-prepare-a",		action="store", type="string", 		dest="box_prepare_a", default="0.",	help="See inx-file.")
 		self.OptionParser.add_option("",   "--box-prepare-b",		action="store", type="string", 		dest="box_prepare_b", default="0.",	help="See inx-file.")
 		self.OptionParser.add_option("",   "--box-prepare-c",		action="store", type="string", 		dest="box_prepare_c", default="0.",	help="See inx-file.")
