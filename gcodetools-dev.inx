@@ -320,7 +320,8 @@ Inside corner:</_param>
 		<param name='box-prepare-b' type="string" _gui-text='Paramater boxb:'>50*3.14159265/180</param>
 		<param name='box-prepare-c' type="string" _gui-text='Paramater boxc:'>50*3.14159265/180</param>
 
-		<param name='box-prepare-corners-tolerance' type="float" precision="5" min="0" max="180" _gui-text='Maximum angle for corner (0-180 deg):'>170</param>
+		<param name='box-prepare-corners-tolerance' type="string" _gui-text='Maximum angle for outside corner (0-180 deg) :'>170</param>
+		<param name='box-prepare-corners-tolerance-inside' type="string" _gui-text='Maximum angle for inside corner (0-180 deg) :'>170</param>
 		<_param name="help" type="description" xml:space="preserve">This extension will cutt out or add some path in corners.
 Extension will eval() formulas as Python code.
 You can use a - for angle value, boxa, boxb, boxc - parameters.  

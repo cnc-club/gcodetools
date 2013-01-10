@@ -4545,7 +4545,7 @@ class Gcodetools(inkex.Effect):
 
 		if self.selected_paths == {}:
 			self.error(_("Nothing is selected. Please select something."),"warning")
-		tolerance = cos((180-self.options.box_prepare_corners_tolerance)*pi/180)
+		tolerance = [cos((180-self.options.box_prepare_corners_tolerance)*pi/180),cos((180-self.options.box_prepare_corners_tolerance_inside)*pi/180)]
 		
 		boxa = eval(self.options.box_prepare_a)
 		boxb = eval(self.options.box_prepare_b)
@@ -4565,7 +4565,7 @@ class Gcodetools(inkex.Effect):
 #							draw_pointer([sp.points[i][1],sp.points[i][1]+n1*10],"#ff00ff",figure="line")
 #							draw_pointer([sp.points[i][1],sp.points[i][1]+n2*10],"#ff00ff",figure="line")
 #							warn(n1.cross(n2),n1.dot(n2)) 
-							if abs(n1.dot(n2)) < tolerance : 
+							if abs(n1.dot(n2)) < (tolerance[0] if n1.cross(n2) < 0 else tolerance[1]) : 
 								if n1.cross(n2) < 0 :
 									box_in_len = self.options.box_in_len
 									box_out_len = self.options.box_out_len
@@ -5026,6 +5026,7 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--plasma-prepare-corners-tolerance", action="store", type="float",	dest="plasma_prepare_corners_tolerance", default=10.,help="Maximum angle for corner (0-180 deg)")
 
 		self.OptionParser.add_option("",   "--box-prepare-corners-tolerance", action="store", type="float",	dest="box_prepare_corners_tolerance", default=10.,help="See inx-file.")
+		self.OptionParser.add_option("",   "--box-prepare-corners-tolerance-inside", action="store", type="float",	dest="box_prepare_corners_tolerance_inside", default=10.,help="See inx-file.")
 		self.OptionParser.add_option("",   "--box-in-len",		action="store", type="string", 		dest="box_in_len", default='',	help="See inx-file.")
 		self.OptionParser.add_option("",   "--box-out-len",		action="store", type="string", 		dest="box_out_len", default='',	help="See inx-file.")
 
