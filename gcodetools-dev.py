@@ -4565,7 +4565,7 @@ class Gcodetools(inkex.Effect):
 #							draw_pointer([sp.points[i][1],sp.points[i][1]+n1*10],"#ff00ff",figure="line")
 #							draw_pointer([sp.points[i][1],sp.points[i][1]+n2*10],"#ff00ff",figure="line")
 #							warn(n1.cross(n2),n1.dot(n2)) 
-							if abs(n1.dot(n2)) < (tolerance[0] if n1.cross(n2) < 0 else tolerance[1]) : 
+							if n1.cross(n2) < 0 and n1.dot(n2) < tolerance[0]  or  n1.cross(n2) >= 0 and abs(n1.dot(n2)) < tolerance[1] : 
 								if n1.cross(n2) < 0 :
 									box_in_len = self.options.box_in_len
 									box_out_len = self.options.box_out_len
