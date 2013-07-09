@@ -586,7 +586,7 @@ class Biarc:
 
 	
 	def l(self) : 
-		return sum([ sum([i.length() for i in subitems]) for subitems in items ])
+		return sum([ sum([i.length() for i in subitems]) for subitems in self.items ])
 	
 	
 	def close(self) :
@@ -776,7 +776,6 @@ class Biarc:
 		#Crve defenitnion [start point, type = {'arc','line','move','end'}, arc center, arc angle, end point, [zstart, zend]]		
 		self.items = []
 		for sp in curve:
-			print_(sp)
 			if sp[1] == 'move':				
 				self.items.append([])
 			if sp[1] == 'arc':
