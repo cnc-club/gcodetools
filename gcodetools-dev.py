@@ -213,6 +213,8 @@ straight_distance_tolerance = 0.0001
 engraving_tolerance = 0.00001
 loft_lengths_tolerance = 0.0000001
 
+TURN_KNIFE_ANGLE_TOLERANCE = 1e-3 # in radians - tolerance on which we should get tangetn knife up tu turn it 
+
 EMC_TOLERANCE_EQUAL = 0.00001
 
 options = {}
@@ -4561,7 +4563,7 @@ class Gcodetools(inkex.Effect):
 			# calculate all vars		
 			a = calculate_angle(a, current_a)
 			axis4 = " A%f"%((a+s[3])*tool['4th axis scale']+tool['4th axis offset']) if s[1]=="arc" else ""
-			if not forse and ( abs((a-current_a)%pi2)<1e-5 or abs((a-current_a)%pi2 - pi2)<1e-5 ) : 
+			if not forse and ( abs((a-current_a)%pi2)<TURN_KNIFE_ANGLE_TOLERANCE or abs((a-current_a)%pi2 - pi2)<TURN_KNIFE_ANGLE_TOLERANCE ) : 
 				g = ""
 			else :	
 				g = "A%f  (Turn knife)\n" % (a*tool['4th axis scale']+tool['4th axis offset'])
