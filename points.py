@@ -41,6 +41,7 @@ class P:
 	def pr(self): return "%.2f,%.2f" % (self.x, self.y)
 	def to_list(self): return [self.x, self.y]	
 	def ccw(self): return P(-self.y,self.x)
+	def cw(self): return P(self.y,-self.x)
 	def l2(self): return self.x*self.x + self.y*self.y
 	def transform(self, matrix) :
 		x = self.x
