@@ -93,6 +93,11 @@ from points import P
 if "errormsg" not in dir(inkex):
 	inkex.errormsg = lambda msg: sys.stderr.write((unicode(msg) + "\n").encode("UTF-8"))
 
+### Creates new-style dxf-point
+def generate_gcodetools_point(xc, yc,layer):
+    path= 'm %s,%s 2.9375,-6.34375 0.8125,1.90625 6.84375,-6.84375 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.8125 z' % (xc,yc)
+    attribs = {'d': path, inkex.addNS('dxfpoint','inkscape'):'1', 'style': 'stroke:#ff0000;fill:#ff0000'}
+    inkex.etree.SubElement(layer, 'path', attribs)
 
 def bezierslopeatt(((bx0,by0),(bx1,by1),(bx2,by2),(bx3,by3)),t):
 	ax,ay,bx,by,cx,cy,x0,y0=bezmisc.bezierparameterize(((bx0,by0),(bx1,by1),(bx2,by2),(bx3,by3)))
@@ -4163,6 +4168,9 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--orientation-points-count",	action="store", type="string", 		dest="orientation_points_count", default="2",			help="Orientation points count")
 		self.OptionParser.add_option("",   "--tools-library-type",			action="store", type="string", 		dest="tools_library_type", default='cylinder cutter',	help="Create tools definition")
 
+		self.OptionParser.add_option("",   "--importoth-filename",			action="store", type="string", 		dest="importoth_filename", default='',			help="importoth-filename")
+		self.OptionParser.add_option("",   "--importoth-type",				action="store", type="string", 		dest="importoth_type", default='kicad-dec-abs-mm',	help="importoth-type")
+
 		self.OptionParser.add_option("",   "--dxfpoints-action",			action="store", type="string", 		dest="dxfpoints_action", default='replace',			help="dxfpoint sign toggle")
 		
 		self.OptionParser.add_option("",   "--drilling-strategy",			action="store", type="string", 		dest="drilling_strategy", default='drillg83',			help="d")
@@ -4953,7 +4961,10 @@ class Gcodetools(inkex.Effect):
 		recursive_search(self.document.getroot(),self.document.getroot())
 
 		if len(self.layers) == 1 : 
-			self.error(_("Document has no layers! Add at least one layer using layers panel (Ctrl+Shift+L)"),"Error")
+#			self.error(_("Document has no layers! Add at least one layer using layers panel (Ctrl+Shift+L)"),"Error")
+			layername = unicode("defaultLayer", "Latin 1")
+			attribs = {inkex.addNS('groupmode','inkscape'): 'layer', inkex.addNS('label','inkscape'): '%s' % layername}
+#			print_("adding default layer")
 		root = self.document.getroot() 
 
 		if  root in self.selected_paths or root in self.paths :
@@ -5263,7 +5274,7 @@ class Gcodetools(inkex.Effect):
 
 					style = simplestyle.parseStyle(path.get("style"))
 					colors[id_] = simplestyle.parseColor(style['stroke'] if "stroke"  in style and style['stroke']!='none' else "#000")
-					if path.get("dxfpoint") == "1":
+					if path.get("dxfpoint") == "1" or path.get("{http://www.inkscape.org/namespaces/inkscape}dxfpoint") == "1":
 						tmp_curve=self.transform_csp(csp, layer)
 						x=tmp_curve[0][0][0][0]
 						y=tmp_curve[0][0][0][1]
@@ -5364,7 +5375,92 @@ class Gcodetools(inkex.Effect):
 
 							
 		self.export_gcode(gcode)
-	
+################################################################################
+###
+###		importoth
+###
+################################################################################
+	def importoth(self):
+		maxGerberLayer=0
+		for layer in self.layers :
+			clname=layer.get("{http://www.inkscape.org/namespaces/inkscape}label")
+			mo = re.search(r"^gerberlayer(\d+)$", str(clname))
+			if mo:
+				if int(mo.group(1)) > maxGerberLayer:
+					maxGerberLayer=int(mo.group(1))
+					print_("maxGerberLayer=%i"%(maxGerberLayer))
+#		maxGerberLayer+=1 #New starting layer for the drilling importer
+		print_("got: maxGerberLayer=%i"%(maxGerberLayer))
+		if options.importoth_filename == "":
+			self.error("File name field is empty. Nothing to do!", "error")
+		layer_nodes = {}
+		drills={}                  
+		real2ink=3.5433070660
+		nothingDone=True
+		layerNum=""
+		for line in open(options.importoth_filename,'r'):
+			line=str(line)
+			line=line.strip("\n")
+			mo = re.search(r"T(\d+)C(\d?\.?\d+)$",line)
+			if mo:
+				print_("new tool definition:",mo.group(1),mo.group(2))	
+				drills[int(mo.group(1))+maxGerberLayer]=float(mo.group(2))
+			mo = re.search(r"T(\d+)$",line)
+#			print_(line,mo)
+			if mo:
+#				print_("inside mo.group != 0 ",line,mo)
+				if mo.group(1) == "0": break
+				layerNum=int(mo.group(1))+maxGerberLayer
+        			layername = unicode("gerberlayer"+str(layerNum), "Latin 1")
+				attribs = {inkex.addNS('groupmode','inkscape'): 'layer', inkex.addNS('label','inkscape'): '%s' % layername}
+#				print_("new tool found: %s and layername=%s"%(mo.group(1),layername),self.document.getroot())
+				if layername not in layer_nodes:          
+					layer_nodes[layername] = inkex.etree.SubElement(self.document.getroot(), 'g', attribs)
+					tool = {
+						"name": "Drill T"+str(layerNum),
+						"id": "drill"+str(layerNum),
+						"diameter":drills[layerNum],
+						"penetration feed":"100",
+						"tool change gcode":"M6 T"+str(layerNum)
+						}
+
+					tool_num = sum([len(self.tools[i]) for i in self.tools])
+					tools_group = inkex.etree.SubElement(layer_nodes[layername], inkex.addNS('g','svg'), {'gcodetools': "Gcodetools tool definition"})
+					bg = inkex.etree.SubElement(	tools_group, inkex.addNS('path','svg'), 
+						{'style':"fill:#0000FF;fill-opacity:0.5;stroke:#444444; stroke-width:1px;", "gcodetools":"Gcodetools tool background"})
+
+					y = 0
+					keys = []
+					for key in self.tools_field_order:
+						if key in tool: keys += [key]
+					for key in tool:
+						if key not in keys: keys += [key]
+					for key in keys :
+						g = inkex.etree.SubElement(tools_group, inkex.addNS('g','svg'), {'gcodetools': "Gcodetools tool parameter"})
+						draw_text(key, 0, y, group = g, gcodetools_tag = "Gcodetools tool definition field name", font_size = 10 if key!='name' else 20)
+						param = tool[key]
+						if type(param)==str and re.match("^\s*$",param) : param = "(None)"
+						draw_text(param, 150, y, group = g, gcodetools_tag = "Gcodetools tool definition field value", font_size = 10 if key!='name' else 20)
+						v = str(param).split("\n")
+						y += 15*len(v) if key!='name' else 20*len(v)
+
+					bg.set('d',"m -20,-20 l 400,0 0,%f -400,0 z " % (y+50))
+					tool = []
+					tools_group.set("transform", simpletransform.formatTransform([ [1,0,self.view_center[0]-150+50*int(mo.group(1)) ], [0,1,self.view_center[1]-150*int(mo.group(1))] ] ))
+
+			x=0
+			y=0
+			mo = re.search(r"^X([+-]?\d+\.\d+)Y([+-]?\d+\.\d+)", line)
+			if mo:
+				x=float(mo.group(1))*real2ink
+				y=-float(mo.group(2))*real2ink + 1052.3622047
+#				print_("got:",x,y)
+				generate_gcodetools_point(x,y,layer_nodes[layername])
+				nothingDone=False
+		if nothingDone:
+			self.error("Can't open file %s for reading or file contains no suitable data."%(options.importoth_filename), "error")
+#                print_("importoth ended")
+
 ################################################################################
 ###
 ###		dxfpoints
@@ -7424,8 +7520,8 @@ G01 Z1 (going to cutting z)\n""",
 		elif self.options.active_tab ==  '"test"' :
 			self.test()
 			
-		elif self.options.active_tab not in ['"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"', '"offset"', '"arrangement"', '"update"', '"graffiti"', '"lathe_modify_path"', '"plasma-prepare-path"', '"box-prepare-path"', '"ignore"']:
-			self.error(_("Select one of the action tabs - Path to Gcode, Area, Engraving, DXF points, Orientation, Offset, Lathe or Tools library.\n Current active tab id is %s" % self.options.active_tab),"error")
+		elif self.options.active_tab not in ['"importoth"','"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"', '"offset"', '"arrangement"', '"update"', '"graffiti"', '"lathe_modify_path"', '"plasma-prepare-path"', '"box-prepare-path"', '"ignore"']:
+			self.error(_("Select one of the action tabs - Path to Gcode, Area, Engraving, Import, DXF points, Orientation, Offset, Lathe or Tools library.\n Current active tab id is %s" % self.options.active_tab),"error")
 		else:
 			# Get all Gcodetools data from the scene.
 			self.get_info()
@@ -7450,7 +7546,9 @@ G01 Z1 (going to cutting z)\n""",
 			elif self.options.active_tab == '"area"': 
 				self.area()		
 			elif self.options.active_tab == '"area_artefacts"': 
-				self.area_artefacts()		
+				self.area_artefacts()
+			elif self.options.active_tab == '"importoth"':
+				self.importoth()
 			elif self.options.active_tab == '"dxfpoints"': 
 				self.dxfpoints()		
 			elif self.options.active_tab == '"engraving"': 

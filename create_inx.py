@@ -27,7 +27,7 @@ def main():
 			assert False, "unhandled option"
 
 	if args == []: 
-		args = [	
+		args = [	        "Import: importoth no_options",
 					"DXF Points: dxfpoints no_options",
 					"Path to Gcode: ptg",
 					"Area: area area_fill area_artefacts ptg",
