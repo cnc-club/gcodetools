@@ -76,6 +76,18 @@ Gcodetools ver. 1.6
 			
 		</page>
 <!-- Gcodetools: /preferences block -->
+<!-- Gcodetools: importoth block -->
+		<page name='importoth' _gui-text='Import'>
+		<_param name="help" type="description">
+
+Imports files from other systems.
+		</_param>
+		<param name="importoth-filename" type="string" _gui-text="Full path to file:"></param>
+		<param name="importoth-type" type="enum" _gui-text="Select file type:">
+			<_item value="KiCAD gerber decimal,mm,absolute">kicad-dec-abs-mm</_item>
+		</param>
+		</page>
+<!-- Gcodetools: /importoth block -->
 <!-- Gcodetools: dxfpoints block -->
 		<page name='dxfpoints' _gui-text='DXF points'>
 			<_param name="help" type="description" xml:space="preserve">
