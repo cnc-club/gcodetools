@@ -4200,6 +4200,19 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--graffiti-preview-size",		action="store", type="int", 		dest="graffiti_preview_size", default=800,	help="Graffiti preview's size.")
 		self.OptionParser.add_option("",   "--graffiti-preview-emmit",		action="store", type="int", 		dest="graffiti_preview_emmit", default=800,	help="Preview's paint emmit (pts/s).")
 
+		self.OptionParser.add_option("",   "--bender-tolerance",			action="store", type="float", 		dest="bender_tolerance", default=10.,	help="Bender angle tolerance")
+		self.OptionParser.add_option("",   "--bender-step",					action="store", type="float", 		dest="bender_step", default=10.,		help="Bender distance step")
+
+								if asin(slope.cross(lslope)) < self.options.bender_tolerance :
+									lslope = slope
+									li = i
+									lt = t
+									# make bending! 
+									a = asin(slope.cross(lslope))
+									bend(a, i,t, li,lt)
+								l += self.options.bender_step
+
+
 
 		self.OptionParser.add_option("",   "--in-out-path",					action="store", type="inkbool", 	dest="in_out_path",	default=True,			help="Create in-out paths")
 		self.OptionParser.add_option("",   "--in-out-path-do-not-add-reference-point",	action="store", type="inkbool", dest="in_out_path_do_not_add_reference_point", default=False,	help="Just add reference in-out point")
@@ -7168,6 +7181,59 @@ G01 Z1 (going to cutting z)\n""",
 			self.error("Can not check the latest version. You can check it manualy at \nhttp://www.cnc-club.ru/gcodetools (English version). \nhttp://www.cnc-club.ru/gcodetools_ru (Russian version). \nCurrent version is Gcodetools %s"%gcodetools_current_version,"Warning")					
 				
 
+################################################################################
+### Bender function generates Gcode for bending machine
+################################################################################
+	def bender(self):
+		def bend(a,i,t,li,lt) :
+			gcode += "(Push %s mm)"%(subpath.l(i,t)-subpath.l(li,lt))
+			gcode += "(Bend %s degrees)"%(asin(a.cross(la))/pi*180)
+			
+		gcode = '' 
+		if self.selected_paths == {} and self.options.auto_select_paths:
+			paths=self.paths
+			self.error(_("No paths are selected! Trying to work on all available paths."),"warning")
+		else :
+			paths = self.selected_paths
+		for layer in self.layers :
+			if layer in paths :
+				for path in paths[layer] :
+					csp = CSP(path)
+					for subpath in csp.items :
+						# here comes the bender
+						gcode += self.tool['gcode before path']+"\n"
+						la = subpath.slope(0,0)														
+						li =0
+						lt = 0
+						for i in range(len(subpath.points)-1) :
+							l = 0	
+							t = 0					
+							while t<=1 :
+								lt = t
+								t = subpath.t_at_l(self, i, l, self_l=None, tolerance=0.001) :
+								slope = subpath.slope(i,t)
+								if asin(slope.cross(lslope)) < self.options.bender_tolerance :
+									lslope = slope
+									li = i
+									lt = t
+									# make bending! 
+									a = asin(slope.cross(lslope))
+									bend(a, i,t, li,lt)
+								l += self.options.bender_step
+							#bend at the end of segment
+							slope = subpath.slope(i,1)
+							lslope = slope
+							li = i
+							lt = t
+							# make bending! 
+							a = asin(slope.cross(lslope))
+							bend(a, i,t, li,lt)
+								
+						gcode += self.tool['gcode after path']+"\n"
+ 
+						
+
+
 
 ################################################################################
 ### Graffiti function generates Gcode for graffiti drawer
@@ -7520,8 +7586,8 @@ G01 Z1 (going to cutting z)\n""",
 		elif self.options.active_tab ==  '"test"' :
 			self.test()
 			
-		elif self.options.active_tab not in ['"importoth"','"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"', '"offset"', '"arrangement"', '"update"', '"graffiti"', '"lathe_modify_path"', '"plasma-prepare-path"', '"box-prepare-path"', '"ignore"']:
-			self.error(_("Select one of the action tabs - Path to Gcode, Area, Engraving, Import, DXF points, Orientation, Offset, Lathe or Tools library.\n Current active tab id is %s" % self.options.active_tab),"error")
+		elif self.options.active_tab not in ['"importoth"','"bender"','"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"orientation"', '"tools_library"', '"lathe"', '"offset"', '"arrangement"', '"update"', '"graffiti"', '"lathe_modify_path"', '"plasma-prepare-path"', '"box-prepare-path"', '"ignore"']:
+			self.error(_("Select one of the action tabs - Path to Gcode, Area, Engraving, Import, DXF points, Orientation, Offset, Lathe, Bender or Tools library.\n Current active tab id is %s" % self.options.active_tab),"error")
 		else:
 			# Get all Gcodetools data from the scene.
 			self.get_info()
@@ -7557,6 +7623,8 @@ G01 Z1 (going to cutting z)\n""",
 				self.orientation()		
 			elif self.options.active_tab == '"graffiti"': 
 				self.graffiti()		
+			elif self.options.active_tab == '"bender"': 
+				self.bender()		
 			elif self.options.active_tab == '"tools_library"': 
 				if self.options.tools_library_type != "check":
 					self.tools_library()

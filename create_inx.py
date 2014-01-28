@@ -42,6 +42,7 @@ def main():
 					"Check for updates: update no_options no_preferences",
 					"Path preparations: plasma-prepare-path box-prepare-path no_options no_preferences",
 					"Ignore: ignore no_options no_preferences",
+					"Bender: bender",
 					"Test: test",					
 					"About: about no_options no_preferences",					
 				]
