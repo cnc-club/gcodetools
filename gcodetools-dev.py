@@ -2019,7 +2019,10 @@ class CSPsubpath() :
 	
 	def l(self, i) :
 		return cspseglength( self.cp_to_list(i), self.cp_to_list(i+1), tolerance=0.001 )
-		
+
+	def l_at_t(self, i, t) :
+		return CSPsubpath(self.headi(i,t)).l(0)
+			
 	def t_at_l(self, i, l, self_l=None, tolerance=0.001) :
 		if self_l == None : self_l = self.l(i)
 		if self_l == 0 : return 0.
@@ -2093,9 +2096,8 @@ class CSPsubpath() :
 	def cut_tail_l(self,l):
 		return self.headl(self.length()-l)
 	
-			
-	def split(self,i,t=.5) :
-		sp1,sp2 = self.cp_to_list(i), self.cp_to_list(i+1)
+	def split_seg(sp1,sp2) :
+		# return P(sp1) P(sp2) P(sp3)
 		[x1,y1],[x2,y2],[x3,y3],[x4,y4] = sp1[1], sp1[2], sp2[0], sp2[1] 
 		x12 = x1+(x2-x1)*t
 		y12 = y1+(y2-y1)*t
@@ -2110,6 +2112,26 @@ class CSPsubpath() :
 		x = x1223+(x2334-x1223)*t
 		y = y1223+(y2334-y1223)*t
 		return [[P(sp1[0]),P(sp1[1]),P(x12,y12)], [P(x1223,y1223),P(x,y),P(x2334,y2334)], [P(x34,y34),P(sp2[1]),P(sp2[2])]]
+		
+	def split(self,i,t=.5) :
+		sp1,sp2 = self.cp_to_list(i), self.cp_to_list(i+1)
+		return split_seg(sp1,sp2)
+
+	def add_nodes(self, num=None, l=None) :
+		pass		
+		
+	def add_nodes_i(self, i, num=None, l=None) :
+		# Will change total number of points! 
+		# Will influence i!!!
+		L = self.l(i)
+		if num == None :
+			num = ceil(L/l)
+		l = L/num	
+		sp1,sp2 = self.cp_to_list(i), self.cp_to_list(i+1)
+		points = []
+		for j in range(num) :
+			self.points[i,i+2] = self.split(i,self.t_at_l(i,l))
+			i += 1
 	
 	def transform(self, matrix) :
 		if matrix == [] : return
@@ -4202,17 +4224,6 @@ class Gcodetools(inkex.Effect):
 
 		self.OptionParser.add_option("",   "--bender-tolerance",			action="store", type="float", 		dest="bender_tolerance", default=10.,	help="Bender angle tolerance")
 		self.OptionParser.add_option("",   "--bender-step",					action="store", type="float", 		dest="bender_step", default=10.,		help="Bender distance step")
-
-								if asin(slope.cross(lslope)) < self.options.bender_tolerance :
-									lslope = slope
-									li = i
-									lt = t
-									# make bending! 
-									a = asin(slope.cross(lslope))
-									bend(a, i,t, li,lt)
-								l += self.options.bender_step
-
-
 
 		self.OptionParser.add_option("",   "--in-out-path",					action="store", type="inkbool", 	dest="in_out_path",	default=True,			help="Create in-out paths")
 		self.OptionParser.add_option("",   "--in-out-path-do-not-add-reference-point",	action="store", type="inkbool", dest="in_out_path_do_not_add_reference_point", default=False,	help="Just add reference in-out point")
@@ -7186,8 +7197,10 @@ G01 Z1 (going to cutting z)\n""",
 ################################################################################
 	def bender(self):
 		def bend(a,i,t,li,lt) :
-			gcode += "(Push %s mm)"%(subpath.l(i,t)-subpath.l(li,lt))
-			gcode += "(Bend %s degrees)"%(asin(a.cross(la))/pi*180)
+			gcode = ""
+			gcode += "(Push %s mm)\n"%(subpath.l_at_t(i,t)-subpath.l_at_t(li,lt))
+			gcode += "(Bend %s degrees)\n\n"%(a/pi*180)
+			return gcode
 			
 		gcode = '' 
 		if self.selected_paths == {} and self.options.auto_select_paths:
@@ -7197,28 +7210,34 @@ G01 Z1 (going to cutting z)\n""",
 			paths = self.selected_paths
 		for layer in self.layers :
 			if layer in paths :
+				self.set_tool(layer)
+				self.tool = self.tools[layer][0]
 				for path in paths[layer] :
 					csp = CSP(path)
 					for subpath in csp.items :
 						# here comes the bender
+						fetch_point(subpath, )
+						
 						gcode += self.tool['gcode before path']+"\n"
+						#split subpath to len 
 						la = subpath.slope(0,0)														
 						li =0
 						lt = 0
+						lslope = None
 						for i in range(len(subpath.points)-1) :
 							l = 0	
 							t = 0					
 							while t<=1 :
 								lt = t
-								t = subpath.t_at_l(self, i, l, self_l=None, tolerance=0.001) :
+								t = subpath.t_at_l(i, l)
 								slope = subpath.slope(i,t)
-								if asin(slope.cross(lslope)) < self.options.bender_tolerance :
+								if lslope==None or asin(slope.cross(lslope)) < self.options.bender_tolerance :
 									lslope = slope
 									li = i
 									lt = t
 									# make bending! 
 									a = asin(slope.cross(lslope))
-									bend(a, i,t, li,lt)
+									gcode += bend(a, i,t, li,lt)
 								l += self.options.bender_step
 							#bend at the end of segment
 							slope = subpath.slope(i,1)
@@ -7227,12 +7246,12 @@ G01 Z1 (going to cutting z)\n""",
 							lt = t
 							# make bending! 
 							a = asin(slope.cross(lslope))
-							bend(a, i,t, li,lt)
+							gcode += bend(a, i,t, li,lt)
 								
 						gcode += self.tool['gcode after path']+"\n"
- 
-						
 
+		if not self.check_dir() : return
+		self.export_gcode(gcode)
 
 
 ################################################################################
@@ -7591,7 +7610,7 @@ G01 Z1 (going to cutting z)\n""",
 		else:
 			# Get all Gcodetools data from the scene.
 			self.get_info()
-			if self.options.active_tab in ['"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"lathe"', '"graffiti"', '"plasma-prepare-path"', '"box-prepare-path"']:
+			if self.options.active_tab in ['"dxfpoints"','"path-to-gcode"', '"area_fill"', '"area"', '"area_artefacts"', '"engraving"', '"lathe"', '"graffiti"', '"plasma-prepare-path"', '"box-prepare-path"', '"bender"']:
 				if self.orientation_points == {} :
 					self.error(_("Orientation points have not been defined! A default set of orientation points has been automatically added."),"warning")
 					self.orientation( self.layers[min(1,len(self.layers)-1)] )		

@@ -51,4 +51,5 @@ class P:
 		if tolerance==None : tolerance = 1e-7
 		return (self-b).l2() < tolerance
 	def copy(self) : return P(self.x,self.y)
-
+	def __getitem__(self, i):
+		return (self.x if i==0 else self.y if i==1 else None)
