@@ -2026,6 +2026,7 @@ class CSPsubpath() :
 	def t_at_l(self, i, l, self_l=None, tolerance=0.001) :
 		if self_l == None : self_l = self.l(i)
 		if self_l == 0 : return 0.
+		if l>=self_l : return 1.
 		return bezmisc.beziertatlength(self.cp_to_list(i)[1:]+self.cp_to_list(i+1)[:2] , l/self_l, tolerance)
 	
 	def at_l(self, l, tolerance=0.001) :
@@ -2116,22 +2117,6 @@ class CSPsubpath() :
 	def split(self,i,t=.5) :
 		sp1,sp2 = self.cp_to_list(i), self.cp_to_list(i+1)
 		return split_seg(sp1,sp2)
-
-	def add_nodes(self, num=None, l=None) :
-		pass		
-		
-	def add_nodes_i(self, i, num=None, l=None) :
-		# Will change total number of points! 
-		# Will influence i!!!
-		L = self.l(i)
-		if num == None :
-			num = ceil(L/l)
-		l = L/num	
-		sp1,sp2 = self.cp_to_list(i), self.cp_to_list(i+1)
-		points = []
-		for j in range(num) :
-			self.points[i,i+2] = self.split(i,self.t_at_l(i,l))
-			i += 1
 	
 	def transform(self, matrix) :
 		if matrix == [] : return
@@ -4223,7 +4208,8 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--graffiti-preview-emmit",		action="store", type="int", 		dest="graffiti_preview_emmit", default=800,	help="Preview's paint emmit (pts/s).")
 
 		self.OptionParser.add_option("",   "--bender-tolerance",			action="store", type="float", 		dest="bender_tolerance", default=10.,	help="Bender angle tolerance")
-		self.OptionParser.add_option("",   "--bender-step",					action="store", type="float", 		dest="bender_step", default=10.,		help="Bender distance step")
+		self.OptionParser.add_option("",   "--bender-step",					action="store", type="float", 		dest="bender_step", default=1.,		help="Bender distance step")
+		self.OptionParser.add_option("",   "--bender-max-split",			action="store", type="int", 		dest="bender_max_split", default=32.,		help="Bender maximum splits")
 
 		self.OptionParser.add_option("",   "--in-out-path",					action="store", type="inkbool", 	dest="in_out_path",	default=True,			help="Create in-out paths")
 		self.OptionParser.add_option("",   "--in-out-path-do-not-add-reference-point",	action="store", type="inkbool", dest="in_out_path_do_not_add_reference_point", default=False,	help="Just add reference in-out point")
@@ -7213,43 +7199,40 @@ G01 Z1 (going to cutting z)\n""",
 				self.set_tool(layer)
 				self.tool = self.tools[layer][0]
 				for path in paths[layer] :
+					gcode += "(Path start)\n"
 					csp = CSP(path)
 					for subpath in csp.items :
-						# here comes the bender
-						fetch_point(subpath, )
-						
+						gcode += "(Subpath start)\n"
 						gcode += self.tool['gcode before path']+"\n"
-						#split subpath to len 
-						la = subpath.slope(0,0)														
-						li =0
-						lt = 0
-						lslope = None
+						# here comes the bender
+						#create list of "points" point = [len, alpha_end-alpha_start].
+						points = []
+						a_st = subpath.slope(0,0)
 						for i in range(len(subpath.points)-1) :
-							l = 0	
-							t = 0					
-							while t<=1 :
-								lt = t
-								t = subpath.t_at_l(i, l)
-								slope = subpath.slope(i,t)
-								if lslope==None or asin(slope.cross(lslope)) < self.options.bender_tolerance :
-									lslope = slope
-									li = i
-									lt = t
-									# make bending! 
-									a = asin(slope.cross(lslope))
-									gcode += bend(a, i,t, li,lt)
-								l += self.options.bender_step
-							#bend at the end of segment
-							slope = subpath.slope(i,1)
-							lslope = slope
-							li = i
-							lt = t
-							# make bending! 
-							a = asin(slope.cross(lslope))
-							gcode += bend(a, i,t, li,lt)
-								
+							# bend at the start of path
+							a_end = subpath.slope(i, 0)
+							points.append([0, asin(a_st.cross(a_end))])
+							# get split len
+							L = subpath.l(i) 
+							if L/self.options.bender_step > self.options.bender_max_split :
+								num = self.options.bender_max_split
+							else : 
+								num = ceil(L/self.options.bender_step)
+							l = L/num
+							a_st = a_end
+							for j in range(int(num)) :
+								t = subpath.t_at_l(i,l*(j+1))
+								a_end = subpath.slope(i,t)						
+								points.append([l, asin(a_st.cross(a_end))])
+								a_st = a_end
+							
+						for p in points :
+							gcode += "(Push %s bend %s degrees)"%(p[0],p[1]*180/pi)
+							gcode += "(G01 X%s Y%s)\n"%(p[0],p[1]*180/pi)
+										
 						gcode += self.tool['gcode after path']+"\n"
-
+						gcode += "(Subpath end)\n\n"
+					gcode += "(Path end)\n\n"
 		if not self.check_dir() : return
 		self.export_gcode(gcode)
 

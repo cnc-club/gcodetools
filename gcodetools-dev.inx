@@ -373,10 +373,9 @@ You can use a - for angle value, boxa, boxb, boxc - parameters.
 	<page name='bender' _gui-text='Bender'>	
 		<_param name="help" type="description" xml:space="preserve">Create Gcode for Bending machine.
 Bite my shiny metall a..!
-		<_param name="bender-tolerance" type="float" precision="5" min="0.01" max="1000" _gui-text="Test parameter 1:">1</_param>
-		<_param name="bender-step" type="float" precision="5" min="0.1" max="1000" _gui-text="Test parameter 1:">1</_param>
 		</_param>
-		
+		<_param name="bender-step" type="float" precision="5" min="0.1" max="1000" _gui-text="Path split step:">1</_param>
+		<_param name="bender-max-split" type="int" min="1" max="1000" _gui-text="Segment max split:">32</_param>
 	</page>
 <!-- Gcodetools: /bender block -->
 
