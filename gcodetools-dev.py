@@ -3672,13 +3672,8 @@ class Gcodetools(inkex.Effect):
 			postprocessor.gcode = self.header + postprocessor.gcode + self.footer
 
 		f = open(self.options.directory+self.options.file, "w")
-		#-
-		new_gcode = []
-		for i in postprocessor.gcode:
-			if i in string.printable:
-				new_gcode.append(i)
-		postprocessor.gcode = ''.join(new_gcode)
-		#-
+
+		postprocessor.gcode = filter(lambda x: x in string.printable, postprocessor.gcode)
 		f.write(postprocessor.gcode)
 		f.close()							
 
