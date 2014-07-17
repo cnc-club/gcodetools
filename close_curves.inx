@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+	<_name>Close curves</_name>
+	<id>ru.cnc-club.filter.close_curves</id>
+	<dependency type="executable" location="extensions">close_curves.py</dependency>
+	<dependency type="executable" location="extensions">inkex.py</dependency>
+	<param name="tolerance" type="float" precision="5" min="-100000" max="100000" _gui-text="Closure tolerance:">0.01</param>			
+	<param name="subpaths" type="boolean" _gui-text="Treat all paths as one path">false</param> 
+	
+	<param name="help" type="description">
+		Select paths that you want to close, and press ok.
+	</param>
+	
+	<effect needs-live-preview="true">
+		 <effects-menu>
+            <submenu _name="Modify Path"/>
+        </effects-menu>
+		<object-type>path</object-type>
+	</effect>
+	<script>
+		<command reldir="extensions" interpreter="python">close_curves.py</command>
+	</script>
+</inkscape-extension>
