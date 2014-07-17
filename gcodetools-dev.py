@@ -87,7 +87,7 @@ import gettext
 _ = gettext.gettext
 from biarc import *
 from points import P
-
+import ast
  
 ### Check if inkex has errormsg (0.46 version does not have one.) Could be removed later.
 if "errormsg" not in dir(inkex):
@@ -2737,26 +2737,22 @@ def biarc_curve_clip_at_l(curve, l, clip_type = "strict") :
 
 class Processors() :
 	def process(self, command) :
-		command = re.sub(r"\\\\",":#:#:slash:#:#:",command)
-		command = re.sub(r"\\;",":#:#:semicolon:#:#:",command)
-		command = command.split(";")
-		for s in command: 
-			s = re.sub(":#:#:slash:#:#:","\\\\",s)
-			s = re.sub(":#:#:semicolon:#:#:","\\;",s)
-			s = s.strip()
-			if s!="" :
-				self.parse_command(s)		
-			
-	def parse_command(self,command):
-		r = re.match(r"([A-Za-z0-9_]+)\s*\(\s*(.*)\)",command)
-		if not r:
-			self.error("Parse error while executing %s.\n(Command: '%s')"%(self.func, command), "error")
-		function, parameters = r.group(1).lower(),r.group(2)
-		if function in self.functions :
-			print_("%s: executing function %s(%s)"%(self.func, function,parameters))
-			self.functions[function](parameters)
-		else : 
-			self.error("Unrecognized function '%s' while executing %s.\n(Command: '%s')"%(self.func, function,command), "error")
+		try :
+			a = ast.parse(command.strip())
+		except Exception as e:	
+			self.error("Parse error while executing processor '%s'.\n\n%s"%(command,e), "error")
+		for l in a.body :
+			try :
+				function = l.value.func.id.lower()
+				parameters = [s1.s for s1 in l.value.args]
+			except :
+				s = command.split("\n")[l.lineno][l.col_offset:]
+				self.error("Parse error while executing processor near '%s'."%(s), "error")
+			if function in self.functions :
+				print_("%s: executing function %s(%s)"%(self.func, function,parameters))
+				self.functions[function](parameters)
+			else : 
+				self.error("Unrecognized function '%s(%s)' while executing processors.\n"%(function, parameters), "error")
 	
 
 
@@ -2772,7 +2768,6 @@ class Preprocessor(Processors) :
 	def clip_angles(self, parameters) :
 		tolerance=10
 		error="warning"
-		parameters = parameters.split(",")
 		if len(parameters)==0 : return 
 		else : radius = float(parameters[0])
 		if len(parameters)>1 : tolerance=float(parameters[1])
@@ -2781,6 +2776,7 @@ class Preprocessor(Processors) :
 
 			
 	def join_paths(self, tolerance) :
+		tolerance = tolerance[0]
 		tolerance = float(tolerance) if tolerance.strip() != "" else None
 		gcodetools.join_paths(tolerance)
 	
@@ -2800,12 +2796,14 @@ class Postprocessor(Processors) :
 					"parameterize"	: self.parameterize,
 					"regex"			: self.re_sub_on_gcode_lines,
 					"regexm"		: self.re_sub_on_gcode,
+					"regexp"			: self.re_sub_on_gcode_lines, # just an alias to regex
+					"regexpm"		: self.re_sub_on_gcode,
 					"remove_a_turns" : self.remove_a_turns,
 					}
 
 	def re_sub_on_gcode(self, parameters):
 		try :
-			self.gcode = eval( "re.sub(%s,self.gcode)"%parameters) #, flags=re.MULTILINE|re.DOTALL
+			self.gcode = re.sub(parameters[0],parameters[1],self.gcode) #, flags=re.MULTILINE|re.DOTALL
 		except Exception as ex :	
 			self.error("Bad parameters for regexp. They should be as re.sub pattern and replacement parameters! For example: r\"G0(\d)\", r\"G\\1\" \n(Parameters: '%s')\n %s"%(parameters, ex), "error")				
 			
@@ -2814,12 +2812,12 @@ class Postprocessor(Processors) :
 		self.gcode = ""
 		try :
 			for line in gcode :
-				self.gcode += eval( "re.sub(%s,line)"%parameters) +"\n"
-
+				self.gcode += re.sub(parameters[0],parameters[1],line) +"\n"
 		except Exception as ex :	
 			self.error("Bad parameters for regexp. They should be as re.sub pattern and replacement parameters! For example: r\"G0(\d)\", r\"G\\1\" \n(Parameters: '%s')\n %s"%(parameters, ex), "error")				
 		
 	def remove_a_turns(self, ascale) :
+		ascale = ascale[0]
 		if ascale.strip() == "" : ascale = 180/pi
 		ascale = float(ascale)
 		gcode = []
@@ -2841,11 +2839,8 @@ class Postprocessor(Processors) :
 	
 	def remap(self,parameters, case_sensitive = False):
 		# remap parameters should be like "x->y,y->x"
-		parameters = parameters.replace("\,",":#:#:coma:#:#:")
-		parameters = parameters.split(",")
 		pattern, remap = [], []
 		for s in parameters:
-			s = s.replace(":#:#:coma:#:#:","\,")
 			r = re.match("""\s*(\'|\")(.*)\\1\s*->\s*(\'|\")(.*)\\3\s*""",s)
 			if not r :
 				self.error("Bad parameters for remap.\n(Parameters: '%s')"%(parameters), "error")
@@ -2864,7 +2859,9 @@ class Postprocessor(Processors) :
 			self.gcode = self.gcode.replace(":#:#:remap_pattern%s:#:#:"%i, remap[i])
 	
 	
-	def transform(self, move, scale):
+	def transform(self, parameters):
+		move, scale = parameters[0], parameters[1]
+		
 		axis = ["xi","yj","zk","a"]
 		flip = scale[0]*scale[1]*scale[2] < 0 
 		gcode = ""
@@ -3015,7 +3012,6 @@ class Postprocessor(Processors) :
 	
 
 	def scale(self, parameters):
-		parameters = parameters.split(",")
 		scale = [1.,1.,1.,1.]
 		try :
 			for i in range(len(parameters)) :
@@ -3028,7 +3024,6 @@ class Postprocessor(Processors) :
 
 	
 	def move(self, parameters):
-		parameters = parameters.split(",")
 		move = [0.,0.,0.,0.]
 		try :
 			for i in range(len(parameters)) :
