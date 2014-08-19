@@ -15,6 +15,9 @@ Inkscape and Gcodetools are licensed under GNU GPL.
 Install
 ==========
 Windows
-    Unpack and copy all the files to the following directory Program Files\Inkscape\share\extensions\ and restart inkscape
+
+Unpack and copy all the files to the following directory Program Files\Inkscape\share\extensions\ and restart inkscape
+
 Linux
-    Unpack and copy all the files to the following directory /usr/share/inkscape/extensions/ and restart inkscape
+
+Unpack and copy all the files to the following directory /usr/share/inkscape/extensions/ and restart inkscape
