@@ -231,7 +231,14 @@ def gcode_comment_str(s, replace_new_line = False):
 			res +=  "(" + re.sub(r"[\(\)\\\n\r]", ".", a) + ")\n"
 		else : 	
 			res +=  "\n"
-	return res	
+	return res
+	
+def gcode_comments(s):
+	res = ""
+	res = s.replace('(',';')
+	res = res.replace(')','')
+	res = res.replace('%','')
+	return res
 
 
 ################################################################################
@@ -3242,7 +3249,7 @@ class Arangement_Genetic:
 
 class Gcodetools(inkex.Effect):
 
-	def export_gcode(self,gcode, no_headers = False) :
+	def export_gcode(self,gcode, no_headers = False,comments = '') :
 		if self.options.postprocessor != ""  or self.options.postprocessor_custom != "" :
 			postprocessor = Postprocessor(self.error)
 			postprocessor.gcode = gcode
@@ -3253,7 +3260,10 @@ class Gcodetools(inkex.Effect):
 
 		if not no_headers :
 			postprocessor.gcode = self.header + postprocessor.gcode + self.footer
-
+			
+		if comments == ';' :
+			postprocessor.gcode = gcode_comments(postprocessor.gcode)
+		
 		f = open(self.options.directory+self.options.file, "w")	
 		f.write(postprocessor.gcode)
 		f.close()							
@@ -3575,6 +3585,7 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--path-to-gcode-sort-paths",	action="store", type="inkbool",		dest="path_to_gcode_sort_paths", default=True,		help="Sort paths to reduse rapid distance.")		
 		self.OptionParser.add_option("",   "--comment-gcode",				action="store", type="string", 		dest="comment_gcode", default="",					help="Comment Gcode")				
 		self.OptionParser.add_option("",   "--comment-gcode-from-properties",action="store", type="inkbool", 	dest="comment_gcode_from_properties", default=False,help="Get additional comments from Object Properties")				
+		self.OptionParser.add_option("",   "--comments",					action="store", type="string",	 	dest="comments", default="",						help="Select comments type")				
 
 
 
@@ -3673,9 +3684,10 @@ class Gcodetools(inkex.Effect):
 					"gcode before path":"",
 					"gcode after path":"",
 					"sog":"",
-					"spinlde rpm":"",
+					"spindle rpm":"",
 					"CW or CCW":"",
 					"tool change gcode":" ",
+					"comments":"",
 					"4th axis meaning": " ",
 					"4th axis scale": 1.,
 					"4th axis offset": 0.,
@@ -3700,6 +3712,7 @@ class Gcodetools(inkex.Effect):
 					"spinlde rpm",
 					"CW or CCW",
 					"tool change gcode",
+					"comments",
 				]
 
 
@@ -3856,6 +3869,7 @@ class Gcodetools(inkex.Effect):
 			else:
 				self.footer = defaults['footer']
 			self.header += self.options.unit + "\n" 
+			
 		else: 
 			self.error(_("Directory does not exist! Please specify existing directory at Preferences tab!"),"error")
 			return False
@@ -3954,7 +3968,7 @@ class Gcodetools(inkex.Effect):
 					a = calculate_angle(a, current_a)
 					g+="G01 A%s\n" % (a*tool['4th axis scale']+tool['4th axis offset'])
 					current_a = a
-				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + penetration_feed +"(Penetrate)\n"	
+				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + penetration_feed +" (Penetrate)\n"	
 				g += "G01" +c(si[0]+[s[5][1]+depth]) + feed + "\n"
 				lg = 'G01'
 			elif s[1] == 'arc':
@@ -3970,7 +3984,7 @@ class Gcodetools(inkex.Effect):
 					axis4 = " A%s"%((current_a+s[3])*tool['4th axis scale']+tool['4th axis offset'])
 					current_a = current_a+s[3]
 				else : axis4 = ""
-				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + penetration_feed + "(Penetrate)\n"				
+				if lg=="G00": g += "G01" + c([None,None,s[5][0]+depth]) + penetration_feed + " (Penetrate)\n"				
 				if (r[0]**2 + r[1]**2)>self.options.min_arc_radius**2:
 					r1, r2 = (P(s[0])-P(s[2])), (P(si[0])-P(s[2]))
 					if abs(r1.mag()-r2.mag()) < 0.001 :
@@ -4650,8 +4664,7 @@ class Gcodetools(inkex.Effect):
 				
 							gcode += gcode_comment_str("End cutting path id: %s\n\n"%curves[key][0][0])
 
-							
-		self.export_gcode(gcode)
+		self.export_gcode(gcode,comments=self.tools[layer][0]["comments"])
 	
 ################################################################################
 ###
@@ -5796,7 +5809,7 @@ class Gcodetools(inkex.Effect):
 			self.header+="(Depth, as a function of radius w, must be "+ self.tools[layer][0]['shape']+ ")\n"
 			self.header+="(Rapid feeds use safe Z="+ str(self.options.Zsafe) + unit + ")\n"
 			self.header+="(Material surface at Z="+ str(self.options.Zsurface) + unit + ")\n"
-			self.export_gcode(gcode)
+			self.export_gcode(gcode,comments=self.tools[layer][0]["comments"])
 		else : 	self.error(_("No need to engrave sharp angles."),"warning")
 
 
@@ -5897,7 +5910,19 @@ class Gcodetools(inkex.Effect):
 					"feed":"400",
 					"penetration feed":"100",
 					"depth step":"1",
-					"tool change gcode":" "
+					"tool change gcode":" ",
+					"comments":" "
+			}
+		elif self.options.tools_library_type == "plotter" :
+			tool = {
+					"name": "Plotter",
+					"id": "Plotter 0001",
+					"diameter":0.4,
+					"feed":"1000",
+					"penetration feed":"1500",
+					"depth step":"1",
+					"tool change gcode":" ",
+					"comments":" "
 			}
 		elif self.options.tools_library_type == "lathe cutter" :
 			tool = {
@@ -5910,7 +5935,8 @@ class Gcodetools(inkex.Effect):
 					"fine feed":"100",
 					"penetration feed":"100",
 					"depth step":"1",
-					"tool change gcode":" "
+					"tool change gcode":" ",
+					"comments":" "
 			}
 		elif self.options.tools_library_type == "cone cutter":	
 			tool = {
@@ -5921,7 +5947,8 @@ class Gcodetools(inkex.Effect):
 					"feed":"400",
 					"penetration feed":"100",
 					"depth step":"1",
-					"tool change gcode":" "
+					"tool change gcode":" ",
+					"comments":" "
 			}
 		elif self.options.tools_library_type == "tangent knife":	
 			tool = {
@@ -5933,7 +5960,8 @@ class Gcodetools(inkex.Effect):
 					"4th axis meaning": "tangent knife",
 					"4th axis scale": 1.,
 					"4th axis offset": 0,
-					"tool change gcode":" "
+					"tool change gcode":" ",
+					"comments":" "
 			}
 			
 		elif self.options.tools_library_type == "plasma cutter":	
@@ -5950,6 +5978,7 @@ M03 (turn on plasma)
 G04 P0.2 (pause)
 G01 Z1 (going to cutting z)\n""",
 				"gcode after path":"M05 (turn off plasma)\n",
+				"comments":" "
 			}
 		elif self.options.tools_library_type == "graffiti":	
 			tool = {
@@ -5961,7 +5990,7 @@ G01 Z1 (going to cutting z)\n""",
 				"gcode before path":"""M03 S1(Turn spray on)\n """,
 				"gcode after path":"M05 (Turn spray off)\n ",
 				"tool change gcode":"(Add G00 here to change sprayer if needed)\n",
-				
+				"comments":" "
 			}
 
 		else :
@@ -6213,7 +6242,7 @@ G01 Z1 (going to cutting z)\n""",
 							gcode += ("G01 %s %f F %f \n" % (z, top_start[1], self.tool["passing feed"]) )
 							gcode += ("G01 %s %f %s %f F %f \n" % (x, top_start[0], z, top_start[1], self.tool["passing feed"]) )
 	
-		self.export_gcode(gcode)
+		self.export_gcode(gcode,comments=self.tools[layer][0]["comments"])
 		
 ################################################################################
 ###
@@ -6598,7 +6627,7 @@ G01 Z1 (going to cutting z)\n""",
 					if polyline_[0] == "draw" and last_state!="draw" :
 						gcode += self.tool['gcode after path']+"\n"
 					last_state = polyline_[0]
-		self.export_gcode(gcode, no_headers=True)				
+		self.export_gcode(gcode, no_headers=True, comments=self.tools[layer][0]["comments"])				
 		if self.options.graffiti_create_preview :
 			try :
 				# Draw reference points			
