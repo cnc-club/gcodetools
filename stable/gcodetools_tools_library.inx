@@ -11,6 +11,7 @@
 			
 			<param type='optiongroup' name='tools-library-type' _gui-text="Tools type:">
 <_option value='default tool'>default</_option>
+<_option value='plotter'>plotter</_option>
 <_option value='cylinder cutter'>cylinder</_option>
 <_option value='cone cutter'>cone</_option>
 <_option value='plasma cutter'>plasma</_option>
