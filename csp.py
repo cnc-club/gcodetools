@@ -4,6 +4,7 @@ import inkex
 import cubicsuperpath
 import simplestyle
 import cmath
+import bezmisc
 ################################################################################
 ###		CSP - cubic super path class
 ################################################################################
@@ -120,7 +121,7 @@ class CSP() :
 	
 	def reverse(self, i=None) :
 		if i==None : 
-			for i in range(len(self.items())) :
+			for i in range(len(self.items)) :
 				self.reverse(i)
 		else :
 			item = self.items[i]
@@ -302,13 +303,13 @@ class CSPsubpath() :
 		return self.points[0][1].near(self.points[-1][1])
 			
 	def length(self) :
-		return sum([self.len(i) for i in range(len(self.points()))])
-	
+		return sum([self.l(i) for i in range(len(self.points)-1)])
+
 	def cp_to_list(self,i) :
 		return [point.to_list() for point in self.points[i]]
 	
-	def l(self, i) :
-		return cspseglength( self.cp_to_list(i), self.cp_to_list(i+1), tolerance=0.001 )
+	def l(self, i, tolerance=0.001) :
+		return bezmisc.bezierlength( self.cp_to_list(i)[:2]+self.cp_to_list(i+1)[1:], tolerance)
 		
 	def t_at_l(self, i, l, self_l=None, tolerance=0.001) :
 		if self_l == None : self_l = self.l(i)
@@ -361,6 +362,29 @@ class CSPsubpath() :
 		res.points[:1] = []
 		res.points = self.taili(i,t) + res.points
 		return res
+
+	def headl(self,l): # Cuts subpath to fit defined l
+		i,t = self.at_l(l)
+		if i==len(self.points) and t==1 : return CSPSubpath([])
+		return self.head(i,t)
+
+	def taill(self,l,cut=False): # Cuts subpath to fit defined l
+		res = self.copy()
+		res.reverse()
+		i,t = res.at_l(l)
+		if i==len(res.points) and t==1 : return CSPSubpath([])
+		#warn(i,t)
+		res = res.head(i,t)
+		res.reverse()
+		return res
+		
+	def cut_head_l(self,l):
+		return self.taill(self.length()-l)
+	
+	def cut_tail_l(self,l):
+		return self.headl(self.length()-l)
+	
+
 				
 	def split(self,i,t=.5) :
 		sp1,sp2 = self.cp_to_list(i), self.cp_to_list(i+1)
