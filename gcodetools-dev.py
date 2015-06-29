@@ -84,6 +84,7 @@ import numpy
 import codecs
 import random
 import gettext
+import string
 _ = gettext.gettext
 from biarc import *
 from points import P
@@ -393,25 +394,25 @@ def point_inside_csp(p,csp, on_the_path = True) :
 		for i in range(1, len(subpath)) :
 			sp1, sp2 = subpath[i-1], subpath[i]
 			ax,ay,bx,by,cx,cy,dx,dy = csp_parameterize(sp1,sp2)
-		 	if  ax==0 and bx==0 and cx==0 and dx==x : 
-		 		#we've got a special case here
-		 		b = csp_true_bounds( [[sp1,sp2]])
-		 		if  b[1][1]<=y<=b[3][1] :
-		 			# points is on the path 
-			 		return on_the_path
-			 	else :
-			 		# we can skip this segment because it wont influence the answer.
-			 		pass	
-		 	else: 
-	 			for t in csp_line_intersection([x,y],[x,y+5],sp1,sp2) :
-	 				if t == 0 or t == 1 :
-	 					#we've got another special case here
-		 				x1,y1 = csp_at_t(sp1,sp2,t)
-		 				if y1==y : 
-		 					# the point is on the path 
-		 					return on_the_path
-	 					# if t == 0 we sould have considered this case previously. 
-	 					if t == 1 :
+			if  ax==0 and bx==0 and cx==0 and dx==x : 
+				#we've got a special case here
+				b = csp_true_bounds( [[sp1,sp2]])
+				if  b[1][1]<=y<=b[3][1] :
+					# points is on the path 
+					return on_the_path
+				else :
+					# we can skip this segment because it wont influence the answer.
+					pass	
+			else: 
+				for t in csp_line_intersection([x,y],[x,y+5],sp1,sp2) :
+					if t == 0 or t == 1 :
+						#we've got another special case here
+						x1,y1 = csp_at_t(sp1,sp2,t)
+						if y1==y : 
+							# the point is on the path 
+							return on_the_path
+						# if t == 0 we sould have considered this case previously. 
+						if t == 1 :
 							# we have to check the next segmant if it is on the same side of the ray
 							st_d = csp_normalized_slope(sp1,sp2,1)[0]
 							if st_d == 0 : st_d = csp_normalized_slope(sp1,sp2,0.99)[0]
@@ -420,20 +421,20 @@ def point_inside_csp(p,csp, on_the_path = True) :
 								if (i+j) % len(subpath) == 0  : continue # skip the closing segment 
 								sp11,sp22 = subpath[(i-1+j) % len(subpath)], subpath[(i+j) % len(subpath)]
 								ax1,ay1,bx1,by1,cx1,cy1,dx1,dy1 = csp_parameterize(sp1,sp2)
-		 						if  ax1==0 and bx1==0 and cx1==0 and dx1==x : continue # this segment parallel to the ray, so skip it 
+								if  ax1==0 and bx1==0 and cx1==0 and dx1==x : continue # this segment parallel to the ray, so skip it 
 								en_d = csp_normalized_slope(sp11,sp22,0)[0]
 								if en_d == 0 : en_d = csp_normalized_slope(sp11,sp22,0.01)[0]
 								if st_d*en_d <=0 : 
-			 						ray_intersections_count += 1
-			 						break 
-	 				else :	
-		 				x1,y1 = csp_at_t(sp1,sp2,t)
-		 				if y1==y : 
-		 					# the point is on the path 
-		 					return on_the_path
-		 				else :
-		 					if y1>y and 3*ax*t**2 + 2*bx*t + cx !=0 : # if it's 0 the path only touches the ray
-		 						ray_intersections_count += 1 	
+									ray_intersections_count += 1
+									break 
+					else :	
+						x1,y1 = csp_at_t(sp1,sp2,t)
+						if y1==y : 
+							# the point is on the path 
+							return on_the_path
+						else :
+							if y1>y and 3*ax*t**2 + 2*bx*t + cx !=0 : # if it's 0 the path only touches the ray
+								ray_intersections_count += 1 	
 	return ray_intersections_count%2 == 1 				
 
 def csp_close_all_subpaths(csp, tolerance = 0.000001):
@@ -751,7 +752,7 @@ def csp_get_t_at_curvature(sp1,sp2,c, sample_points = 16):
 				d = (f1x**2+f1y**2)**1.5
 				F1 = (
 						 (	(f1x*f3y-f3x*f1y)*d - (f1x*f2y-f2x*f1y)*3.*(f2x*f1x+f2y*f1y)*((f1x**2+f1y**2)**.5) )	/ 
-				 				((f1x**2+f1y**2)**3)
+								((f1x**2+f1y**2)**3)
 					 )
 				F = (f1x*f2y-f1y*f2x)/d - c
 				t -= F/F1
@@ -788,7 +789,7 @@ def csp_max_curvature(sp1,sp2):
 			F = (f1x*f2y-f1y*f2x)/d
 			F1 = 	(
 						 (	d*(f1x*f3y-f3x*f1y) - (f1x*f2y-f2x*f1y)*3.*(f2x*f1x+f2y*f1y)*pow(f1x**2+f1y**2,.5) )	/ 
-				 				(f1x**2+f1y**2)**3
+								(f1x**2+f1y**2)**3
 					)
 			i+=1	
 			if F1!=0:
@@ -827,7 +828,7 @@ def csp_curvature_at_t(sp1,sp2,t, depth = 3) :
 			return csp_curvature_at_t(sp1,sp2,t*1.004, depth-1)
 		return 1e100
 
-	 	
+		
 def csp_curvature_radius_at_t(sp1,sp2,t) :
 	c = csp_curvature_at_t(sp1,sp2,t)
 	if c == 0 : return 1e100 
@@ -1267,10 +1268,10 @@ def csp_seg_bound_to_csp_seg_bound_max_min_distance(sp1,sp2,sp3,sp4) :
 
 def csp_reverse(csp) :
 	for i in range(len(csp)) :
-	 	n = []
-	 	for j in csp[i] :
+		n = []
+		for j in csp[i] :
 			n = [  [j[2][:],j[1][:],j[0][:]]  ] + n
-	 	csp[i] = n[:]
+		csp[i] = n[:]
 	return csp			
 
 
@@ -1326,10 +1327,10 @@ def csp_concat_subpaths(*s):
 		if s1 == [] : return s2
 		if s2 == [] : return s1
 		if (s1[-1][1][0]-s2[0][1][0])**2 + (s1[-1][1][1]-s2[0][1][1])**2 > 0.00001 :
-	 		return s1[:-1]+[ [s1[-1][0],s1[-1][1],s1[-1][1]],  [s2[0][1],s2[0][1],s2[0][2]] ] + s2[1:]		
-	 	else :
-	 		return s1[:-1]+[ [s1[-1][0],s2[0][1],s2[0][2]] ] + s2[1:]		
-	 		
+			return s1[:-1]+[ [s1[-1][0],s1[-1][1],s1[-1][1]],  [s2[0][1],s2[0][1],s2[0][2]] ] + s2[1:]		
+		else :
+			return s1[:-1]+[ [s1[-1][0],s2[0][1],s2[0][2]] ] + s2[1:]		
+			
 	if len(s) == 0 : return []
 	if len(s) ==1 : return s[0]
 	result = s[0]
@@ -1599,12 +1600,12 @@ def get_text(node) :
 
 
 
-def draw_text(text,x,y, group = None, style = None, font_size = 10, gcodetools_tag = None, layer = None) :
+def draw_text(self, text,x,y, group = None, style = None, font_size = 10, gcodetools_tag = None, layer = None):
 	if layer != None :
 		x,y = gcodetools.transform([x,y], layer, True)
 	if style == None : 
 		style = "font-family:DejaVu Sans;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:DejaVu Sans;fill:#000000;fill-opacity:1;stroke:none;"
-	style += "font-size:%fpx;"%font_size
+	style += "font-size:%f;"%(self.utouu(str(font_size)+"px"))
 	attributes = {			'x':	str(x),
 							inkex.addNS("space","xml"):"preserve",
 							'y':	str(y),
@@ -1676,7 +1677,7 @@ def draw_pointer(x1, color = "#f00", figure = "cross", group = None, comment = "
 	if text != None	:
 		if font_size == None : font_size = 7
 		group = inkex.etree.SubElement( group, inkex.addNS('g','svg'), {"gcodetools": pointer_type+" group"} )		
-		draw_text(text,x[0]+size*2.2,x[1]-size, group = group, font_size = font_size) 
+		self.draw_text(text,x[0]+size*2.2,x[1]-size, group = group, font_size = font_size) 
 	if figure  == "line" :
 		s = ""
 		for i in range(1,len(x)/2) :
@@ -1702,7 +1703,7 @@ def draw_pointer(x1, color = "#f00", figure = "cross", group = None, comment = "
 
 
 def straight_segments_intersection(a,b, true_intersection = True) : # (True intersection means check ta and tb are in [0,1])
- 	ax,bx,cx,dx, ay,by,cy,dy = a[0][0],a[1][0],b[0][0],b[1][0], a[0][1],a[1][1],b[0][1],b[1][1] 
+	ax,bx,cx,dx, ay,by,cy,dy = a[0][0],a[1][0],b[0][0],b[1][0], a[0][1],a[1][1],b[0][1],b[1][1] 
 	if (ax==bx and ay==by) or (cx==dx and cy==dy) : return False, 0, 0
 	if (bx-ax)*(dy-cy)-(by-ay)*(dx-cx)==0 :	# Lines are parallel
 		ta = (ax-cx)/(dx-cx) if cx!=dx else (ay-cy)/(dy-cy)
@@ -1950,7 +1951,7 @@ class CSP() :
 		
 		if text!="" :
 			st = csp.items[0].points[0][1]
-			draw_text(text, st.x+10,st.y , group = group) 
+			self.draw_text(text, st.x+10,st.y , group = group) 
 		attr = {
 				"style":	style,
 				"d": 		cubicsuperpath.formatPath(csp.to_list()),
@@ -3589,6 +3590,35 @@ class Arangement_Genetic:
 ################################################################################
 
 class Gcodetools(inkex.Effect):
+	def draw_text(self, text,x,y, group = None, style = None, font_size = 10, gcodetools_tag = None, layer = None):
+		if layer != None :
+			x,y = gcodetools.transform([x,y], layer, True)
+		if style == None : 
+			style = "font-family:DejaVu Sans;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:DejaVu Sans;fill:#000000;fill-opacity:1;stroke:none;"
+		style += "font-size:%f;"%(self.utouu(str(font_size)+"px"))
+		attributes = {			'x':	str(x),
+								inkex.addNS("space","xml"):"preserve",
+								'y':	str(y),
+								'style' : style
+							}
+		if gcodetools_tag!=None : 
+			attributes["gcodetools"] = str(gcodetools_tag)
+	 
+		if group == None:
+			group = options.doc_root
+
+		t = inkex.etree.SubElement(	group, inkex.addNS('text','svg'), attributes)
+		text = str(text).split("\n")
+		for s in text :
+			span = inkex.etree.SubElement( t, inkex.addNS('tspan','svg'), 
+							{
+								'x':	str(x),
+								'y':	str(y),
+								inkex.addNS("role","sodipodi"):"line",
+							})					
+			y += font_size
+			span.text = str(s)
+		return t
 
 	def test_prof(self) :
 		
@@ -3636,11 +3666,16 @@ class Gcodetools(inkex.Effect):
 				postprocessor.process(self.options.postprocessor)
 			if self.options.postprocessor_custom != "" :
 				postprocessor.process(self.options.postprocessor_custom)
-
+		else:
+			postprocessor = Postprocessor(self.error)
+			postprocessor.gcode = gcode
+		
 		if not no_headers :
 			postprocessor.gcode = self.header + postprocessor.gcode + self.footer
 
-		f = open(self.options.directory+self.options.file, "w")	
+		f = open(self.options.directory+self.options.file, "w")
+
+		postprocessor.gcode = filter(lambda x: x in string.printable, postprocessor.gcode)
 		f.write(postprocessor.gcode)
 		f.close()							
 
@@ -4066,7 +4101,7 @@ class Gcodetools(inkex.Effect):
 				x,y = 400* (champions_count%10), 700*int(champions_count/10)
 				surface.move(x-b[0],y-b[1])
 				surface.draw(width=2, color=colors[0])
-				draw_text("Step = %s\nSquare = %f\nSquare improvement = %f\nTime from start = %f"%(i,(b[2]-b[0])*(b[3]-b[1]),improve,time.time()-start_time),x,y-50)
+				self.draw_text("Step = %s\nSquare = %f\nSquare improvement = %f\nTime from start = %f"%(i,(b[2]-b[0])*(b[3]-b[1]),improve,time.time()-start_time),x,y-50)
 				champions_count += 1
 				"""
 				spiece = population.population[0][1]
@@ -4106,7 +4141,10 @@ class Gcodetools(inkex.Effect):
 		
 		
 	def __init__(self):
+					
+
 		inkex.Effect.__init__(self)
+
 		self.OptionParser.add_option("-d", "--directory",					action="store", type="string", 		dest="directory", default="/home/",					help="Directory for gcode file")
 		self.OptionParser.add_option("-f", "--filename",					action="store", type="string", 		dest="file", default="-1.0",						help="File name")			
 		self.OptionParser.add_option("",   "--add-numeric-suffix-to-filename", action="store", type="inkbool",	dest="add_numeric_suffix_to_filename", default=True,help="Add numeric suffix to filename")			
@@ -4237,6 +4275,9 @@ class Gcodetools(inkex.Effect):
 		self.OptionParser.add_option("",   "--test-string",	action="store", type="string", 	dest="test_string", default='',	help="See inx.")		
 		self.OptionParser.add_option("",   "--test-profile",	action="store", type="inkbool", 	dest="test_profile", default=False,	help="See inx.")		
 
+		self.OptionParser.add_option("", "--op-x-offset", action="store", type="string", dest="op_x_offset", default="0.0", help='X coordinate for (0, 0) orientation point, such as "10mm", "3in", etc')
+		self.OptionParser.add_option("", "--op-y-offset", action="store", type="string", dest="op_y_offset", default="0.0", help='Y coordinate for (0, 0) orientation point, such as "10mm", "3in", etc')
+		
 		self.default_tool = {
 					"name": "Default tool",
 					"id": "default tool",
@@ -4799,6 +4840,7 @@ class Gcodetools(inkex.Effect):
 						selection_does_not_contain_paths_will_take_all
 						selection_is_empty_will_comupe_drawing
 						selection_contains_objects_that_are_not_paths
+						selection_contains_unsupported_objects
 						Continue
 						"""
 		errors = """
@@ -4941,7 +4983,13 @@ class Gcodetools(inkex.Effect):
 					else :
 						self.error(_("Warning! Found bad graffiti reference point in '%s' layer. Resulting Gcode could be corrupt!") % layer.get(inkex.addNS('label','inkscape')), "bad_orientation_points_in_some_layers") 
 				
-				elif i.tag == inkex.addNS('path','svg'):
+				elif (i.tag == inkex.addNS('path', 'svg') or
+					i.tag == inkex.addNS('circle', 'svg') or
+					i.tag == inkex.addNS('ellipse', 'svg') or
+					i.tag == inkex.addNS('line', 'svg') or
+					i.tag == inkex.addNS('polyline', 'svg') or
+					i.tag == inkex.addNS('polygon', 'svg') or
+					i.tag == inkex.addNS('rect', 'svg')):
 					if "gcodetools"  not in i.keys() or gct=="" :
 						self.paths[layer] = self.paths[layer] + [i] if layer in self.paths else [i]  
 						if i.get("id") in self.selected :
@@ -4958,19 +5006,32 @@ class Gcodetools(inkex.Effect):
 				elif i.tag == inkex.addNS("g",'svg'):
 					recursive_search(i,layer, (i.get("id") in self.selected) )
 
-				elif i.get("id") in self.selected :
-# xgettext:no-pango-format
-					self.error(_("This extension works with Paths and Dynamic Offsets and groups of them only! All other objects will be ignored!\nSolution 1: press Path->Object to path or Shift+Ctrl+C.\nSolution 2: Path->Dynamic offset or Ctrl+J.\nSolution 3: export all contours to PostScript level 2 (File->Save As->.ps) and File->Import this file."),"selection_contains_objects_that_are_not_paths")
-				
-					
+				elif i.get("id") in self.selected:
+					'''1) duplicates same message for each unsupportable object
+					2) does not print error while working on all available paths'''
+					self.error(_("This extension do not works with objects \"%s\"!\n" +
+					"Solution 1: press Path->Object to path or Shift+Ctrl+C.\n" +
+					"Solution 2: Path->Dynamic offset or Ctrl+J.\n" +
+					"Solution 3: export all contours to PostScript level 2 (File->Save As->.ps) and File->Import this file.")
+					% (i.tag), "selection_contains_unsupported_objects")
+
+
 		recursive_search(self.document.getroot(),self.document.getroot())
 
+		root = self.document.getroot()
+		
 		if len(self.layers) == 1 : 
 #			self.error(_("Document has no layers! Add at least one layer using layers panel (Ctrl+Shift+L)"),"Error")
 			layername = unicode("defaultLayer", "Latin 1")
 			attribs = {inkex.addNS('groupmode','inkscape'): 'layer', inkex.addNS('label','inkscape'): '%s' % layername}
-#			print_("adding default layer")
-		root = self.document.getroot() 
+
+			layer = inkex.etree.SubElement(self.document.getroot(), 'g')
+			layer.set(inkex.addNS('label', 'inkscape'), 'LAYER NAME')
+			layer.set(inkex.addNS('groupmode', 'inkscape'), 'layer')
+			self.error('layer generated!')
+			recursive_search(self.document.getroot(),self.document.getroot())
+			if len(self.layers) == 1:
+				self.error("unbeliveble")
 
 		if  root in self.selected_paths or root in self.paths :
 			self.error(_("Warning! There are some paths in the root of the document, but not in any layer! Using bottom-most layer for them."), "tools_warning" )
@@ -5083,8 +5144,96 @@ class Gcodetools(inkex.Effect):
 ###		Path to Gcode
 ###
 ################################################################################
-	def path_to_gcode(self) :
+	def path_to_gcode(self):
 		from functools import partial
+
+		def getDfrompath(path):
+			epsilon = 1.0001
+			if path.tag == inkex.addNS('rect', 'svg'):
+				x = float(path.get('x',0))
+				y = float(path.get('y',0))
+				w = float(path.get('width',0))
+				h = float(path.get('height',0))
+				rx = float(path.get('rx',0))
+				ry = float(path.get('ry',0))
+				
+				if rx>0 and ry==0:
+					ry = rx
+				if ry>0 and rx==0:
+					rx = ry
+				
+				if epsilon*rx>=w/2:
+					rx = w/2
+					lx = 0
+				else:
+					lx = w - 2*rx
+				
+				if epsilon*ry>=h/2:
+					ry = h/2
+					ly = 0
+				else:
+					ly = h - 2*ry
+				
+				
+				d = "M %f,%f " % (x+rx, y+h)
+				if lx:
+					d += "h %f " % (lx)
+				if rx:
+					d += "a %f,%f 0 0 0 %f,%f " % (rx, ry, rx, -ry)
+				if ly:
+					d += "v %f " % (-ly)
+				if rx:
+					d += "a %f,%f 0 0 0 %f,%f " % (rx, ry, -rx, -ry)
+				if lx:
+					d += "h %f " % (-lx)
+				if rx:
+					d += "a %f,%f 0 0 0 %f,%f " % (rx, ry, -rx, ry)
+				if ly:
+					d += "v %f " % (ly)
+				if rx:
+					d += "a %f,%f 0 0 0 %f,%f " % (rx, ry, rx, ry)
+				#d += "z"
+				print_("Rectangle D = " + d)
+				return d
+			elif (path.tag == inkex.addNS('ellipse', 'svg') or
+				path.tag == inkex.addNS('circle', 'svg')):
+				cx = float(path.get('cx',0))
+				cy = float(path.get('cy',0))
+				r = float(path.get('r',0))
+				if r == 0:
+					rx = float(path.get('rx',0))
+					ry = float(path.get('ry',0))
+				else:
+					rx = ry = r
+				d = "M %f,%f " % (cx+rx, cy)
+				d += "a %f,%f 0 0 0 %f,%f " % (rx, ry, -rx, -ry)
+				d += "%f,%f 0 0 0 %f,%f " % (rx, ry, -rx, ry)
+				d += "%f,%f 0 0 0 %f,%f " % (rx, ry, rx, ry)
+				d += "%f,%f 0 0 0 %f,%f " % (rx, ry, rx, -ry)
+				#d += "z"
+				print_("Circle/ellipse D = " + d)
+				return d
+			elif (path.tag == inkex.addNS('line', 'svg') or
+				path.tag == inkex.addNS('polyline', 'svg') or
+				path.tag == inkex.addNS('polygon', 'svg')):
+				#inkscape choose start point in svg:polygon as it want. but who cares
+				points = []
+				if path.get('points'):
+					#polyline or polygon
+					points = str(path.get('points')).replace(',',' ').split(None)
+				else:
+					#line
+					points = [path.get('x1',0), path.get('y1',0),path.get('x2',0), path.get('y2',0)]
+				d = "M %f,%f " % (float(points[0]), float(points[1]))
+				for i in range(1, len(points)/2):
+					d += "L %f,%f " % (float(points[2*i]), float(points[2*i+1]))
+				if path.tag == inkex.addNS('polygon', 'svg'):
+					d += "z"
+				return d
+			else:
+				#d from svg:path or other unknown object
+				return path.get('d')
+
 		def get_boundaries(points):
 			minx,miny,maxx,maxy=None,None,None,None
 			out=[[],[],[],[]]
@@ -5253,10 +5402,11 @@ class Gcodetools(inkex.Effect):
 					self.error("Bad depth function! Enter correct function at Path to Gcode tab!") 
 
 				for path in paths[layer] :
-					if "d" not in path.keys() : 
-						self.error(_("Warning: One or more paths do not have 'd' parameter, try to Ungroup (Ctrl+Shift+G) and Object to Path (Ctrl+Shift+C)!"),"selection_contains_objects_that_are_not_paths")
-						continue					
-					csp = cubicsuperpath.parsePath(path.get("d"))
+					d = getDfrompath(path)
+					if d == None:
+						 self.error(_("Warning: One or more paths do not have 'd' parameter, try to Ungroup (Ctrl+Shift+G) and Object to Path (Ctrl+Shift+C)!"),"selection_contains_objects_that_are_not_paths")
+						 continue					
+					csp = cubicsuperpath.parsePath(d)
 					csp = self.apply_transforms(path, csp)
 					id_ = path.get("id")
 					
@@ -5292,8 +5442,8 @@ class Gcodetools(inkex.Effect):
 						c = 1. - float(sum(colors[id_]))/255/3
 						curves += 	[
 										 [  
-										 	[id_, depth_func(c,zd,zs), comment],
-										 	[ self.parse_curve([subpath], layer) for subpath in csp  ]
+											[id_, depth_func(c,zd,zs), comment],
+											[ self.parse_curve([subpath], layer) for subpath in csp  ]
 										 ]
 									]
 #				for c in curves : 
@@ -5416,7 +5566,7 @@ class Gcodetools(inkex.Effect):
 #				print_("inside mo.group != 0 ",line,mo)
 				if mo.group(1) == "0": break
 				layerNum=int(mo.group(1))+maxGerberLayer
-        			layername = unicode("gerberlayer"+str(layerNum), "Latin 1")
+				layername = unicode("gerberlayer"+str(layerNum), "Latin 1")
 				attribs = {inkex.addNS('groupmode','inkscape'): 'layer', inkex.addNS('label','inkscape'): '%s' % layername}
 #				print_("new tool found: %s and layername=%s"%(mo.group(1),layername),self.document.getroot())
 				if layername not in layer_nodes:          
@@ -5442,10 +5592,10 @@ class Gcodetools(inkex.Effect):
 						if key not in keys: keys += [key]
 					for key in keys :
 						g = inkex.etree.SubElement(tools_group, inkex.addNS('g','svg'), {'gcodetools': "Gcodetools tool parameter"})
-						draw_text(key, 0, y, group = g, gcodetools_tag = "Gcodetools tool definition field name", font_size = 10 if key!='name' else 20)
+						self.draw_text(key, 0, y, group = g, gcodetools_tag = "Gcodetools tool definition field name", font_size = 10 if key!='name' else 20)
 						param = tool[key]
 						if type(param)==str and re.match("^\s*$",param) : param = "(None)"
-						draw_text(param, 150, y, group = g, gcodetools_tag = "Gcodetools tool definition field value", font_size = 10 if key!='name' else 20)
+						self.draw_text(param, 150, y, group = g, gcodetools_tag = "Gcodetools tool definition field value", font_size = 10 if key!='name' else 20)
 						v = str(param).split("\n")
 						y += 15*len(v) if key!='name' else 20*len(v)
 
@@ -5561,7 +5711,7 @@ class Gcodetools(inkex.Effect):
 						if  (bounds[2]-bounds[0])**2+(bounds[3]-bounds[1])**2 < self.options.area_find_artefacts_diameter**2:
 							if self.options.area_find_artefacts_action == "mark with an arrow" :
 								arrow =  cubicsuperpath.parsePath( 'm %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z' % (subpath[0][1][0],subpath[0][1][1]) )
- 								arrow = self.apply_transforms(path,arrow,True)
+								arrow = self.apply_transforms(path,arrow,True)
 								inkex.etree.SubElement(parent, inkex.addNS('path','svg'), 
 										{
 											'd': cubicsuperpath.formatPath(arrow),
@@ -5623,28 +5773,28 @@ class Gcodetools(inkex.Effect):
 						# Reverse path if needed.
 						if min_y!=float("-inf") :
 							# Move outline subpath to the begining of csp
-	 					 	subp = csp[min_i]
-	 					 	del csp[min_i]
-	 					 	j = min_j
-	 					 	# Split by the topmost point and join again
-	 					 	if min_t in [0,1]:
-	 					 		if min_t == 0: j=j-1
-		 					 	subp[-1][2], subp[0][0] = subp[-1][1], subp[0][1]
-	 					 		subp = [ [subp[j][1], subp[j][1], subp[j][2]] ] + subp[j+1:] + subp[:j] + [ [subp[j][0], subp[j][1], subp[j][1]] ]
+							subp = csp[min_i]
+							del csp[min_i]
+							j = min_j
+							# Split by the topmost point and join again
+							if min_t in [0,1]:
+								if min_t == 0: j=j-1
+								subp[-1][2], subp[0][0] = subp[-1][1], subp[0][1]
+								subp = [ [subp[j][1], subp[j][1], subp[j][2]] ] + subp[j+1:] + subp[:j] + [ [subp[j][0], subp[j][1], subp[j][1]] ]
 							else: 					 		
-		 						sp1,sp2,sp3 = csp_split(subp[j-1],subp[j],min_t)
-		 						subp[-1][2], subp[0][0] = subp[-1][1], subp[0][1]
+								sp1,sp2,sp3 = csp_split(subp[j-1],subp[j],min_t)
+								subp[-1][2], subp[0][0] = subp[-1][1], subp[0][1]
 								subp = [ [ sp2[1], sp2[1],sp2[2] ] ] + [sp3] + subp[j+1:] + subp[:j-1] + [sp1] + [[ sp2[0], sp2[1],sp2[1] ]] 					 	  
-	 					 	csp = [subp] + csp
+							csp = [subp] + csp
 							# reverse path if needed
 							if csp_subpath_ccw(csp[0]) :
 								for i in range(len(csp)):
-								 	n = []
-								 	for j in csp[i]:
-								 		n = [  [j[2][:],j[1][:],j[0][:]]  ] + n
-								 	csp[i] = n[:]
+									n = []
+									for j in csp[i]:
+										n = [  [j[2][:],j[1][:],j[0][:]]  ] + n
+									csp[i] = n[:]
 
-	 					 	
+							
 						d = cubicsuperpath.formatPath(csp)
 						print_(("original  d=",d))
 						d = re.sub(r'(?i)(m[^mz]+)',r'\1 Z ',d)
@@ -5996,7 +6146,7 @@ class Gcodetools(inkex.Effect):
 					
 
 
-					 					
+										
 
 
 ################################################################################
@@ -6535,7 +6685,7 @@ class Gcodetools(inkex.Effect):
 						#LT6a build nlLT[j] for each subpath - ends here
 						#for nnn in nlLT :
 							#print_("nlLT",nnn) #LT debug stuff
-				 		# Calculate offset points
+						# Calculate offset points
 						reflex=False
 						for j in xrange(len(nlLT)): #LT6b for each subpath
 							cspm=[] #Will be my output. List of csps.
@@ -6654,6 +6804,14 @@ class Gcodetools(inkex.Effect):
 			self.export_gcode(gcode)
 		else : 	self.error(_("No need to engrave sharp angles."),"warning")
 
+	def utouu(self, value):
+		'''
+		convert all units to user units using self.unittouu()
+		'''
+		if type(value) == list:
+			return map(self.utouu, value)
+		else:
+			return self.unittouu(str(value))
 
 ################################################################################
 ###
@@ -6687,7 +6845,7 @@ class Gcodetools(inkex.Effect):
 					'gcodetools': "Gcodetools graffiti reference point arrow"
 				})
 			
-			draw_text(axis,graffiti_reference_points_count*100+10,-10, group = g, gcodetools_tag = "Gcodetools graffiti reference point text")
+			self.draw_text(axis,graffiti_reference_points_count*100+10,-10, group = g, gcodetools_tag = "Gcodetools graffiti reference point text")
 
 		elif self.options.orientation_points_count == "in-out reference point" :
 			draw_pointer(self.view_center, group = self.current_layer, figure="arrow", size=10, fill="#0072a7", pointer_type = "In-out reference point", text = "In-out point")
@@ -6701,37 +6859,55 @@ class Gcodetools(inkex.Effect):
 			attr = {"gcodetools":"Gcodetools orientation group"}
 			if 	transform != [] :
 				attr["transform"] = transform 
-
+			attr['style'] = "opacity: 0.5"
 			orientation_group = inkex.etree.SubElement(layer, inkex.addNS('g','svg'), attr)
-			try : 
-				doc_height = inkex.unittouu(self.document.getroot().get('height'))
-			except :
-				doc_height = self.unittouu(self.document.getroot().get('height'))
 			if self.document.getroot().get('height') == "100%" :
 				doc_height = 1052.3622047
 				print_("Overruding height from 100 percents to %s" % doc_height)
-			if self.options.unit == "G21 (All units in mm)" : 
-				points = [[0.,0.,self.options.Zsurface],[100.,0.,self.options.Zdepth],[0.,100.,0.]]
-				orientation_scale = 3.5433070660
-				print_("orientation_scale < 0 ===> switching to mm units=%0.10f"%orientation_scale )
-			elif self.options.unit == "G20 (All units in inches)" :
-				points = [[0.,0.,self.options.Zsurface],[5.,0.,self.options.Zdepth],[0.,5.,0.]]
-				orientation_scale = 90
-				print_("orientation_scale < 0 ===> switching to inches units=%0.10f"%orientation_scale )
+			else:
+				try : 
+					doc_height = inkex.unittouu(self.document.getroot().get('height'))
+				except :
+					doc_height = self.unittouu(self.document.getroot().get('height'))
+
+			
+			if self.options.unit == "G21 (All units in mm)":
+				base_unit = "mm"
+			elif self.options.unit == "G20 (All units in inches)":
+				base_unit = "in"
+			else:
+				raise ValueError("Unknown units, require mm or in")
+
+			if base_unit == "mm":
+				points = [[0., 0., float(self.options.Zsurface)],
+					  [100., 0., float(self.options.Zdepth)],
+					  [0, 100., 0.]]
+			elif base_unit == "in":
+				points = [[0., 0., float(self.options.Zsurface)],
+					  [4., 0., float(self.options.Zdepth)],
+					  [0, 4., 0.]]
+
 			if self.options.orientation_points_count == "2" :
 				points = points[:2]
-			print_(("using orientation scale",orientation_scale,"i=",points))
+
+			arrow = [2.9375, -6.3438, 0.8125, 1.9063, 6.8437, -6.8437, 0.0, 0.0, 0.6875, 0.6875, -6.8438, 6.8438, 1.9063, 0.8125]
+			arrow = map(lambda x: str(x) + "px", arrow)
+			arrow = self.utouu(arrow)
+			arrow = ' '.join(map(str, arrow)) + ' z z'
 			for i in points :
-				si = [i[0]*orientation_scale, i[1]*orientation_scale]
+				si = [self.utouu(str(i[0])+base_unit) + self.utouu(self.options.op_x_offset),
+				      self.utouu(str(i[1])+base_unit) + self.utouu(self.options.op_y_offset)]
+				print_(si)
 				g = inkex.etree.SubElement(orientation_group, inkex.addNS('g','svg'), {'gcodetools': "Gcodetools orientation point (%s points)" % self.options.orientation_points_count})
+				d = 'm %s, %s ' % (si[0], -si[1]+doc_height) + arrow
 				inkex.etree.SubElement(	g, inkex.addNS('path','svg'), 
 					{
 						'style':	"stroke:none;fill:#000000;", 	
-						'd':'m %s,%s 2.9375,-6.343750000001 0.8125,1.90625 6.843748640396,-6.84374864039 0,0 0.6875,0.6875 -6.84375,6.84375 1.90625,0.812500000001 z z' % (si[0], -si[1]+doc_height),
+						'd': d,
 						'gcodetools': "Gcodetools orientation point arrow"
 					})
 
-				draw_text("(%s; %s; %s)" % (i[0],i[1],i[2]), (si[0]+10), (-si[1]-10+doc_height), group = g, gcodetools_tag = "Gcodetools orientation point text")
+				self.draw_text("(%s; %s; %s)" % (i[0],i[1],i[2]), (si[0]+self.utouu("9.5px")), (-si[1]-self.utouu("10px")+doc_height), group = g, gcodetools_tag = "Gcodetools orientation point text")
 
 		
 ################################################################################
@@ -6841,10 +7017,10 @@ G01 Z1 (going to cutting z)\n""",
 			if key not in keys: keys += [key]
 		for key in keys :
 			g = inkex.etree.SubElement(tools_group, inkex.addNS('g','svg'), {'gcodetools': "Gcodetools tool parameter"})
-			draw_text(key, 0, y, group = g, gcodetools_tag = "Gcodetools tool definition field name", font_size = 10 if key!='name' else 20)
+			self.draw_text(key, 0, y, group = g, gcodetools_tag = "Gcodetools tool definition field name", font_size = 10 if key!='name' else 20)
 			param = tool[key]
 			if type(param)==str and re.match("^\s*$",param) : param = "(None)"
-			draw_text(param, 150, y, group = g, gcodetools_tag = "Gcodetools tool definition field value", font_size = 10 if key!='name' else 20)
+			self.draw_text(param, 150, y, group = g, gcodetools_tag = "Gcodetools tool definition field value", font_size = 10 if key!='name' else 20)
 			v = str(param).split("\n")
 			y += 15*len(v) if key!='name' else 20*len(v)
 
@@ -7363,8 +7539,8 @@ G01 Z1 (going to cutting z)\n""",
 							self.graffiti_reference_points[layer] = self.graffiti_reference_points[self.layers[i]]
 							break
 					if reference_points == None :
-					 	self.error('There are no graffiti reference points for layer %s'%layer,"error")
-					 	
+						self.error('There are no graffiti reference points for layer %s'%layer,"error")
+						
 				# Transform reference points
 				for i in range(len(self.graffiti_reference_points[layer])):
 					self.graffiti_reference_points[layer][i][0] = self.transform(self.graffiti_reference_points[layer][i][0], layer)
@@ -7576,6 +7752,8 @@ G01 Z1 (going to cutting z)\n""",
 		else : 
 			debugger.add_debugger_to_class = lambda *x: None	
 
+		if self.options.active_tab[0] != '"':
+			self.options.active_tab = '"' + str(self.options.active_tab) + '"'
 		
 		if self.options.active_tab == '"help"' :
 			self.help()
