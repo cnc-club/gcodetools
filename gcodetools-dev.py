@@ -6667,7 +6667,7 @@ class Gcodetools(inkex.Effect):
 
 								for p in nlLT[-1]: #For last sub-path
 									if p[2]: 
-										print_([   [  [p[0]]*3, [p[0][0]+p[1][0]*de10,p[0][1]+p[1][1]*10]*3] ])
+										#print_([   [  [p[0]]*3, [p[0][0]+p[1][0]*de10,p[0][1]+p[1][1]*10]*3] ])
 										self.draw_csp(	
 													  [ [  [p[0]]*3, [[p[0][0]+p[1][0]*10,p[0][1]+p[1][1]*10]]*3   ] ],
 														layer, engraving_group, 
