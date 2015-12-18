@@ -6799,7 +6799,7 @@ class Gcodetools(inkex.Effect):
 			#LT3 for layers loop ends here
 		if gcode!='' :
 			self.header+="(Tool diameter should be at least "+str(2*wmax)+unit+ ")\n"
-			self.header+="(Depth, as a function of radius w, must be "+ self.tools[layer][0]['shape']+ ")\n"
+			#self.header+="(Depth, as a function of radius w, must be "+ self.tools[layer][0]['shape']+ ")\n"
 			self.header+="(Rapid feeds use safe Z="+ str(self.options.Zsafe) + unit + ")\n"
 			self.header+="(Material surface at Z="+ str(self.options.Zsurface) + unit + ")\n"
 			self.export_gcode(gcode)
