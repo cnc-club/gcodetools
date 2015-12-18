@@ -74,6 +74,7 @@ from simplepath import formatPath
 
 import os
 from math import *
+import math
 import bezmisc
 import re
 import copy
