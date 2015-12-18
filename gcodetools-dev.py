@@ -6811,7 +6811,10 @@ class Gcodetools(inkex.Effect):
 		if type(value) == list:
 			return map(self.utouu, value)
 		else:
-			return self.unittouu(str(value))
+			try:
+				return self.unittouu(str(value))
+			except:
+				return inkex.unittouu(str(value))
 
 ################################################################################
 ###
