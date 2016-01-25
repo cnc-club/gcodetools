@@ -74,6 +74,7 @@ from simplepath import formatPath
 
 import os
 from math import *
+import math
 import bezmisc
 import re
 import copy
@@ -6667,7 +6668,7 @@ class Gcodetools(inkex.Effect):
 
 								for p in nlLT[-1]: #For last sub-path
 									if p[2]: 
-										print_([   [  [p[0]]*3, [p[0][0]+p[1][0]*de10,p[0][1]+p[1][1]*10]*3] ])
+										#print_([   [  [p[0]]*3, [p[0][0]+p[1][0]*de10,p[0][1]+p[1][1]*10]*3] ])
 										self.draw_csp(	
 													  [ [  [p[0]]*3, [[p[0][0]+p[1][0]*10,p[0][1]+p[1][1]*10]]*3   ] ],
 														layer, engraving_group, 
@@ -6798,7 +6799,7 @@ class Gcodetools(inkex.Effect):
 			#LT3 for layers loop ends here
 		if gcode!='' :
 			self.header+="(Tool diameter should be at least "+str(2*wmax)+unit+ ")\n"
-			self.header+="(Depth, as a function of radius w, must be "+ self.tools[layer][0]['shape']+ ")\n"
+			#self.header+="(Depth, as a function of radius w, must be "+ self.tools[layer][0]['shape']+ ")\n"
 			self.header+="(Rapid feeds use safe Z="+ str(self.options.Zsafe) + unit + ")\n"
 			self.header+="(Material surface at Z="+ str(self.options.Zsurface) + unit + ")\n"
 			self.export_gcode(gcode)
@@ -6811,7 +6812,10 @@ class Gcodetools(inkex.Effect):
 		if type(value) == list:
 			return map(self.utouu, value)
 		else:
-			return self.unittouu(str(value))
+			try:
+				return self.unittouu(str(value))
+			except:
+				return inkex.unittouu(str(value))
 
 ################################################################################
 ###

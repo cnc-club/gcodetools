@@ -325,8 +325,6 @@ packets will be needed)">false</param>
 Inside corner:</_param>
 		<param name="box-in-len-inside" type="string" _gui-text="In-going length formula (if &lt;0 will add some path):">-(boxa/tan(boxb)/sin(a) - boxa/sin(boxb)/tan(boxc))</param>
 		<param name="box-out-len-inside" type="string" _gui-text="Out-going length formula (if &lt;0 will add some path):">-boxa/tan(boxb)/sin(a)</param>
-		<_param name="help" type="description" xml:space="preserve">
-		</_param>
 		
 		<param name='box-prepare-a' type="string" _gui-text='Paramater boxa:'>50*3.14159265/180</param>
 		<param name='box-prepare-b' type="string" _gui-text='Paramater boxb:'>50*3.14159265/180</param>
