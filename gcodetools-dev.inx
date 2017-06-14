@@ -410,7 +410,7 @@ To get more info visit developers page at http://www.cnc-club.ru/gcodetools</_pa
 
 <!-- Gcodetools: footer block -->
 	</param>	
-    <effect>
+    <effect needs-live-preview="false">
 <!-- Gcodetools: submenu -->
 <!-- Gcodetools: /submenu -->
 		<object-type>path</object-type>
