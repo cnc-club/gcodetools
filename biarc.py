@@ -617,19 +617,20 @@ class Biarc:
 		i = 0
 		while i<len(self.items) :
 			j = 0
-			closed = self.items[i][0].st.near(self.items[i][-1].end)
-			while j<len(self.items[i]) :
-				item = self.items[i][j]
-				if ( item.__class__==Line and item.l<1e-3 or
-					 item.__class__==Arc and abs(item.r)<1e-3 or
-					 (item.st-item.end).l2()<1e-5   )  :
-					 		if not closed and j==0 : 
-					 			self.items[i][j+1].rebuild(st=self.items[i][j].st)
-					 		else: 
-					 			self.items[i][j-1].rebuild(end=self.items[i][j].end)
-							self.items[i][j:j+1] = []
-							continue
-				j += 1		
+			if self.items[i]:
+				closed = self.items[i][0].st.near(self.items[i][-1].end)
+				while j<len(self.items[i]) :
+					item = self.items[i][j]
+					if ( item.__class__==Line and item.l<1e-3 or
+						 item.__class__==Arc and abs(item.r)<1e-3 or
+						 (item.st-item.end).l2()<1e-5   )  :
+								if not closed and j==0 :
+									self.items[i][j+1].rebuild(st=self.items[i][j].st)
+								else:
+									self.items[i][j-1].rebuild(end=self.items[i][j].end)
+								self.items[i][j:j+1] = []
+								continue
+					j += 1
 			if self.items[i]==[] :
 				self.items[i:i+1] = []
 				continue
