@@ -4439,15 +4439,10 @@ class Gcodetools(inkex.Effect):
 
 
 		def remove_duplicates(points):
-			i=0		
-			out=[]
+			s = set([])
 			for p in points:
-				for j in xrange(i,len(points)):
-					if p==points[j]: points[j]=[None,None]	
-				if p!=[None,None]: out+=[p]
-			i+=1
-			return(out)
-	
+				s.add(p)
+			return list(s)
 	
 		def get_way_len(points):
 			l=0
